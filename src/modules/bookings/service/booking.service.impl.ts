@@ -1,6 +1,13 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿import {
+  Inject,
+  Injectable,
+  Scope,
+} from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { DataSource, EntityManager } from 'typeorm';
+import type { Request } from 'express';
 
-import { BadRequestException } from 'src/common/exceptions/bad-request.exception';
+import { BadRequestException as AppBadRequestException } from 'src/common/exceptions/bad-request.exception';
 import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 
 import { BookingStatus } from 'src/common/constants/booking-status.enum';
@@ -31,12 +38,15 @@ import { PetRepository } from 'src/modules/pets/repositories/pet.repository';
 import { UserRepository } from 'src/modules/users/repositories/user.repository';
 import { OrderRepository } from 'src/modules/orders/repositories/order.repository';
 
+import { User } from 'src/modules/users/entities/user.entity';
+import { Pet } from 'src/modules/pets/entities/pet.entity';
 import { Order } from 'src/modules/orders/entities/order.entity';
 import { Payment } from 'src/modules/payments/entities/payment.entity';
 
+import { SecurityUtil } from 'src/modules/auth/security/security.util';
 import { BookingService } from 'src/modules/bookings/service/booking.service';
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class BookingServiceImpl implements BookingService {
   constructor(
     private readonly bookingRepository: BookingRepository,
@@ -46,242 +56,232 @@ export class BookingServiceImpl implements BookingService {
     private readonly userRepository: UserRepository,
     private readonly bookingMapper: BookingMapper,
     private readonly orderRepository: OrderRepository,
+    private readonly dataSource: DataSource,
+    @Inject(REQUEST)
+    private readonly request: Request,
   ) {}
 
   async createBooking(
     req: ReqCreateBookingDto,
   ): Promise<BookingDto> {
-    if (req.startTime >= req.endTime) {
-      throw new BadRequestException(
-        '[BOOKING] Start time must be before end time',
-      );
-    }
+    return this.dataSource.transaction(
+      async (manager: EntityManager) => {
+        if (req.startTime > req.endTime) {
+          throw new AppBadRequestException(
+            '[BOOKING] Start time must be before end time',
+          );
+        }
 
-    const now = new Date();
+        const startDateTime =
+          this.combineDateAndTime(
+            req.bookingDate,
+            req.startTime,
+          );
 
-    const bookingDate = new Date(req.bookingDate);
+        if (startDateTime < new Date()) {
+          throw new AppBadRequestException(
+            '[BOOKING] Booking start time cannot be in the past',
+          );
+        }
 
-    const [startHour, startMinute, startSecond = '0'] =
-      req.startTime.split(':');
+        const user =
+          await manager
+            .getRepository(User)
+            .findOne({
+              where: {
+                id: req.userId,
+              },
+            });
 
-    bookingDate.setHours(
-      Number(startHour),
-      Number(startMinute),
-      Number(startSecond),
-      0,
-    );
+        if (!user) {
+          throw new NotFoundException(
+            `[BOOKING] User not found with ID: ${req.userId}`,
+          );
+        }
 
-    if (bookingDate < now) {
-      throw new BadRequestException(
-        '[BOOKING] Booking start time cannot be in the past',
-      );
-    }
+        const services: PetService[] = [];
 
-    const user =
-      await this.userRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: req.userId,
-          },
-        });
+        for (const serviceId of req.serviceIds) {
+          const service =
+            await manager
+              .getRepository(PetService)
+              .findOne({
+                where: {
+                  id: serviceId,
+                },
+              });
 
-    if (!user) {
-      throw new NotFoundException(
-        `[BOOKING] User not found with ID: ${req.userId}`,
-      );
-    }
+          if (!service) {
+            throw new NotFoundException(
+              `[BOOKING] Service not found with ID: ${serviceId}`,
+            );
+          }
 
-    const services: PetService[] = [];
+          if (
+            service.deleteFlag === true ||
+            service.activeFlag === false
+          ) {
+            throw new AppBadRequestException(
+              `[BOOKING] Service is disabled: ${service.name}`,
+            );
+          }
 
-    for (const serviceId of req.serviceIds) {
-      const service =
-        await this.petServiceRepository
-          .getRepository()
-          .findOne({
-            where: {
-              id: serviceId,
-            },
-          });
+          services.push(service);
+        }
 
-      if (!service) {
-        throw new NotFoundException(
-          `[BOOKING] Service not found with ID: ${serviceId}`,
+        let totalPrice = 0;
+
+        for (const service of services) {
+          totalPrice += Number(service.basePrice);
+        }
+
+        const totalDurationMin =
+          services.reduce(
+            (total, service) =>
+              total + Number(service.durationMin),
+            0,
+          );
+
+        const availableMinutes =
+          this.calculateDurationMinutes(
+            req.startTime,
+            req.endTime,
+          );
+
+        if (totalDurationMin > availableMinutes) {
+          throw new AppBadRequestException(
+            `[BOOKING] Total service duration (${totalDurationMin} min) exceeds available time window (${availableMinutes} min)`,
+          );
+        }
+
+        const existingBookings =
+          await manager
+            .getRepository(Booking)
+            .createQueryBuilder('booking')
+            .where(
+              'booking.bookingDate = :bookingDate',
+              {
+                bookingDate: req.bookingDate,
+              },
+            )
+            .andWhere(
+              'booking.status != :status',
+              {
+                status: BookingStatus.CANCELLED,
+              },
+            )
+            .getMany();
+
+        for (const existing of existingBookings) {
+          if (
+            !existing.startTime ||
+            !existing.endTime
+          ) {
+            continue;
+          }
+
+          const startInside =
+            req.startTime >= existing.startTime &&
+            req.startTime <= existing.endTime;
+
+          const endInside =
+            req.endTime >= existing.startTime &&
+            req.endTime <= existing.endTime;
+
+          const fullyContains =
+            req.startTime < existing.startTime &&
+            req.endTime > existing.endTime;
+
+          if (
+            startInside ||
+            endInside ||
+            fullyContains
+          ) {
+            throw new AppBadRequestException(
+              `[BOOKING] Requested time ${req.startTime}-${req.endTime} conflicts with existing booking ${existing.startTime}-${existing.endTime}`,
+            );
+          }
+        }
+
+        const booking = new Booking();
+
+        booking.user = user;
+        booking.bookingDate = req.bookingDate;
+        booking.startTime = req.startTime;
+        booking.endTime = req.endTime;
+        booking.actualPrice = totalPrice;
+        booking.status = BookingStatus.PENDING;
+
+        if (req.petId != null) {
+          const pet =
+            await manager
+              .getRepository(Pet)
+              .findOne({
+                where: {
+                  id: req.petId,
+                },
+              });
+
+          if (!pet) {
+            throw new NotFoundException(
+              `[BOOKING] Pet not found with ID: ${req.petId}`,
+            );
+          }
+
+          booking.pet = pet;
+        }
+
+        const savedBooking =
+          await manager
+            .getRepository(Booking)
+            .save(booking);
+
+        const bookingDetails: BookingDetail[] = [];
+
+        for (const service of services) {
+          const detail = new BookingDetail();
+
+          detail.booking = savedBooking;
+          detail.service = service;
+
+          bookingDetails.push(detail);
+        }
+
+        await manager
+          .getRepository(BookingDetail)
+          .save(bookingDetails);
+
+        const payment = new Payment();
+
+        payment.status = PaymentStatus.PENDING;
+        payment.amount = totalPrice;
+
+        const order = new Order();
+
+        order.user = user;
+        order.totalAmount = totalPrice;
+        order.status = OrderStatus.PENDING;
+        order.orderType = OrderType.BOOKING;
+        order.payment = payment;
+        order.orderDetails = [];
+
+        const savedOrder =
+          await manager
+            .getRepository(Order)
+            .save(order);
+
+        savedBooking.order = savedOrder;
+
+        await manager
+          .getRepository(Booking)
+          .save(savedBooking);
+
+        savedBooking.bookingDetails = bookingDetails;
+
+        return this.bookingMapper.toDto(
+          savedBooking,
         );
-      }
-
-      if (
-        service.deleteFlag === true ||
-        service.activeFlag === false
-      ) {
-        throw new BadRequestException(
-          `[BOOKING] Service is disabled: ${service.name}`,
-        );
-      }
-
-      services.push(service);
-    }
-
-    let totalPrice = 0;
-
-    for (const service of services) {
-      totalPrice += Number(
-        service.basePrice ?? 0,
-      );
-    }
-
-    const totalDurationMin =
-      services.reduce(
-        (total, service) =>
-          total +
-          Number(service.durationMin ?? 0),
-        0,
-      );
-
-    const availableMinutes =
-      this.calculateDurationMinutes(
-        req.startTime,
-        req.endTime,
-      );
-
-    if (
-      totalDurationMin >
-      availableMinutes
-    ) {
-      throw new BadRequestException(
-        `[BOOKING] Total service duration (${totalDurationMin} min) exceeds available time window (${availableMinutes} min)`,
-      );
-    }
-
-    const existingBookings =
-      await this.bookingRepository
-        .findByBookingDateAndStatusNot(
-          req.bookingDate,
-          BookingStatus.CANCELLED,
-        );
-
-    for (const existing of existingBookings) {
-      if (
-        !existing.startTime ||
-        !existing.endTime
-      ) {
-        continue;
-      }
-
-      const startInside =
-        req.startTime >= existing.startTime &&
-        req.startTime <= existing.endTime;
-
-      const endInside =
-        req.endTime >= existing.startTime &&
-        req.endTime <= existing.endTime;
-
-      const fullyContains =
-        req.startTime < existing.startTime &&
-        req.endTime > existing.endTime;
-
-      if (
-        startInside ||
-        endInside ||
-        fullyContains
-      ) {
-        throw new BadRequestException(
-          `[BOOKING] Requested time ${req.startTime}-${req.endTime} conflicts with existing booking ${existing.startTime}-${existing.endTime}`,
-        );
-      }
-    }
-
-    const booking = new Booking();
-
-    booking.user = user;
-    booking.bookingDate =
-      req.bookingDate;
-    booking.startTime =
-      req.startTime;
-    booking.endTime =
-      req.endTime;
-    booking.actualPrice =
-      totalPrice;
-    booking.status =
-      BookingStatus.PENDING;
-
-    if (req.petId != null) {
-      const pet =
-        await this.petRepository
-          .getRepository()
-          .findOne({
-            where: {
-              id: req.petId,
-            },
-          });
-
-      if (!pet) {
-        throw new NotFoundException(
-          `[BOOKING] Pet not found with ID: ${req.petId}`,
-        );
-      }
-
-      booking.pet = pet;
-    }
-
-    const savedBooking =
-      await this.bookingRepository
-        .getRepository()
-        .save(booking);
-
-    const bookingDetails: BookingDetail[] =
-      [];
-
-    for (const service of services) {
-      const detail =
-        new BookingDetail();
-
-      detail.booking = savedBooking;
-      detail.service = service;
-
-      bookingDetails.push(detail);
-    }
-
-    await this.bookingDetailRepository
-      .getRepository()
-      .save(bookingDetails);
-
-    const payment = new Payment();
-
-    payment.status =
-      PaymentStatus.PENDING;
-    payment.amount =
-      totalPrice;
-
-    const order = new Order();
-
-    order.user = user;
-    order.totalAmount =
-      totalPrice;
-    order.status =
-      OrderStatus.PENDING;
-    order.orderType =
-      OrderType.BOOKING;
-    order.payment = payment;
-    order.orderDetails = [];
-
-    const savedOrder =
-      await this.orderRepository
-        .getRepository()
-        .save(order);
-
-    savedBooking.order =
-      savedOrder;
-
-    await this.bookingRepository
-      .getRepository()
-      .save(savedBooking);
-
-    savedBooking.bookingDetails =
-      bookingDetails;
-
-    return this.bookingMapper.toDto(
-      savedBooking,
+      },
     );
   }
 
@@ -310,9 +310,7 @@ export class BookingServiceImpl implements BookingService {
       );
     }
 
-    return this.bookingMapper.toDto(
-      booking,
-    );
+    return this.bookingMapper.toDto(booking);
   }
 
   async getBookedTimeSlots(
@@ -331,12 +329,18 @@ export class BookingServiceImpl implements BookingService {
           booking.startTime != null &&
           booking.endTime != null,
       )
-      .map((booking) => ({
-        startTime:
-          booking.startTime as string,
-        endTime:
-          booking.endTime as string,
-      }))
+      .map((booking) => {
+        const timeSlot =
+          new BookingTimeSlotDto();
+
+        timeSlot.startTime =
+          booking.startTime as string;
+
+        timeSlot.endTime =
+          booking.endTime as string;
+
+        return timeSlot;
+      })
       .sort((a, b) =>
         a.startTime.localeCompare(
           b.startTime,
@@ -348,8 +352,29 @@ export class BookingServiceImpl implements BookingService {
     page: number,
     pageSize: number,
   ): Promise<ResultPaginationDto> {
-    throw new BadRequestException(
-      '[BOOKING] Current user context is required',
+    const currentUser =
+      SecurityUtil.getCurrentUserLogin(
+        this.request,
+      );
+
+    if (!currentUser) {
+      throw new AppBadRequestException(
+        '[BOOKING] Current user not authenticated',
+      );
+    }
+
+    const [bookings, total] =
+      await this.bookingRepository.findByUserId(
+        currentUser,
+        page,
+        pageSize,
+      );
+
+    return this.buildPaginationResponse(
+      this.bookingMapper.toDtos(bookings),
+      page,
+      pageSize,
+      total,
     );
   }
 
@@ -363,34 +388,27 @@ export class BookingServiceImpl implements BookingService {
     try {
       bookingStatus =
         BookingStatus[
-          status
-            .toUpperCase()
-            .trim() as keyof typeof BookingStatus
+          status.toUpperCase() as keyof typeof BookingStatus
         ];
-    } catch {
-      throw new BadRequestException(
-        `[BOOKING] Invalid status: ${status}`,
-      );
-    }
 
-    if (!bookingStatus) {
-      throw new BadRequestException(
+      if (!bookingStatus) {
+        throw new Error();
+      }
+    } catch {
+      throw new AppBadRequestException(
         `[BOOKING] Invalid status: ${status}`,
       );
     }
 
     const [bookings, total] =
-      await this.bookingRepository
-        .findByStatus(
-          bookingStatus,
-          page,
-          pageSize,
-        );
+      await this.bookingRepository.findByStatus(
+        bookingStatus,
+        page,
+        pageSize,
+      );
 
     return this.buildPaginationResponse(
-      this.bookingMapper.toDtos(
-        bookings,
-      ),
+      this.bookingMapper.toDtos(bookings),
       page,
       pageSize,
       total,
@@ -398,51 +416,21 @@ export class BookingServiceImpl implements BookingService {
   }
 
   async getAllBookings(
-    filter: string[],
     page: number,
     pageSize: number,
   ): Promise<ResultPaginationDto> {
     const queryBuilder =
       this.bookingRepository
         .getRepository()
-        .createQueryBuilder('booking');
-
-    if (filter?.length) {
-      for (const expression of filter) {
-        const parsed =
-          this.parseFilter(expression);
-
-        if (!parsed) {
-          continue;
-        }
-
-        queryBuilder.andWhere(
-          `booking.${parsed.field} ${parsed.operator} :${parsed.parameter}`,
-          {
-            [parsed.parameter]:
-              parsed.value,
-          },
-        );
-      }
-    }
-
-    queryBuilder
-      .andWhere(
-        'booking.deleteFlag = :deleteFlag',
-        {
-          deleteFlag: false,
-        },
-      )
-      .skip((page - 1) * pageSize)
-      .take(pageSize);
+        .createQueryBuilder('booking')
+        .skip((page - 1) * pageSize)
+        .take(pageSize);
 
     const [bookings, total] =
       await queryBuilder.getManyAndCount();
 
     return this.buildPaginationResponse(
-      this.bookingMapper.toDtos(
-        bookings,
-      ),
+      this.bookingMapper.toDtos(bookings),
       page,
       pageSize,
       total,
@@ -452,56 +440,60 @@ export class BookingServiceImpl implements BookingService {
   async cancelBooking(
     id: number,
   ): Promise<BookingDto> {
-    const booking =
-      await this.bookingRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id,
-          },
-          relations: [
-            'user',
-            'pet',
-            'order',
-            'bookingDetails',
-            'bookingDetails.service',
-          ],
-        });
+    return this.dataSource.transaction(
+      async (manager: EntityManager) => {
+        const booking =
+          await manager
+            .getRepository(Booking)
+            .findOne({
+              where: {
+                id,
+              },
+              relations: [
+                'user',
+                'pet',
+                'order',
+                'bookingDetails',
+                'bookingDetails.service',
+              ],
+            });
 
-    if (!booking) {
-      throw new NotFoundException(
-        `[BOOKING] Booking not found with ID: ${id}`,
-      );
-    }
+        if (!booking) {
+          throw new NotFoundException(
+            `[BOOKING] Booking not found with ID: ${id}`,
+          );
+        }
 
-    if (
-      booking.status ===
-      BookingStatus.CANCELLED
-    ) {
-      throw new BadRequestException(
-        '[BOOKING] Booking is already cancelled',
-      );
-    }
+        if (
+          booking.status ===
+          BookingStatus.CANCELLED
+        ) {
+          throw new AppBadRequestException(
+            '[BOOKING] Booking is already cancelled',
+          );
+        }
 
-    if (
-      booking.status ===
-      BookingStatus.COMPLETED
-    ) {
-      throw new BadRequestException(
-        '[BOOKING] Cannot cancel completed booking',
-      );
-    }
+        if (
+          booking.status ===
+          BookingStatus.COMPLETED
+        ) {
+          throw new AppBadRequestException(
+            '[BOOKING] Cannot cancel completed booking',
+          );
+        }
 
-    booking.status =
-      BookingStatus.CANCELLED;
+        booking.status =
+          BookingStatus.CANCELLED;
 
-    const updatedBooking =
-      await this.bookingRepository
-        .getRepository()
-        .save(booking);
+        const updatedBooking =
+          await manager
+            .getRepository(Booking)
+            .save(booking);
 
-    return this.bookingMapper.toDto(
-      updatedBooking,
+        return this.bookingMapper.toDto(
+          updatedBooking,
+        );
+      },
     );
   }
 
@@ -509,132 +501,124 @@ export class BookingServiceImpl implements BookingService {
     id: number,
     status: string,
   ): Promise<BookingDto> {
-    const booking =
-      await this.bookingRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id,
-          },
-          relations: [
-            'user',
-            'pet',
-            'order',
-            'bookingDetails',
-            'bookingDetails.service',
-          ],
-        });
+    return this.dataSource.transaction(
+      async (manager: EntityManager) => {
+        const booking =
+          await manager
+            .getRepository(Booking)
+            .findOne({
+              where: {
+                id,
+              },
+              relations: [
+                'user',
+                'pet',
+                'order',
+                'bookingDetails',
+                'bookingDetails.service',
+              ],
+            });
 
-    if (!booking) {
-      throw new NotFoundException(
-        `[BOOKING] Booking not found with ID: ${id}`,
-      );
-    }
+        if (!booking) {
+          throw new NotFoundException(
+            `[BOOKING] Booking not found with ID: ${id}`,
+          );
+        }
 
-    const normalizedStatus =
-      status.toUpperCase().trim();
+        let newStatus: BookingStatus;
 
-    const newStatus =
-      Object.values(
-        BookingStatus,
-      ).find(
-        (value) =>
-          value === normalizedStatus,
-      );
+        try {
+          newStatus =
+            BookingStatus[
+              status.toUpperCase() as keyof typeof BookingStatus
+            ];
 
-    if (!newStatus) {
-      throw new BadRequestException(
-        `[BOOKING] Invalid status: ${status}`,
-      );
-    }
+          if (!newStatus) {
+            throw new Error();
+          }
+        } catch {
+          throw new AppBadRequestException(
+            `[BOOKING] Invalid status: ${status}`,
+          );
+        }
 
-    if (
-      newStatus ===
-      BookingStatus.CONFIRMED
-    ) {
-      this.validateBookingForConfirmation(
-        booking,
-      );
-    }
+        if (
+          newStatus ===
+          BookingStatus.CONFIRMED
+        ) {
+          await this.validateBookingForConfirmation(
+            booking,
+            manager,
+          );
+        }
 
-    booking.status = newStatus;
+        booking.status = newStatus;
 
-    const updatedBooking =
-      await this.bookingRepository
-        .getRepository()
-        .save(booking);
+        const updatedBooking =
+          await manager
+            .getRepository(Booking)
+            .save(booking);
 
-    return this.bookingMapper.toDto(
-      updatedBooking,
+        return this.bookingMapper.toDto(
+          updatedBooking,
+        );
+      },
     );
   }
 
-  private validateBookingForConfirmation(
+  private async validateBookingForConfirmation(
     booking: Booking,
-  ): void {
+    manager: EntityManager,
+  ): Promise<void> {
     if (
       !booking.startTime ||
       !booking.endTime
     ) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         '[BOOKING] Start time and end time are required',
       );
     }
 
     if (
-      booking.startTime >=
+      booking.startTime >
       booking.endTime
     ) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         '[BOOKING] Start time must be before end time',
       );
     }
 
     if (!booking.bookingDate) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         '[BOOKING] Booking date is required',
       );
     }
 
     const startDateTime =
-      new Date(booking.bookingDate);
+      this.combineDateAndTime(
+        booking.bookingDate,
+        booking.startTime,
+      );
 
-    const [
-      hour,
-      minute,
-      second = '0',
-    ] = booking.startTime.split(':');
-
-    startDateTime.setHours(
-      Number(hour),
-      Number(minute),
-      Number(second),
-      0,
-    );
-
-    if (
-      startDateTime <
-      new Date()
-    ) {
-      throw new BadRequestException(
+    if (startDateTime < new Date()) {
+      throw new AppBadRequestException(
         '[BOOKING] Booking start time cannot be in the past',
       );
     }
 
-    const details =
-      booking.bookingDetails ?? [];
-
-    if (details.length === 0) {
-      throw new BadRequestException(
+    if (
+      !booking.bookingDetails ||
+      booking.bookingDetails.length === 0
+    ) {
+      throw new AppBadRequestException(
         '[BOOKING] Booking must contain at least one service',
       );
     }
 
     const services: PetService[] = [];
 
-    for (const detail of details) {
-      const service =
-        detail.service;
+    for (const detail of booking.bookingDetails) {
+      const service = detail.service;
 
       if (!service) {
         throw new NotFoundException(
@@ -646,7 +630,7 @@ export class BookingServiceImpl implements BookingService {
         service.deleteFlag === true ||
         service.activeFlag === false
       ) {
-        throw new BadRequestException(
+        throw new AppBadRequestException(
           `[BOOKING] Service is disabled: ${service.name}`,
         );
       }
@@ -657,8 +641,7 @@ export class BookingServiceImpl implements BookingService {
     const totalDurationMin =
       services.reduce(
         (total, service) =>
-          total +
-          Number(service.durationMin ?? 0),
+          total + Number(service.durationMin),
         0,
       );
 
@@ -668,13 +651,71 @@ export class BookingServiceImpl implements BookingService {
         booking.endTime,
       );
 
-    if (
-      totalDurationMin >
-      availableMinutes
-    ) {
-      throw new BadRequestException(
+    if (totalDurationMin > availableMinutes) {
+      throw new AppBadRequestException(
         `[BOOKING] Total service duration (${totalDurationMin} min) exceeds available time window (${availableMinutes} min)`,
       );
+    }
+
+    const existingBookings =
+      await manager
+        .getRepository(Booking)
+        .createQueryBuilder('booking')
+        .where(
+          'booking.bookingDate = :bookingDate',
+          {
+            bookingDate:
+              booking.bookingDate,
+          },
+        )
+        .andWhere(
+          'booking.status != :status',
+          {
+            status:
+              BookingStatus.CANCELLED,
+          },
+        )
+        .getMany();
+
+    for (const existing of existingBookings) {
+      if (existing.id === booking.id) {
+        continue;
+      }
+
+      if (
+        !existing.startTime ||
+        !existing.endTime
+      ) {
+        continue;
+      }
+
+      const startInside =
+        booking.startTime >=
+          existing.startTime &&
+        booking.startTime <=
+          existing.endTime;
+
+      const endInside =
+        booking.endTime >=
+          existing.startTime &&
+        booking.endTime <=
+          existing.endTime;
+
+      const fullyContains =
+        booking.startTime <
+          existing.startTime &&
+        booking.endTime >
+          existing.endTime;
+
+      if (
+        startInside ||
+        endInside ||
+        fullyContains
+      ) {
+        throw new AppBadRequestException(
+          `[BOOKING] Requested time ${booking.startTime}-${booking.endTime} conflicts with existing booking ${existing.startTime}-${existing.endTime}`,
+        );
+      }
     }
   }
 
@@ -682,13 +723,10 @@ export class BookingServiceImpl implements BookingService {
     startTime: string,
     endTime: string,
   ): number {
-    const start =
-      this.timeToMinutes(startTime);
-
-    const end =
-      this.timeToMinutes(endTime);
-
-    return end - start;
+    return (
+      this.timeToMinutes(endTime) -
+      this.timeToMinutes(startTime)
+    );
   }
 
   private timeToMinutes(
@@ -707,90 +745,26 @@ export class BookingServiceImpl implements BookingService {
     );
   }
 
-  private parseFilter(
-    expression: string,
-  ): {
-    field: string;
-    operator: string;
-    parameter: string;
-    value: string;
-  } | null {
-    const operators = [
-      '>=',
-      '<=',
-      '!=',
-      '>',
-      '<',
-      ':',
-      '~',
-    ];
+  private combineDateAndTime(
+    date: Date,
+    time: string,
+  ): Date {
+    const result = new Date(date);
 
-    for (const operator of operators) {
-      const index =
-        expression.indexOf(operator);
+    const [
+      hour,
+      minute,
+      second = '0',
+    ] = time.split(':');
 
-      if (index === -1) {
-        continue;
-      }
+    result.setHours(
+      Number(hour),
+      Number(minute),
+      Number(second),
+      0,
+    );
 
-      const field =
-        expression
-          .substring(0, index)
-          .trim();
-
-      const value =
-        expression
-          .substring(
-            index + operator.length,
-          )
-          .trim();
-
-      if (!field) {
-        return null;
-      }
-
-      let sqlOperator = '=';
-
-      switch (operator) {
-        case '!=':
-          sqlOperator = '<>';
-          break;
-        case '>':
-          sqlOperator = '>';
-          break;
-        case '<':
-          sqlOperator = '<';
-          break;
-        case '>=':
-          sqlOperator = '>=';
-          break;
-        case '<=':
-          sqlOperator = '<=';
-          break;
-        case '~':
-          sqlOperator = 'LIKE';
-          break;
-        default:
-          sqlOperator = '=';
-      }
-
-      const parameter =
-        `filter_${Math.random()
-          .toString(36)
-          .slice(2, 10)}`;
-
-      return {
-        field,
-        operator: sqlOperator,
-        parameter,
-        value:
-          operator === '~'
-            ? `%${value}%`
-            : value,
-      };
-    }
-
-    return null;
+    return result;
   }
 
   private buildPaginationResponse(
@@ -804,8 +778,7 @@ export class BookingServiceImpl implements BookingService {
 
     response.result = data;
 
-    const meta =
-      new Meta();
+    const meta = new Meta();
 
     meta.page = page;
     meta.pageSize = pageSize;

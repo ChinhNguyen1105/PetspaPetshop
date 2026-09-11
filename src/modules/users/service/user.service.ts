@@ -27,7 +27,7 @@ export interface UserService {
 
   getUserByEmail(email: string): Promise<User>;
 
-  updateUserToken(token: string, email: string): Promise<void>;
+  updateUserToken(token: string | null, email: string): Promise<void>;
 
   getUserWithRoleAndPermissions(id: string): Promise<User>;
 
