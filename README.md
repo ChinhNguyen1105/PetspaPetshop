@@ -48,3 +48,69 @@ Obtain confirmation for the database/ORM, migration flow, JWT/refresh policy,
 permission matrix, booking capacity/cancellation rules, order transition graph,
 and VNPay configuration/refund policy. These are deliberately marked as open
 decisions in the documentation rather than guessed.
+
+
+
+
+
+
+src/
+│
+├── main.ts
+├── app.module.ts
+│
+├── common/
+│   ├── constants/
+│   ├── decorators/
+│   ├── dto/
+│   ├── entities/
+│   ├── exceptions/
+│   ├── filters/
+│   ├── guards/
+│   ├── interceptors/
+│   ├── pipes/
+│   ├── utils/
+│   └── validators/
+│
+├── config/
+│   ├── index.ts
+│   └── validation.ts
+│
+├── database/
+│   ├── data-source.ts
+│   ├── migrations/
+│   └── seeds/
+│
+└── modules/
+    │
+    ├── auth/
+    │
+    ├── users/
+    │
+    ├── roles/
+    │
+    ├── permissions/
+    │
+    ├── pets/
+    │
+    ├── catalogue/
+    │
+    ├── cart/
+    │
+    ├── orders/
+    │
+    ├── inventory/
+    │
+    ├── bookings/
+    │
+    ├── shipping/
+    │
+    ├── payments/
+    │
+    ├── reviews/
+    │
+    ├── files/
+    │
+    ├── menu/
+    │
+    └── recommendation/

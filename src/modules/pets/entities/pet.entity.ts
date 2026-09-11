@@ -1,37 +1,78 @@
-import { Entity, Column, ManyToOne, ForeignKey } from 'typeorm';
-import { BaseEntity } from '../../../common/entities/base.entity';
-import { User } from '../../auth/entities/user.entity';
+﻿import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
-@Entity('pets')
-export class Pet extends BaseEntity {
-  @Column()
-  name: string;
+import { FlagUserDateAuditing } from '../../../common/entities/flag-user-date-auditing.entity';
+import { GenderEnum } from '../../../common/constants/gender.enum';
 
-  @Column()
-  @ForeignKey(() => User)
-  userId: string;
+import { User } from '../../users/entities/user.entity';
+import { Booking } from '../../bookings/entities/booking.entity';
 
-  @Column()
-  species: string; // dog, cat, rabbit, etc.
+@Entity('tbl_pets')
+export class Pet extends FlagUserDateAuditing {
+  @PrimaryGeneratedColumn({
+    name: 'id',
+    type: 'bigint',
+  })
+  id: number;
 
-  @Column({ nullable: true })
-  breed: string;
+  @Column({
+    name: 'name',
+    nullable: true,
+  })
+  name: string | null;
 
-  @Column({ type: 'date' })
-  dateOfBirth: string;
+  @Column({
+    name: 'specie',
+    nullable: true,
+  })
+  specie: string | null;
 
-  @Column({ nullable: true })
-  weight: number; // in kg
+  @Column({
+    name: 'gender',
+    type: 'enum',
+    enum: GenderEnum,
+    nullable: true,
+  })
+  gender: GenderEnum | null;
 
-  @Column({ nullable: true })
-  color: string;
+  @Column({
+    name: 'birthday',
+    type: 'date',
+    nullable: true,
+  })
+  birthday: Date | null;
 
-  @Column({ nullable: true })
-  avatar: string;
+  @Column({
+    name: 'weight',
+    type: 'float',
+    nullable: true,
+  })
+  weight: number;
 
-  @Column({ default: 'ACTIVE' })
-  status: string; // ACTIVE, ARCHIVED
+  @Column({
+    name: 'health_status',
+    nullable: true,
+  })
+  healthStatus: string | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(
+    () => User,
+    (user) => user.pets,
+  )
+  @JoinColumn({
+    name: 'user_id',
+  })
   user: User;
+
+  @OneToMany(
+    () => Booking,
+    (booking) => booking.pet,
+  )
+  bookings: Booking[];
 }
