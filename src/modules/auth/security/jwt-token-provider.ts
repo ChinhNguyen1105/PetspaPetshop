@@ -26,18 +26,16 @@ export class JwtTokenProvider {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {
-    this.secretKey =
-      this.configService.getOrThrow<string>('jwt.secret');
+    this.secretKey = 
+      this.configService.getOrThrow<string>('JWT_SECRET');
 
-    this.expirationTimeAccessToken =
-      this.configService.getOrThrow<number>(
-        'jwt.access.expiration_time',
-      );
+    this.expirationTimeAccessToken = this.configService.getOrThrow<number>(
+      'JWT_ACCESS_EXPIRATION',
+    );
 
-    this.expirationTimeRefreshToken =
-      this.configService.getOrThrow<number>(
-        'jwt.refresh.expiration_time',
-      );
+    this.expirationTimeRefreshToken = this.configService.getOrThrow<number>(
+      'JWT_REFRESH_EXPIRATION',
+    );
   }
 
   generateToken(

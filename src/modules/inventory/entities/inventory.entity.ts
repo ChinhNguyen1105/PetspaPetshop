@@ -22,14 +22,12 @@ export class Inventory extends UserDateAuditing {
 
   @Column({
     name: 'quantity',
+    type: 'int', // Bắt buộc thêm kiểu dữ liệu int
     nullable: true,
   })
   quantity: number | null;
 
-  @OneToOne(
-    () => Product,
-    (product) => product.inventory,
-  )
+  @OneToOne(() => Product, (product) => product.inventory)
   @JoinColumn({
     name: 'product_id',
   })

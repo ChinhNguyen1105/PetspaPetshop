@@ -27,6 +27,8 @@ export class Product extends FlagUserDateAuditing {
 
   @Column({
     name: 'name',
+    type: 'varchar', // Bổ sung type cho chuỗi
+    length: 255,
     nullable: true,
   })
   name: string | null;
@@ -47,47 +49,30 @@ export class Product extends FlagUserDateAuditing {
   })
   price: number | null;
 
-  @OneToOne(
-    () => Inventory,
-    (inventory) => inventory.product,
-  )
+  @OneToOne(() => Inventory, (inventory) => inventory.product)
   inventory: Inventory;
 
-  @OneToMany(
-    () => ProductImage,
-    (productImage) => productImage.product,
-  )
+  @OneToMany(() => ProductImage, (productImage) => productImage.product)
   productImages: ProductImage[];
 
-  @OneToMany(
-    () => CartItem,
-    (cartItem) => cartItem.product,
-  )
+  @OneToMany(() => CartItem, (cartItem) => cartItem.product)
   cartItems: CartItem[];
 
-  @OneToMany(
-    () => OrderDetail,
-    (orderDetail) => orderDetail.product,
-  )
+  @OneToMany(() => OrderDetail, (orderDetail) => orderDetail.product)
   orderDetails: OrderDetail[];
 
-  @ManyToOne(
-    () => Category,
-    (category) => category.products,
-  )
+  @ManyToOne(() => Category, (category) => category.products)
   @JoinColumn({
     name: 'category_id',
   })
   category: Category;
 
-  @OneToMany(
-    () => ProductReview,
-    (productReview) => productReview.product,
-  )
+  @OneToMany(() => ProductReview, (productReview) => productReview.product)
   productReviews: ProductReview[];
 
   @Column({
     name: 'avg_rating',
+    type: 'float', // Bổ sung type float hoặc double cho điểm đánh giá
     nullable: true,
     default: 0.0,
   })
@@ -95,6 +80,7 @@ export class Product extends FlagUserDateAuditing {
 
   @Column({
     name: 'total_reviews',
+    type: 'int', // Bổ sung type int cho số lượng
     nullable: true,
     default: 0,
   })

@@ -26,12 +26,16 @@ export class Order extends FlagUserDateAuditing {
 
   @Column({
     name: 'shipping_name',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   shippingName: string | null;
 
   @Column({
     name: 'shipping_phone',
+    type: 'varchar',
+    length: 50,
     nullable: true,
   })
   shippingPhone: string | null;
@@ -60,35 +64,24 @@ export class Order extends FlagUserDateAuditing {
   })
   status: OrderStatus | null;
 
-  @OneToOne(
-    () => Payment,
-    (payment) => payment.order,
-    {
-      cascade: true,
-    },
-  )
+  @OneToOne(() => Payment, (payment) => payment.order, {
+    cascade: true,
+  })
   @JoinColumn({
     name: 'payment_id',
   })
   payment: Payment;
 
-  @ManyToOne(
-    () => User,
-    (user) => user.orders,
-  )
+  @ManyToOne(() => User, (user) => user.orders)
   @JoinColumn({
     name: 'user_id',
   })
   user: User;
 
-  @OneToMany(
-    () => OrderDetail,
-    (orderDetail) => orderDetail.order,
-    {
-      cascade: true,
-      orphanedRowAction: 'delete',
-    },
-  )
+  @OneToMany(() => OrderDetail, (orderDetail) => orderDetail.order, {
+    cascade: true,
+    orphanedRowAction: 'delete',
+  })
   orderDetails: OrderDetail[];
 
   @Column({

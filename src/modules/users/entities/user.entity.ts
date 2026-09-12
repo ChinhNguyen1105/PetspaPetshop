@@ -34,18 +34,24 @@ export class User extends FlagUserDateAuditing {
 
   @Column({
     name: 'name',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   name: string | null;
 
   @Column({
     name: 'email',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   email: string | null;
 
   @Column({
     name: 'password',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   password: string | null;
@@ -72,65 +78,41 @@ export class User extends FlagUserDateAuditing {
   })
   refreshToken: string | null;
 
-  @OneToMany(
-    () => Pet,
-    (pet) => pet.user,
-    {
-      lazy: false,
-    },
-  )
+  @OneToMany(() => Pet, (pet) => pet.user, {
+    lazy: false,
+  })
   pets: Pet[];
 
-  @OneToMany(
-    () => Booking,
-    (booking) => booking.user,
-    {
-      lazy: false,
-    },
-  )
+  @OneToMany(() => Booking, (booking) => booking.user, {
+    lazy: false,
+  })
   bookings: Booking[];
 
-  @OneToMany(
-    () => Order,
-    (order) => order.user,
-  )
+  @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
 
-  @ManyToOne(
-    () => Role,
-    (role) => role.users,
-  )
+  @ManyToOne(() => Role, (role) => role.users)
   @JoinColumn({
     name: 'role_id',
   })
   role: Role;
 
-  @OneToMany(
-    () => ShippingAddress,
-    (shippingAddress) => shippingAddress.user,
-  )
+  @OneToMany(() => ShippingAddress, (shippingAddress) => shippingAddress.user)
   shippingAddresses: ShippingAddress[];
 
-  @OneToMany(
-    () => ProductReview,
-    (review) => review.user,
-  )
+  @OneToMany(() => ProductReview, (review) => review.user)
   reviews: ProductReview[];
 
-  @OneToMany(
-    () => PetServiceReview,
-    (review) => review.user,
-  )
+  @OneToMany(() => PetServiceReview, (review) => review.user)
   petServiceReviews: PetServiceReview[];
 
-  @OneToOne(
-    () => Cart,
-    (cart) => cart.user,
-  )
+  @OneToOne(() => Cart, (cart) => cart.user)
   cart: Cart;
 
   @Column({
     name: 'avatar_url',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   avatarUrl: string | null;

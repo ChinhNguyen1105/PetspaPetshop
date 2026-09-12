@@ -23,12 +23,16 @@ export class Pet extends FlagUserDateAuditing {
 
   @Column({
     name: 'name',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   name: string | null;
 
   @Column({
     name: 'specie',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   specie: string | null;
@@ -57,22 +61,18 @@ export class Pet extends FlagUserDateAuditing {
 
   @Column({
     name: 'health_status',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   healthStatus: string | null;
 
-  @ManyToOne(
-    () => User,
-    (user) => user.pets,
-  )
+  @ManyToOne(() => User, (user) => user.pets)
   @JoinColumn({
     name: 'user_id',
   })
   user: User;
 
-  @OneToMany(
-    () => Booking,
-    (booking) => booking.pet,
-  )
+  @OneToMany(() => Booking, (booking) => booking.pet)
   bookings: Booking[];
 }

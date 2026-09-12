@@ -23,12 +23,15 @@ export class PetService extends FlagUserDateAuditing {
 
   @Column({
     name: 'name',
+    type: 'varchar', // Bổ sung type cho chuỗi
+    length: 255,
     nullable: true,
   })
   name: string | null;
 
   @Column({
     name: 'description',
+    type: 'text', // Sử dụng text vì phần mô tả thường khá dài
     nullable: true,
   })
   description: string | null;
@@ -49,24 +52,15 @@ export class PetService extends FlagUserDateAuditing {
   })
   durationMin: number;
 
-  @OneToMany(
-    () => BookingDetail,
-    (bookingDetail) => bookingDetail.service,
-  )
+  @OneToMany(() => BookingDetail, (bookingDetail) => bookingDetail.service)
   bookingDetails: BookingDetail[];
 
-  @ManyToOne(
-    () => Category,
-    (category) => category.petServices,
-  )
+  @ManyToOne(() => Category, (category) => category.petServices)
   @JoinColumn({
     name: 'category_id',
   })
   category: Category;
 
-  @OneToMany(
-    () => PetServiceImage,
-    (serviceImage) => serviceImage.petService,
-  )
+  @OneToMany(() => PetServiceImage, (serviceImage) => serviceImage.petService)
   serviceImages: PetServiceImage[];
 }

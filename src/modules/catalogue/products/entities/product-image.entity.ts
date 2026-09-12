@@ -19,21 +19,21 @@ export class ProductImage extends DateAuditing {
 
   @Column({
     name: 'image_url',
+    type: 'varchar', // Bắt buộc khai báo kiểu chuỗi
+    length: 255, // Có thể đổi thành type: 'text' nếu URL lưu trữ rất dài
     nullable: true,
   })
   imageUrl: string | null;
 
   @Column({
     name: 'is_main',
+    type: 'boolean', // Bắt buộc khai báo kiểu boolean (MySQL sẽ map thành tinyint)
     nullable: true,
     default: false,
   })
   isThumbnail: boolean;
 
-  @ManyToOne(
-    () => Product,
-    (product) => product.productImages,
-  )
+  @ManyToOne(() => Product, (product) => product.productImages)
   @JoinColumn({
     name: 'product_id',
   })

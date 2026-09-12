@@ -21,6 +21,7 @@ export class OrderDetail extends DateAuditing {
 
   @Column({
     name: 'quantity',
+    type: 'int', // Bắt buộc khai báo kiểu int cho số lượng
     nullable: true,
   })
   quantity: number | null;
@@ -34,19 +35,13 @@ export class OrderDetail extends DateAuditing {
   })
   unitPrice: number | null;
 
-  @ManyToOne(
-    () => Order,
-    (order) => order.orderDetails,
-  )
+  @ManyToOne(() => Order, (order) => order.orderDetails)
   @JoinColumn({
     name: 'order_id',
   })
   order: Order;
 
-  @ManyToOne(
-    () => Product,
-    (product) => product.orderDetails,
-  )
+  @ManyToOne(() => Product, (product) => product.orderDetails)
   @JoinColumn({
     name: 'product_id',
   })

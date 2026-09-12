@@ -21,6 +21,7 @@ export class InventoryTransaction extends UserDateAuditing {
 
   @Column({
     name: 'quantity',
+    type: 'int', // Bắt buộc thêm type cho số lượng
     nullable: true,
   })
   quantity: number | null;
@@ -35,14 +36,13 @@ export class InventoryTransaction extends UserDateAuditing {
 
   @Column({
     name: 'note',
+    type: 'varchar', // Bắt buộc thêm type cho chuỗi
+    length: 255, // Định nghĩa độ dài cho varchar
     nullable: true,
   })
   note: string | null;
 
-  @ManyToOne(
-    () => Inventory,
-    (inventory) => inventory.inventoryTransactions,
-  )
+  @ManyToOne(() => Inventory, (inventory) => inventory.inventoryTransactions)
   @JoinColumn({
     name: 'inventory_id',
   })

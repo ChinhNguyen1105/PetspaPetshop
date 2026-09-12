@@ -1,9 +1,4 @@
-﻿import {
-  Column,
-  Entity,
-  OneToMany,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+﻿import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 import { FlagUserDateAuditing } from '../../../../common/entities/flag-user-date-auditing.entity';
 import { CategoryType } from '../../../../common/constants/category-type.enum';
@@ -21,6 +16,8 @@ export class Category extends FlagUserDateAuditing {
 
   @Column({
     name: 'name',
+    type: 'varchar', // Bổ sung type cho chuỗi
+    length: 255,
     nullable: true,
   })
   name: string | null;
@@ -33,15 +30,9 @@ export class Category extends FlagUserDateAuditing {
   })
   categoryType: CategoryType | null;
 
-  @OneToMany(
-    () => Product,
-    (product) => product.category,
-  )
+  @OneToMany(() => Product, (product) => product.category)
   products: Product[];
 
-  @OneToMany(
-    () => PetService,
-    (petService) => petService.category,
-  )
+  @OneToMany(() => PetService, (petService) => petService.category)
   petServices: PetService[];
 }

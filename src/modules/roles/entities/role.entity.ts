@@ -23,23 +23,22 @@ export class Role extends FlagUserDateAuditing {
 
   @Column({
     name: 'name',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   name: string | null;
 
   @Column({
     name: 'description',
+    type: 'text',
     nullable: true,
   })
   description: string | null;
 
-  @ManyToMany(
-    () => Permission,
-    (permission) => permission.roles,
-    {
-      lazy: true,
-    },
-  )
+  @ManyToMany(() => Permission, (permission) => permission.roles, {
+    lazy: true,
+  })
   @JoinTable({
     name: 'tbl_permission_role',
     joinColumn: {
@@ -53,21 +52,13 @@ export class Role extends FlagUserDateAuditing {
   })
   permissions: Promise<Permission[]>;
 
-  @OneToMany(
-    () => User,
-    (user) => user.role,
-    {
-      lazy: true,
-    },
-  )
+  @OneToMany(() => User, (user) => user.role, {
+    lazy: true,
+  })
   users: Promise<User[]>;
 
-  @ManyToMany(
-    () => Menu,
-    (menu) => menu.roles,
-    {
-      lazy: true,
-    },
-  )
+  @ManyToMany(() => Menu, (menu) => menu.roles, {
+    lazy: true,
+  })
   menus: Promise<Menu[]>;
 }

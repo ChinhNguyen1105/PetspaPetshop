@@ -20,10 +20,8 @@ export class Payment extends UserDateAuditing {
   })
   id: number;
 
-  @OneToOne(
-    () => Order,
-    (order) => order.payment,
-  )
+  @OneToOne(() => Order, (order) => order.payment)
+  @JoinColumn({ name: 'order_id' }) // Chỉ định rõ khóa ngoại liên kết tới bảng Order
   order: Order;
 
   @Column({
@@ -36,6 +34,8 @@ export class Payment extends UserDateAuditing {
 
   @Column({
     name: 'transaction_id',
+    type: 'varchar', // Bắt buộc khai báo kiểu dữ liệu cho chuỗi
+    length: 255,
     unique: true,
     nullable: true,
   })

@@ -19,21 +19,21 @@ export class PetServiceImage extends DateAuditing {
 
   @Column({
     name: 'image_url',
+    type: 'varchar', // Khai báo rõ kiểu chuỗi
+    length: 255,
     nullable: true,
   })
   imageUrl: string | null;
 
   @Column({
     name: 'is_main',
+    type: 'boolean', // Khai báo rõ kiểu boolean
     nullable: true,
     default: false,
   })
   isThumbnail: boolean;
 
-  @ManyToOne(
-    () => PetService,
-    (petService) => petService.serviceImages,
-  )
+  @ManyToOne(() => PetService, (petService) => petService.serviceImages)
   @JoinColumn({
     name: 'service_id',
   })

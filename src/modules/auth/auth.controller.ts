@@ -2,6 +2,7 @@
   Body,
   Controller,
   HttpStatus,
+  Inject,
   Post,
   Req,
   Res,
@@ -25,7 +26,9 @@ import { User } from 'src/modules/users/entities/user.entity';
 @Controller()
 export class AuthController {
   constructor(
+    @Inject('USER_SERVICE')
     private readonly userService: UserService,
+    @Inject('AUTH_SERVICE')
     private readonly authService: AuthService,
   ) {}
 
@@ -35,17 +38,11 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const loginResult =
-      await this.authService.login(
-        loginRequestDto,
-        request,
-      );
+    const loginResult = await this.authService.login(loginRequestDto, request);
 
     response.setHeader(
       'Set-Cookie',
-      this.buildResponseCookie(
-        loginResult.responseCookie,
-      ),
+      this.buildResponseCookie(loginResult.responseCookie),
     );
 
     return VsResponseUtil.successWithStatus(
@@ -55,34 +52,23 @@ export class AuthController {
   }
 
   @Post('auth/register')
-  async register(
-    @Body() register: ReqRegisterDto,
-  ) {
-    const responseDto =
-      await this.authService.register(register);
+  async register(@Body() register: ReqRegisterDto) {
+    const responseDto = await this.authService.register(register);
 
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      responseDto,
-    );
+    return VsResponseUtil.successWithStatus(HttpStatus.OK, responseDto);
   }
 
   @Post('auth/logout')
-  async logout(
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const currentUser: User | null =
-      await this.userService.getUserLogin();
+  async logout(@Res({ passthrough: true }) response: Response) {
+    const currentUser: User | null = await this.userService.getUserLogin();
 
     if (currentUser !== null && currentUser.email !== null) {
       await this.userService.updateUserToken(null, currentUser.email);
     }
 
-    const deleteSpringCookie =
-      new ResponseCookieDto();
+    const deleteSpringCookie = new ResponseCookieDto();
 
-    deleteSpringCookie.name =
-      'refresh_token';
+    deleteSpringCookie.name = 'refresh_token';
     deleteSpringCookie.value = null;
     deleteSpringCookie.maxAge = 0;
     deleteSpringCookie.domain = null;
@@ -94,9 +80,7 @@ export class AuthController {
 
     response.setHeader(
       'Set-Cookie',
-      this.buildResponseCookie(
-        deleteSpringCookie,
-      ),
+      this.buildResponseCookie(deleteSpringCookie),
     );
 
     const responseDto: CommonResponseDto = {
@@ -104,42 +88,26 @@ export class AuthController {
       message: 'Logout successfully!',
     };
 
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      responseDto,
-    );
+    return VsResponseUtil.successWithStatus(HttpStatus.OK, responseDto);
   }
 
-  private buildResponseCookie(
-    cookie: ResponseCookieDto,
-  ): string {
+  private buildResponseCookie(cookie: ResponseCookieDto): string {
     const parts: string[] = [];
 
-    const value =
-      cookie.value === null
-        ? ''
-        : cookie.value;
+    const value = cookie.value === null ? '' : cookie.value;
 
-    parts.push(
-      `${cookie.name}=${value}`,
-    );
+    parts.push(`${cookie.name}=${value}`);
 
     if (cookie.maxAge !== undefined) {
-      parts.push(
-        `Max-Age=${cookie.maxAge}`,
-      );
+      parts.push(`Max-Age=${cookie.maxAge}`);
     }
 
     if (cookie.domain !== null) {
-      parts.push(
-        `Domain=${cookie.domain}`,
-      );
+      parts.push(`Domain=${cookie.domain}`);
     }
 
     if (cookie.path !== null) {
-      parts.push(
-        `Path=${cookie.path}`,
-      );
+      parts.push(`Path=${cookie.path}`);
     }
 
     if (cookie.secure) {
@@ -154,13 +122,8 @@ export class AuthController {
       parts.push('Partitioned');
     }
 
-    if (
-      cookie.sameSite !== null &&
-      cookie.sameSite.length > 0
-    ) {
-      parts.push(
-        `SameSite=${cookie.sameSite}`,
-      );
+    if (cookie.sameSite !== null && cookie.sameSite.length > 0) {
+      parts.push(`SameSite=${cookie.sameSite}`);
     }
 
     return parts.join('; ');

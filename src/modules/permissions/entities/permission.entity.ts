@@ -1,9 +1,4 @@
-﻿import {
-  Column,
-  Entity,
-  ManyToMany,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+﻿import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 import { UserDateAuditing } from '../../../common/entities/user-date-auditing.entity';
 
@@ -19,32 +14,37 @@ export class Permission extends UserDateAuditing {
 
   @Column({
     name: 'name',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   name: string | null;
 
   @Column({
     name: 'apiPath',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   apiPath: string | null;
 
   @Column({
     name: 'method',
+    type: 'varchar',
+    length: 50,
     nullable: true,
   })
   method: string | null;
 
   @Column({
     name: 'module',
+    type: 'varchar',
+    length: 255,
     nullable: true,
   })
   module: string | null;
 
-  @ManyToMany(
-    () => Role,
-    (role) => role.permissions,
-  )
+  @ManyToMany(() => Role, (role) => role.permissions)
   roles: Role[];
 
   constructor(
