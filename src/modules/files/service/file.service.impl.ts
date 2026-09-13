@@ -50,26 +50,18 @@ export class FileServiceImpl implements FileService {
 
   private readonly baseUri: string;
 
-  constructor(
-    private readonly configService: ConfigService,
-  ) {
-    const baseUri =
-      this.configService.get<string>(
-        'hoang.upload-file.base-uri',
-      );
+  constructor(private readonly configService: ConfigService) {
+    const baseUri = this.configService.get<string>('UPLOAD_PATH');
 
     if (!baseUri) {
-      throw new Error(
-        'Missing configuration: hoang.upload-file.base-uri',
-      );
+      throw new Error('Missing configuration: UPLOAD_PATH');
     }
 
     this.baseUri = baseUri;
   }
 
   async createDirectory(folder: string): Promise<void> {
-    const targetPath = path
-      .resolve(this.baseUri, folder);
+    const targetPath = path.resolve(this.baseUri, folder);
 
     try {
       await fs.mkdir(targetPath, {
@@ -78,9 +70,7 @@ export class FileServiceImpl implements FileService {
     } catch (error) {
       throw new Error(
         `Lỗi khởi tạo thư mục lưu trữ: ${
-          error instanceof Error
-            ? error.message
-            : String(error)
+          error instanceof Error ? error.message : String(error)
         }`,
       );
     }
@@ -96,14 +86,9 @@ export class FileServiceImpl implements FileService {
     const resUploadFileFailedList: string[] = [];
 
     for (const file of files) {
-      const originalFileName =
-        this.cleanFileName(file.originalname);
+      const originalFileName = this.cleanFileName(file.originalname);
 
-      const validationError =
-        this.validateAllFile(
-          file,
-          originalFileName,
-        );
+      const validationError = this.validateAllFile(file, originalFileName);
 
       if (validationError !== null) {
         resUploadFileFailedList.push(
@@ -113,16 +98,9 @@ export class FileServiceImpl implements FileService {
       }
 
       try {
-        const finalName =
-          this.generateUniqueFileName(
-            originalFileName,
-          );
+        const finalName = this.generateUniqueFileName(originalFileName);
 
-        await this.saveFileToStorage(
-          file,
-          folder,
-          finalName,
-        );
+        await this.saveFileToStorage(file, folder, finalName);
 
         const dto = new ResUploadFileDto();
 
@@ -142,23 +120,15 @@ export class FileServiceImpl implements FileService {
 
     const result = new ResUploadFileResultDto();
 
-    result.resUploadFileDtoList =
-      resUploadFileDtoList;
+    result.resUploadFileDtoList = resUploadFileDtoList;
 
-    result.resUploadFileFailedList =
-      resUploadFileFailedList;
+    result.resUploadFileFailedList = resUploadFileFailedList;
 
     return result;
   }
 
-  async getFileLength(
-    fileName: string,
-    folder: string,
-  ): Promise<number> {
-    const filePath = this.resolveFilePath(
-      fileName,
-      folder,
-    );
+  async getFileLength(fileName: string, folder: string): Promise<number> {
+    const filePath = this.resolveFilePath(fileName, folder);
 
     try {
       const stat = await fs.stat(filePath);
@@ -173,31 +143,21 @@ export class FileServiceImpl implements FileService {
     }
   }
 
-  async getResource(
-    fileName: string,
-    folder: string,
-  ): Promise<unknown> {
-    const filePath = this.resolveFilePath(
-      fileName,
-      folder,
-    );
+  async getResource(fileName: string, folder: string): Promise<unknown> {
+    const filePath = this.resolveFilePath(fileName, folder);
 
     try {
       const stat = await fs.stat(filePath);
 
       if (!stat.isFile()) {
-        throw new Error(
-          `Không tìm thấy file: ${fileName}`,
-        );
+        throw new Error(`Không tìm thấy file: ${fileName}`);
       }
 
       await fs.access(filePath);
 
       return await fs.readFile(filePath);
     } catch {
-      throw new Error(
-        `Không tìm thấy file: ${fileName}`,
-      );
+      throw new Error(`Không tìm thấy file: ${fileName}`);
     }
   }
 
@@ -207,31 +167,17 @@ export class FileServiceImpl implements FileService {
   ): Promise<ResUploadFileDto> {
     await this.createDirectory(folder);
 
-    const originalFileName =
-      this.cleanFileName(file.originalname);
+    const originalFileName = this.cleanFileName(file.originalname);
 
-    const validationError =
-      this.validFileImage(
-        file,
-        originalFileName,
-      );
+    const validationError = this.validFileImage(file, originalFileName);
 
     if (validationError !== null) {
-      throw new UploadFileException(
-        validationError,
-      );
+      throw new UploadFileException(validationError);
     }
 
-    const finalName =
-      this.generateUniqueFileName(
-        originalFileName,
-      );
+    const finalName = this.generateUniqueFileName(originalFileName);
 
-    await this.saveFileToStorage(
-      file,
-      folder,
-      finalName,
-    );
+    await this.saveFileToStorage(file, folder, finalName);
 
     const dto = new ResUploadFileDto();
 
@@ -249,36 +195,25 @@ export class FileServiceImpl implements FileService {
       return 'File trống';
     }
 
-    const lowerFileName =
-      originalFileName.toLowerCase();
+    const lowerFileName = originalFileName.toLowerCase();
 
-    const isValidExtension =
-      FileServiceImpl.ALLOWED_EXTENSIONS.some(
-        (extension) =>
-          lowerFileName.endsWith(
-            `.${extension}`,
-          ),
-      );
+    const isValidExtension = FileServiceImpl.ALLOWED_EXTENSIONS.some(
+      (extension) => lowerFileName.endsWith(`.${extension}`),
+    );
 
     if (!isValidExtension) {
       return 'Định dạng file không được hỗ trợ';
     }
 
-    if (
-      file.size >
-      FileServiceImpl.MAX_FILE_SIZE
-    ) {
+    if (file.size > FileServiceImpl.MAX_FILE_SIZE) {
       return 'Dung lượng file vượt quá giới hạn cho phép (4MB)';
     }
 
-    const contentType =
-      file.mimetype?.toLowerCase();
+    const contentType = file.mimetype?.toLowerCase();
 
     if (
       !contentType ||
-      !FileServiceImpl.ALLOWED_MIME_TYPES.includes(
-        contentType,
-      )
+      !FileServiceImpl.ALLOWED_MIME_TYPES.includes(contentType)
     ) {
       return 'Loại nội dung (MimeType) không hợp lệ';
     }
@@ -294,36 +229,25 @@ export class FileServiceImpl implements FileService {
       return 'File trống';
     }
 
-    const lowerFileName =
-      originalFileName.toLowerCase();
+    const lowerFileName = originalFileName.toLowerCase();
 
-    const isValidExtension =
-      FileServiceImpl.ALLOWED_EXTENSIONS_IMAGE.some(
-        (extension) =>
-          lowerFileName.endsWith(
-            `.${extension}`,
-          ),
-      );
+    const isValidExtension = FileServiceImpl.ALLOWED_EXTENSIONS_IMAGE.some(
+      (extension) => lowerFileName.endsWith(`.${extension}`),
+    );
 
     if (!isValidExtension) {
       return 'Định dạng file không được hỗ trợ';
     }
 
-    if (
-      file.size >
-      FileServiceImpl.MAX_FILE_SIZE
-    ) {
+    if (file.size > FileServiceImpl.MAX_FILE_SIZE) {
       return 'Dung lượng file vượt quá giới hạn cho phép (4MB)';
     }
 
-    const contentType =
-      file.mimetype?.toLowerCase();
+    const contentType = file.mimetype?.toLowerCase();
 
     if (
       !contentType ||
-      !FileServiceImpl.ALLOWED_MIME_TYPES_IMAGE.includes(
-        contentType,
-      )
+      !FileServiceImpl.ALLOWED_MIME_TYPES_IMAGE.includes(contentType)
     ) {
       return 'Loại nội dung (MimeType) không hợp lệ';
     }
@@ -331,9 +255,7 @@ export class FileServiceImpl implements FileService {
     return null;
   }
 
-  private generateUniqueFileName(
-    originalFileName: string,
-  ): string {
+  private generateUniqueFileName(originalFileName: string): string {
     return `${Date.now()}-${originalFileName}`;
   }
 
@@ -342,32 +264,16 @@ export class FileServiceImpl implements FileService {
     folder: string,
     finalName: string,
   ): Promise<void> {
-    const targetLocation =
-      this.resolveFilePath(
-        finalName,
-        folder,
-      );
+    const targetLocation = this.resolveFilePath(finalName, folder);
 
-    await fs.copyFile(
-      file.path,
-      targetLocation,
-    );
+    await fs.copyFile(file.path, targetLocation);
   }
 
-  private resolveFilePath(
-    fileName: string,
-    folder: string,
-  ): string {
-    return path.resolve(
-      this.baseUri,
-      folder,
-      fileName,
-    );
+  private resolveFilePath(fileName: string, folder: string): string {
+    return path.resolve(this.baseUri, folder, fileName);
   }
 
-  private cleanFileName(
-    fileName: string,
-  ): string {
+  private cleanFileName(fileName: string): string {
     return path.basename(fileName);
   }
 }

@@ -1,4 +1,5 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+﻿
+import { Injectable, Logger } from '@nestjs/common';
 
 import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 
@@ -12,7 +13,7 @@ import { ServiceImageMapper } from 'src/modules/catalogue/services/mapper/servic
 import { PetServiceImageRepository } from 'src/modules/catalogue/services/repositories/pet-service-image.repository';
 import { PetServiceRepository } from 'src/modules/catalogue/services/repositories/pet-service.repository';
 
-import { PetServiceImageService } from 'src/modules/catalogue/services/service/pet-service-image.service';
+import type { PetServiceImageService } from 'src/modules/catalogue/services/service/pet-service-image.service';
 
 @Injectable()
 export class PetServiceImageServiceImpl
@@ -236,3 +237,4 @@ export class PetServiceImageServiceImpl
     );
   }
 }
+

@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+﻿import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
 import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 
@@ -9,37 +9,30 @@ import { CartRepository } from 'src/modules/cart/repositories/cart.repository';
 
 import type { UserService } from 'src/modules/users/service/user.service';
 
-import { CartService } from 'src/modules/cart/service/cart.service';
-
+import type { CartService } from 'src/modules/cart/service/cart.service';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 @Injectable()
 export class CartServiceImpl implements CartService {
-  private readonly logger = new Logger(
-    CartServiceImpl.name,
-  );
+  private readonly logger = new Logger(CartServiceImpl.name);
 
   constructor(
     private readonly cartRepository: CartRepository,
+
+    @Inject(PROVIDER_TOKEN.USER_SERVICE)
     private readonly userService: UserService,
+
     private readonly cartItemMapper: CartItemMapper,
   ) {}
 
   async getCart(): Promise<CartDto> {
-    this.logger.log(
-      '[CART] Xem giỏ hàng của user hiện tại',
-    );
+    this.logger.log('[CART] Xem giỏ hàng của user hiện tại');
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    const cart =
-      await this.cartRepository.findByUserId(
-        currentUser.id,
-      );
+    const cart = await this.cartRepository.findByUserId(currentUser.id);
 
     if (!cart) {
-      this.logger.log(
-        `[CART] Giỏ hàng trống | User ID: ${currentUser.id}`,
-      );
+      this.logger.log(`[CART] Giỏ hàng trống | User ID: ${currentUser.id}`);
 
       return {
         totalItem: 0,
@@ -48,20 +41,14 @@ export class CartServiceImpl implements CartService {
       } as CartDto;
     }
 
-    const cartItems =
-      (cart.cartItems ?? []).map(
-        (cartItem) =>
-          this.cartItemMapper.toDto(
-            cartItem,
-          ),
-      );
+    const cartItems = (cart.cartItems ?? []).map((cartItem) =>
+      this.cartItemMapper.toDto(cartItem),
+    );
 
-    const totalAmount =
-      cartItems.reduce(
-        (sum, item) =>
-          sum + Number(item.totalPrice ?? 0),
-        0,
-      );
+    const totalAmount = cartItems.reduce(
+      (sum, item) => sum + Number(item.totalPrice ?? 0),
+      0,
+    );
 
     this.logger.log(
       `[CART] User ID: ${currentUser.id} | Số item: ${cartItems.length} | Tổng tiền: ${totalAmount}`,
@@ -76,32 +63,19 @@ export class CartServiceImpl implements CartService {
   }
 
   async deleteCart(): Promise<CommonResponseDto> {
-    this.logger.log(
-      '[CART] Xóa toàn bộ giỏ hàng',
-    );
+    this.logger.log('[CART] Xóa toàn bộ giỏ hàng');
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    const cart =
-      await this.cartRepository.findByUserId(
-        currentUser.id,
-      );
+    const cart = await this.cartRepository.findByUserId(currentUser.id);
 
     if (!cart) {
-      throw new NotFoundException(
-        'Giỏ hàng không tồn tại',
-      );
+      throw new NotFoundException('Giỏ hàng không tồn tại');
     }
 
-    cart.cartItems?.splice(
-      0,
-      cart.cartItems.length,
-    );
+    cart.cartItems?.splice(0, cart.cartItems.length);
 
-    await this.cartRepository
-      .getRepository()
-      .save(cart);
+    await this.cartRepository.getRepository().save(cart);
 
     this.logger.log(
       `[CART] Xóa toàn bộ giỏ hàng thành công | User ID: ${currentUser.id}`,

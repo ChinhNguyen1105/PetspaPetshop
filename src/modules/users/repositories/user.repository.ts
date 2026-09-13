@@ -1,3 +1,4 @@
+﻿
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,6 +15,7 @@ export class UserRepository {
   findByEmailAndDeleteFlagFalse(email: string) {
     return this.repository
       .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
       .where('user.email = :email', { email })
       .andWhere('user.deleteFlag = false')
       .getOne();

@@ -1,9 +1,11 @@
-﻿import {
+﻿
+import {
   Body,
   Controller,
   Delete,
   Get,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -13,6 +15,7 @@
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { ReqAddServiceImageDto } from 'src/modules/catalogue/services/dto/request/req-add-service-image.dto';
 import type { PetServiceImageService } from 'src/modules/catalogue/services/service/pet-service-image.service';
@@ -21,6 +24,7 @@ import type { PetServiceImageService } from 'src/modules/catalogue/services/serv
 @Controller()
 export class PetServiceImageController {
   constructor(
+    @Inject(PROVIDER_TOKEN.PET_SERVICE_IMAGE_SERVICE)
     private readonly serviceImageService: PetServiceImageService,
   ) {}
 
@@ -84,3 +88,4 @@ export class PetServiceImageController {
     );
   }
 }
+

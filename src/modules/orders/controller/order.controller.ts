@@ -1,9 +1,11 @@
-﻿import {
+﻿
+import {
   Body,
   Controller,
   Delete,
   Get,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -14,6 +16,7 @@
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { ReqCreateOrderFromCartDto } from 'src/modules/orders/dto/request/req-create-order-from-cart.dto';
 import { ReqCreateOrderBuyNowDto } from 'src/modules/orders/dto/request/req-create-order-buy-now.dto';
@@ -26,6 +29,7 @@ import type { OrderService } from 'src/modules/orders/service/order.service';
 @Controller()
 export class OrderController {
   constructor(
+    @Inject(PROVIDER_TOKEN.ORDER_SERVICE)
     private readonly orderService: OrderService,
   ) {}
 
@@ -143,3 +147,4 @@ export class OrderController {
     );
   }
 }
+

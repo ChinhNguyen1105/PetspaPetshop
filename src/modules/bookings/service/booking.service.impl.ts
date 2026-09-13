@@ -44,7 +44,7 @@ import { Order } from 'src/modules/orders/entities/order.entity';
 import { Payment } from 'src/modules/payments/entities/payment.entity';
 
 import { SecurityUtil } from 'src/modules/auth/security/security.util';
-import { BookingService } from 'src/modules/bookings/service/booking.service';
+import type { BookingService } from 'src/modules/bookings/service/booking.service';
 
 @Injectable({ scope: Scope.REQUEST })
 export class BookingServiceImpl implements BookingService {

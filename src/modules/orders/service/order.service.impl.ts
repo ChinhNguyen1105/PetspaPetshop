@@ -1,4 +1,5 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿
+import { Inject, Injectable } from '@nestjs/common';
 
 import { BadRequestException } from 'src/common/exceptions/bad-request.exception';
 import { ForbiddenException } from 'src/common/exceptions/forbidden.exception';
@@ -9,6 +10,7 @@ import { PaymentMethod } from 'src/common/constants/payment-method.enum';
 import { PaymentStatus } from 'src/common/constants/payment-status.enum';
 import { TypeInventory } from 'src/common/constants/type-inventory.enum';
 import { RoleConstant } from 'src/common/constants/role.constant';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import {
   Meta,
@@ -42,14 +44,16 @@ import { Inventory } from 'src/modules/inventory/entities/inventory.entity';
 import { InventoryTransaction } from 'src/modules/inventory/entities/inventory-transaction.entity';
 
 import type { UserService } from 'src/modules/users/service/user.service';
-
-import { OrderService } from 'src/modules/orders/service/order.service';
+import type { OrderService } from 'src/modules/orders/service/order.service';
 
 @Injectable()
 export class OrderServiceImpl implements OrderService {
   constructor(
     private readonly orderRepository: OrderRepository,
+
+    @Inject(PROVIDER_TOKEN.USER_SERVICE)
     private readonly userService: UserService,
+
     private readonly orderMapper: OrderMapper,
     private readonly cartRepository: CartRepository,
     private readonly shippingAddressRepository: ShippingAddressRepository,

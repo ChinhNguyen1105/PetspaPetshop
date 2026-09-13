@@ -1,12 +1,7 @@
-﻿import {
-  Controller,
-  Get,
-  Header,
-  Query,
-  Res,
-} from '@nestjs/common';
+﻿import { Controller, Get, Header, Inject, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import type { FileService } from 'src/modules/files/service/file.service';
 
@@ -14,6 +9,7 @@ import type { FileService } from 'src/modules/files/service/file.service';
 @Controller()
 export class FileController {
   constructor(
+    @Inject(PROVIDER_TOKEN.FILE_SERVICE)
     private readonly fileService: FileService,
   ) {}
 
@@ -23,19 +19,11 @@ export class FileController {
     @Query('folder') folder: string,
     @Res() response: Response,
   ) {
-    const resource =
-      await this.fileService.getResource(
-        fileName,
-        folder,
-      );
+    const resource = await this.fileService.getResource(fileName, folder);
 
-    const contentType =
-      this.getContentType(fileName);
+    const contentType = this.getContentType(fileName);
 
-    response.setHeader(
-      'Content-Type',
-      contentType,
-    );
+    response.setHeader('Content-Type', contentType);
 
     response.setHeader(
       'Content-Disposition',
@@ -45,14 +33,8 @@ export class FileController {
     response.send(resource);
   }
 
-  private getContentType(
-    fileName: string,
-  ): string {
-    const extension =
-      fileName
-        .split('.')
-        .pop()
-        ?.toLowerCase();
+  private getContentType(fileName: string): string {
+    const extension = fileName.split('.').pop()?.toLowerCase();
 
     switch (extension) {
       case 'pdf':

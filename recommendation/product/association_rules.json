@@ -1,0 +1,466 @@
+[
+    {
+        "antecedent": [
+            1
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.6,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            3
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.6,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            4
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.4,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            5
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.4,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            1,
+            3
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.4,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            1,
+            5
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.2,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            3,
+            4
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.2,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            4,
+            5
+        ],
+        "consequent": [
+            2
+        ],
+        "confidence": 1.0,
+        "support": 0.2,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            1
+        ],
+        "consequent": [
+            3
+        ],
+        "confidence": 0.666667,
+        "support": 0.4,
+        "lift": 1.111111
+    },
+    {
+        "antecedent": [
+            3
+        ],
+        "consequent": [
+            1
+        ],
+        "confidence": 0.666667,
+        "support": 0.4,
+        "lift": 1.111111
+    },
+    {
+        "antecedent": [
+            1,
+            2
+        ],
+        "consequent": [
+            3
+        ],
+        "confidence": 0.666667,
+        "support": 0.4,
+        "lift": 1.111111
+    },
+    {
+        "antecedent": [
+            2,
+            3
+        ],
+        "consequent": [
+            1
+        ],
+        "confidence": 0.666667,
+        "support": 0.4,
+        "lift": 1.111111
+    },
+    {
+        "antecedent": [
+            1
+        ],
+        "consequent": [
+            2,
+            3
+        ],
+        "confidence": 0.666667,
+        "support": 0.4,
+        "lift": 1.111111
+    },
+    {
+        "antecedent": [
+            3
+        ],
+        "consequent": [
+            1,
+            2
+        ],
+        "confidence": 0.666667,
+        "support": 0.4,
+        "lift": 1.111111
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            1
+        ],
+        "confidence": 0.6,
+        "support": 0.6,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            3
+        ],
+        "confidence": 0.6,
+        "support": 0.6,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            4
+        ],
+        "consequent": [
+            5
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 1.25
+    },
+    {
+        "antecedent": [
+            5
+        ],
+        "consequent": [
+            4
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 1.25
+    },
+    {
+        "antecedent": [
+            2,
+            4
+        ],
+        "consequent": [
+            5
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 1.25
+    },
+    {
+        "antecedent": [
+            2,
+            5
+        ],
+        "consequent": [
+            4
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 1.25
+    },
+    {
+        "antecedent": [
+            4
+        ],
+        "consequent": [
+            2,
+            5
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 1.25
+    },
+    {
+        "antecedent": [
+            5
+        ],
+        "consequent": [
+            2,
+            4
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 1.25
+    },
+    {
+        "antecedent": [
+            5
+        ],
+        "consequent": [
+            1
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            4
+        ],
+        "consequent": [
+            3
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            2,
+            5
+        ],
+        "consequent": [
+            1
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            5
+        ],
+        "consequent": [
+            1,
+            2
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            2,
+            4
+        ],
+        "consequent": [
+            3
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            4
+        ],
+        "consequent": [
+            2,
+            3
+        ],
+        "confidence": 0.5,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            4
+        ],
+        "confidence": 0.4,
+        "support": 0.4,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            5
+        ],
+        "confidence": 0.4,
+        "support": 0.4,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            1,
+            3
+        ],
+        "confidence": 0.4,
+        "support": 0.4,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            1
+        ],
+        "consequent": [
+            5
+        ],
+        "confidence": 0.333333,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            3
+        ],
+        "consequent": [
+            4
+        ],
+        "confidence": 0.333333,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            1,
+            2
+        ],
+        "consequent": [
+            5
+        ],
+        "confidence": 0.333333,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            1
+        ],
+        "consequent": [
+            2,
+            5
+        ],
+        "confidence": 0.333333,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            2,
+            3
+        ],
+        "consequent": [
+            4
+        ],
+        "confidence": 0.333333,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            3
+        ],
+        "consequent": [
+            2,
+            4
+        ],
+        "confidence": 0.333333,
+        "support": 0.2,
+        "lift": 0.833333
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            1,
+            5
+        ],
+        "confidence": 0.2,
+        "support": 0.2,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            3,
+            4
+        ],
+        "confidence": 0.2,
+        "support": 0.2,
+        "lift": 1.0
+    },
+    {
+        "antecedent": [
+            2
+        ],
+        "consequent": [
+            4,
+            5
+        ],
+        "confidence": 0.2,
+        "support": 0.2,
+        "lift": 1.0
+    }
+]

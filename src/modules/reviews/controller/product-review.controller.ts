@@ -4,11 +4,14 @@
   Delete,
   Get,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Put,
   Query,
 } from '@nestjs/common';
+
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
@@ -22,6 +25,7 @@ import type { ProductReviewService } from 'src/modules/reviews/service/product-r
 @Controller()
 export class ProductReviewController {
   constructor(
+    @Inject(PROVIDER_TOKEN.PRODUCT_REVIEW_SERVICE)
     private readonly productReviewService: ProductReviewService,
   ) {}
 
@@ -45,51 +49,30 @@ export class ProductReviewController {
     );
   }
 
-  @Post(
-    UrlConstant.ProductReview.CREATE_REVIEW,
-  )
-  async createReview(
-    @Body() req: ReqCreateProductReviewDto,
-  ) {
+  @Post(UrlConstant.ProductReview.CREATE_REVIEW)
+  async createReview(@Body() req: ReqCreateProductReviewDto) {
     return VsResponseUtil.success(
-      await this.productReviewService.createReview(
-        req,
-      ),
+      await this.productReviewService.createReview(req),
     );
   }
 
-  @Put(
-    UrlConstant.ProductReview.UPDATE_REVIEW,
-  )
-  async updateReview(
-    @Body() req: ReqUpdateProductReviewDto,
-  ) {
+  @Put(UrlConstant.ProductReview.UPDATE_REVIEW)
+  async updateReview(@Body() req: ReqUpdateProductReviewDto) {
     return VsResponseUtil.success(
-      await this.productReviewService.updateReview(
-        req,
-      ),
+      await this.productReviewService.updateReview(req),
     );
   }
 
   @Delete(
-    UrlConstant.ProductReview.DELETE_REVIEW.replace(
-      '{reviewId}',
-      ':reviewId',
-    ),
+    UrlConstant.ProductReview.DELETE_REVIEW.replace('{reviewId}', ':reviewId'),
   )
-  async deleteReview(
-    @Param('reviewId') reviewId: number,
-  ) {
+  async deleteReview(@Param('reviewId') reviewId: number) {
     return VsResponseUtil.success(
-      await this.productReviewService.deleteReview(
-        Number(reviewId),
-      ),
+      await this.productReviewService.deleteReview(Number(reviewId)),
     );
   }
 
-  @Get(
-    UrlConstant.ProductReview.GET_ALL_REVIEWS,
-  )
+  @Get(UrlConstant.ProductReview.GET_ALL_REVIEWS)
   async getAllReviews(
     @Query('filter') filter: string[] | undefined,
     @Query('page') page = 1,

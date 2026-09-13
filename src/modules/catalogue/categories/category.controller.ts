@@ -16,11 +16,16 @@ import { UrlConstant } from 'src/common/constants/url.constant';
 import { ReqCreateCategoryDto } from 'src/modules/catalogue/categories/dto/req-create-category.dto';
 import { ReqUpdateCategoryDto } from 'src/modules/catalogue/categories/dto/request/req-update-category.dto';
 import type { CategoryService } from 'src/modules/catalogue/categories/service/category.service';
+import { Inject } from '@nestjs/common';
+
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+
 
 @RestApiV1()
 @Controller()
 export class CategoryController {
   constructor(
+    @Inject(PROVIDER_TOKEN.CATEGORY_SERVICE)
     private readonly categoryService: CategoryService,
   ) {}
 
@@ -34,22 +39,16 @@ export class CategoryController {
   }
 
   @Get(UrlConstant.Category.GET_CATEGORY)
-  async getCategoryDetail(
-    @Param('id') id: string,
-  ) {
+  async getCategoryDetail(@Param('id') id: string) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.categoryService.getCategoryDetail(
-        Number(id),
-      ),
+      await this.categoryService.getCategoryDetail(Number(id)),
     );
   }
 
   // Admin
   @Post(UrlConstant.Category.CREATE_CATEGORY)
-  async createCategory(
-    @Body() req: ReqCreateCategoryDto,
-  ) {
+  async createCategory(@Body() req: ReqCreateCategoryDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.CREATED,
       await this.categoryService.createCategory(req),
@@ -57,21 +56,15 @@ export class CategoryController {
   }
 
   @Put(UrlConstant.Category.UPDATE_CATEGORY)
-  async updateCategory(
-    @Body() req: ReqUpdateCategoryDto,
-  ) {
+  async updateCategory(@Body() req: ReqUpdateCategoryDto) {
     return this.categoryService.updateCategory(req);
   }
 
   @Delete(UrlConstant.Category.DELETE_CATEGORY)
-  async deleteCategory(
-    @Param('id') id: string,
-  ) {
+  async deleteCategory(@Param('id') id: string) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.categoryService.deleteCategory(
-        Number(id),
-      ),
+      await this.categoryService.deleteCategory(Number(id)),
     );
   }
 }

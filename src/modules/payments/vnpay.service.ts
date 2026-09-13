@@ -22,47 +22,37 @@ import { Inventory } from 'src/modules/inventory/entities/inventory.entity';
 import { InventoryTransaction } from 'src/modules/inventory/entities/inventory-transaction.entity';
 import type { UserService } from 'src/modules/users/service/user.service';
 import { PaymentStatusDto } from 'src/modules/orders/dto/response/payment-status.dto';
-
+import { Inject } from '@nestjs/common';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 @Injectable()
 export class VNPayService {
   constructor(
     private readonly configService: ConfigService,
     private readonly vnPayUtil: VNPayUtil,
     private readonly dataSource: DataSource,
+
+    @Inject(PROVIDER_TOKEN.USER_SERVICE)
     private readonly userService: UserService,
   ) {}
 
-  async createPaymentUrl(
-    orderId: number,
-    request: Request,
-  ): Promise<string> {
-    const order = await this.dataSource
-      .getRepository(Order)
-      .findOne({
-        where: { id: orderId },
-        relations: ['payment'],
-      });
+  async createPaymentUrl(orderId: number, request: Request): Promise<string> {
+    const order = await this.dataSource.getRepository(Order).findOne({
+      where: { id: orderId },
+      relations: ['payment'],
+    });
 
     if (!order) {
-      throw new NotFoundException(
-        `Not found order with id: ${orderId}`,
-      );
+      throw new NotFoundException(`Not found order with id: ${orderId}`);
     }
 
     if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException(
-        'Order status is not in PENDING status',
-      );
+      throw new BadRequestException('Order status is not in PENDING status');
     }
 
     const tmnCode = this.configService.get<string>('vnpay.tmnCode');
-    const hashSecret = this.configService.get<string>(
-      'vnpay.hashSecret',
-    );
+    const hashSecret = this.configService.get<string>('vnpay.hashSecret');
     const vnpayUrl = this.configService.get<string>('vnpay.url');
-    const returnUrl = this.configService.get<string>(
-      'vnpay.returnUrl',
-    );
+    const returnUrl = this.configService.get<string>('vnpay.returnUrl');
 
     if (!tmnCode || !hashSecret || !vnpayUrl || !returnUrl) {
       throw new Error('VNPAY configuration is incomplete');
@@ -70,9 +60,7 @@ export class VNPayService {
 
     const vnpTxnRef = `${orderId}_${Date.now()}`;
 
-    const vnpAmount = String(
-      Math.round(Number(order.totalAmount ?? 0) * 100),
-    );
+    const vnpAmount = String(Math.round(Number(order.totalAmount ?? 0) * 100));
 
     const now = new Date();
 
@@ -89,34 +77,23 @@ export class VNPayService {
       vnp_ReturnUrl: returnUrl,
       vnp_IpAddr: this.vnPayUtil.getCurrentIp(request),
       vnp_CreateDate: this.formatDate(now),
-      vnp_ExpireDate: this.formatDate(
-        new Date(now.getTime() + 15 * 60 * 1000),
-      ),
+      vnp_ExpireDate: this.formatDate(new Date(now.getTime() + 15 * 60 * 1000)),
     };
 
-    const sortedEntries = Object.entries(vnpParams).sort(
-      ([keyA], [keyB]) => keyA.localeCompare(keyB),
+    const sortedEntries = Object.entries(vnpParams).sort(([keyA], [keyB]) =>
+      keyA.localeCompare(keyB),
     );
 
     const hashData = sortedEntries
       .filter(
-        ([, value]) =>
-          value !== null &&
-          value !== undefined &&
-          value !== '',
+        ([, value]) => value !== null && value !== undefined && value !== '',
       )
-      .map(
-        ([key, value]) =>
-          `${key}=${encodeURIComponent(value)}`,
-      )
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
       .join('&');
 
     const query = sortedEntries
       .filter(
-        ([, value]) =>
-          value !== null &&
-          value !== undefined &&
-          value !== '',
+        ([, value]) => value !== null && value !== undefined && value !== '',
       )
       .map(
         ([key, value]) =>
@@ -124,18 +101,13 @@ export class VNPayService {
       )
       .join('&');
 
-    const secureHash = this.vnPayUtil.hmacSHA512(
-      hashSecret,
-      hashData,
-    );
+    const secureHash = this.vnPayUtil.hmacSHA512(hashSecret, hashData);
 
     return `${vnpayUrl}?${query}&vnp_SecureHash=${secureHash}`;
   }
 
   async handleReturn(request: Request): Promise<string> {
-    const hashSecret = this.configService.get<string>(
-      'vnpay.hashSecret',
-    );
+    const hashSecret = this.configService.get<string>('vnpay.hashSecret');
 
     if (!hashSecret) {
       throw new Error('VNPAY hash secret is not configured');
@@ -149,9 +121,7 @@ export class VNPayService {
         key !== 'vnp_SecureHash' &&
         key !== 'vnp_SecureHashType'
       ) {
-        const parameterValue = Array.isArray(value)
-          ? value[0]
-          : value;
+        const parameterValue = Array.isArray(value) ? value[0] : value;
 
         if (
           parameterValue !== undefined &&
@@ -163,8 +133,8 @@ export class VNPayService {
       }
     });
 
-    const sortedParams = [...params.entries()].sort(
-      ([keyA], [keyB]) => keyA.localeCompare(keyB),
+    const sortedParams = [...params.entries()].sort(([keyA], [keyB]) =>
+      keyA.localeCompare(keyB),
     );
 
     const hashData = sortedParams
@@ -181,39 +151,26 @@ export class VNPayService {
         ? secureHashValue
         : undefined;
 
-    const computedHash = this.vnPayUtil.hmacSHA512(
-      hashSecret,
-      hashData,
-    );
+    const computedHash = this.vnPayUtil.hmacSHA512(hashSecret, hashData);
 
     if (computedHash !== secureHash) {
       return 'INVALID_SIGNATURE';
     }
 
-    const responseCode = this.getQueryString(
-      request.query.vnp_ResponseCode,
-    );
+    const responseCode = this.getQueryString(request.query.vnp_ResponseCode);
 
-    const txnRef = this.getQueryString(
-      request.query.vnp_TxnRef,
-    );
+    const txnRef = this.getQueryString(request.query.vnp_TxnRef);
 
-    const transactionId = this.getQueryString(
-      request.query.vnp_TransactionNo,
-    );
+    const transactionId = this.getQueryString(request.query.vnp_TransactionNo);
 
     if (!txnRef) {
-      throw new BadRequestException(
-        'VNPAY transaction reference is missing',
-      );
+      throw new BadRequestException('VNPAY transaction reference is missing');
     }
 
     const orderId = Number(txnRef.split('_')[0]);
 
     if (!Number.isInteger(orderId)) {
-      throw new BadRequestException(
-        'Invalid VNPAY transaction reference',
-      );
+      throw new BadRequestException('Invalid VNPAY transaction reference');
     }
 
     return this.dataSource.transaction(async (manager) => {
@@ -225,23 +182,15 @@ export class VNPayService {
 
       const order = await orderRepository.findOne({
         where: { id: orderId },
-        relations: [
-          'payment',
-          'orderDetails',
-          'orderDetails.product',
-        ],
+        relations: ['payment', 'orderDetails', 'orderDetails.product'],
       });
 
       if (!order) {
-        throw new NotFoundException(
-          'Không tìm thấy đơn hàng',
-        );
+        throw new NotFoundException('Không tìm thấy đơn hàng');
       }
 
       if (!order.payment) {
-        throw new NotFoundException(
-          'Không tìm thấy payment của đơn hàng',
-        );
+        throw new NotFoundException('Không tìm thấy payment của đơn hàng');
       }
 
       if (order.payment.status !== PaymentStatus.PENDING) {
@@ -277,10 +226,7 @@ export class VNPayService {
 
             const inventory = await inventoryRepository
               .createQueryBuilder('inventory')
-              .leftJoinAndSelect(
-                'inventory.product',
-                'product',
-              )
+              .leftJoinAndSelect('inventory.product', 'product')
               .where('product.id = :productId', { productId })
               .getOne();
 
@@ -297,23 +243,18 @@ export class VNPayService {
               break;
             }
 
-            inventory.quantity =
-              oldQuantity - orderDetail.quantity;
+            inventory.quantity = oldQuantity - orderDetail.quantity;
 
             await inventoryRepository.save(inventory);
 
-            const inventoryTransaction =
-              inventoryTransactionRepository.create({
-                inventory,
-                quantity: orderDetail.quantity,
-                type: TypeInventory.EXPORT,
-                note:
-                  'Export product to order after successful payment',
-              });
+            const inventoryTransaction = inventoryTransactionRepository.create({
+              inventory,
+              quantity: orderDetail.quantity,
+              type: TypeInventory.EXPORT,
+              note: 'Export product to order after successful payment',
+            });
 
-            await inventoryTransactionRepository.save(
-              inventoryTransaction,
-            );
+            await inventoryTransactionRepository.save(inventoryTransaction);
           }
         }
 
@@ -351,20 +292,14 @@ export class VNPayService {
     });
   }
 
-  async getPaymentStatus(
-    orderId: number,
-  ): Promise<PaymentStatusDto> {
-    const order = await this.dataSource
-      .getRepository(Order)
-      .findOne({
-        where: { id: orderId },
-        relations: ['payment', 'user'],
-      });
+  async getPaymentStatus(orderId: number): Promise<PaymentStatusDto> {
+    const order = await this.dataSource.getRepository(Order).findOne({
+      where: { id: orderId },
+      relations: ['payment', 'user'],
+    });
 
     if (!order) {
-      throw new NotFoundException(
-        `Không tìm thấy đơn hàng ID: ${orderId}`,
-      );
+      throw new NotFoundException(`Không tìm thấy đơn hàng ID: ${orderId}`);
     }
 
     const currentUser = await this.userService.getUserLogin();
@@ -380,18 +315,14 @@ export class VNPayService {
     dto.orderId = order.id;
     dto.orderStatus = order.status as OrderStatus;
     dto.totalAmount = Number(order.totalAmount ?? 0);
-    dto.transactionId =
-      order.payment?.transactionId ?? '';
+    dto.transactionId = order.payment?.transactionId ?? '';
 
     if (order.payment) {
-      dto.paymentStatus =
-        order.payment.status as PaymentStatus;
+      dto.paymentStatus = order.payment.status as PaymentStatus;
 
-      dto.transactionId =
-        order.payment.transactionId ?? '';
+      dto.transactionId = order.payment.transactionId ?? '';
 
-      dto.paymentMethod =
-        order.payment.paymentMethod?.toString() ?? '';
+      dto.paymentMethod = order.payment.paymentMethod?.toString() ?? '';
     }
 
     return dto;
@@ -408,9 +339,7 @@ export class VNPayService {
     return `${year}${month}${day}${hour}${minute}${second}`;
   }
 
-  private getQueryString(
-    value: unknown,
-  ): string | undefined {
+  private getQueryString(value: unknown): string | undefined {
     if (typeof value === 'string') {
       return value;
     }
@@ -418,9 +347,7 @@ export class VNPayService {
     if (Array.isArray(value)) {
       const firstValue = value[0];
 
-      return typeof firstValue === 'string'
-        ? firstValue
-        : undefined;
+      return typeof firstValue === 'string' ? firstValue : undefined;
     }
 
     return undefined;

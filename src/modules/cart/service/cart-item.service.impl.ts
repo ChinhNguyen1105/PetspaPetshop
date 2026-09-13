@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+﻿import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { BadRequestException } from 'src/common/exceptions/bad-request.exception';
 import { ForbiddenException } from 'src/common/exceptions/forbidden.exception';
@@ -24,38 +24,37 @@ import { ProductRepository } from 'src/modules/catalogue/products/repositories/p
 import { UserRepository } from 'src/modules/users/repositories/user.repository';
 import type { UserService } from 'src/modules/users/service/user.service';
 
-import { CartItemService } from 'src/modules/cart/service/cart-item.service';
-
+import type { CartItemService } from 'src/modules/cart/service/cart-item.service';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 @Injectable()
 export class CartItemServiceImpl implements CartItemService {
-  private readonly logger = new Logger(
-    CartItemServiceImpl.name,
-  );
+  private readonly logger = new Logger(CartItemServiceImpl.name);
 
   constructor(
     private readonly cartItemRepository: CartItemRepository,
+
     private readonly productRepository: ProductRepository,
+
+    @Inject(PROVIDER_TOKEN.USER_SERVICE)
     private readonly userService: UserService,
+
     private readonly cartRepository: CartRepository,
+
     private readonly inventoryRepository: InventoryRepository,
+
     private readonly cartItemMapper: CartItemMapper,
+
     private readonly userRepository: UserRepository,
   ) {}
 
-  async addCartItem(
-    reqAddCartItem: ReqAddCartItemDto,
-  ): Promise<CartItemDto> {
+  async addCartItem(reqAddCartItem: ReqAddCartItemDto): Promise<CartItemDto> {
     this.logger.log(
       `[CART] Thêm sản phẩm ID: ${reqAddCartItem.productId} vào giỏ hàng`,
     );
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    let cart =
-      await this.cartRepository.findByUserId(
-        currentUser.id,
-      );
+    let cart = await this.cartRepository.findByUserId(currentUser.id);
 
     if (!cart) {
       this.logger.log(
@@ -67,27 +66,19 @@ export class CartItemServiceImpl implements CartItemService {
 
       currentUser.cart = newCart;
 
-      await this.userRepository
-        .getRepository()
-        .save(currentUser);
+      await this.userRepository.getRepository().save(currentUser);
 
-      cart =
-        await this.cartRepository
-          .getRepository()
-          .save(newCart);
+      cart = await this.cartRepository.getRepository().save(newCart);
     }
 
-    const product =
-      await this.productRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: reqAddCartItem.productId,
-          },
-          relations: {
-            productImages: true,
-          },
-        });
+    const product = await this.productRepository.getRepository().findOne({
+      where: {
+        id: reqAddCartItem.productId,
+      },
+      relations: {
+        productImages: true,
+      },
+    });
 
     if (!product) {
       throw new NotFoundException(
@@ -95,10 +86,9 @@ export class CartItemServiceImpl implements CartItemService {
       );
     }
 
-    const inventory =
-      await this.inventoryRepository.findByProductId(
-        reqAddCartItem.productId,
-      );
+    const inventory = await this.inventoryRepository.findByProductId(
+      reqAddCartItem.productId,
+    );
 
     if (!inventory) {
       throw new NotFoundException(
@@ -106,32 +96,23 @@ export class CartItemServiceImpl implements CartItemService {
       );
     }
 
-    const inventoryQuantity =
-      inventory.quantity ?? 0;
+    const inventoryQuantity = inventory.quantity ?? 0;
 
-    if (
-      inventoryQuantity <
-      reqAddCartItem.quantity
-    ) {
+    if (inventoryQuantity < reqAddCartItem.quantity) {
       throw new BadRequestException(
         `Inventory quantity is not enough: ${inventoryQuantity}`,
       );
     }
 
-    let cartItem =
-      await this.cartItemRepository
-        .findByCartIdAndProductId(
-          cart.id,
-          product.id,
-        );
+    let cartItem = await this.cartItemRepository.findByCartIdAndProductId(
+      cart.id,
+      product.id,
+    );
 
     if (cartItem) {
-      const currentQuantity =
-        cartItem.quantity ?? 0;
+      const currentQuantity = cartItem.quantity ?? 0;
 
-      const newQty =
-        currentQuantity +
-        reqAddCartItem.quantity;
+      const newQty = currentQuantity + reqAddCartItem.quantity;
 
       if (inventoryQuantity < newQty) {
         throw new BadRequestException(
@@ -152,13 +133,10 @@ export class CartItemServiceImpl implements CartItemService {
       cartItem = new CartItem();
       cartItem.cart = cart;
       cartItem.product = product;
-      cartItem.quantity =
-        reqAddCartItem.quantity;
+      cartItem.quantity = reqAddCartItem.quantity;
     }
 
-    await this.cartItemRepository
-      .getRepository()
-      .save(cartItem);
+    await this.cartItemRepository.getRepository().save(cartItem);
 
     this.logger.log(
       `[CART] Lưu CartItem thành công | Product ID: ${reqAddCartItem.productId} | Quantity: ${cartItem.quantity}`,
@@ -167,60 +145,46 @@ export class CartItemServiceImpl implements CartItemService {
     return this.cartItemMapper.toDto(cartItem);
   }
 
-  async updateCartItem(
-    req: ReqUpdateCartItemDto,
-  ): Promise<CartItemDto> {
+  async updateCartItem(req: ReqUpdateCartItemDto): Promise<CartItemDto> {
     this.logger.log(
       `[CART] Cập nhật CartItem ID: ${req.itemId} | Quantity mới: ${req.quantity}`,
     );
 
-    const cartItem =
-      await this.cartItemRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: req.itemId,
-          },
-          relations: {
-            cart: {
-              user: true,
-            },
-            product: {
-              productImages: true,
-            },
-          },
-        });
+    const cartItem = await this.cartItemRepository.getRepository().findOne({
+      where: {
+        id: req.itemId,
+      },
+      relations: {
+        cart: {
+          user: true,
+        },
+        product: {
+          productImages: true,
+        },
+      },
+    });
 
     if (!cartItem) {
-      throw new NotFoundException(
-        `CartItem not found with ID: ${req.itemId}`,
-      );
+      throw new NotFoundException(`CartItem not found with ID: ${req.itemId}`);
     }
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    if (
-      cartItem.cart?.user?.id !==
-      currentUser.id
-    ) {
+    if (cartItem.cart?.user?.id !== currentUser.id) {
       throw new ForbiddenException(
         'You do not have permission to update this cart item',
       );
     }
 
     if (req.quantity === 0) {
-      await this.cartItemRepository
-        .getRepository()
-        .remove(cartItem);
+      await this.cartItemRepository.getRepository().remove(cartItem);
 
       return null as unknown as CartItemDto;
     }
 
-    const inventory =
-      await this.inventoryRepository.findByProductId(
-        cartItem.product.id,
-      );
+    const inventory = await this.inventoryRepository.findByProductId(
+      cartItem.product.id,
+    );
 
     if (!inventory) {
       throw new NotFoundException(
@@ -228,12 +192,9 @@ export class CartItemServiceImpl implements CartItemService {
       );
     }
 
-    const inventoryQuantity =
-      inventory.quantity ?? 0;
+    const inventoryQuantity = inventory.quantity ?? 0;
 
-    if (
-      inventoryQuantity < req.quantity
-    ) {
+    if (inventoryQuantity < req.quantity) {
       throw new BadRequestException(
         `Inventory quantity is not enough: ${inventoryQuantity}`,
       );
@@ -241,65 +202,42 @@ export class CartItemServiceImpl implements CartItemService {
 
     cartItem.quantity = req.quantity;
 
-    await this.cartItemRepository
-      .getRepository()
-      .save(cartItem);
+    await this.cartItemRepository.getRepository().save(cartItem);
 
-    this.logger.log(
-      `[CART] Cập nhật thành công CartItem ID: ${req.itemId}`,
-    );
+    this.logger.log(`[CART] Cập nhật thành công CartItem ID: ${req.itemId}`);
 
-    return this.cartItemMapper.toDto(
-      cartItem,
-    );
+    return this.cartItemMapper.toDto(cartItem);
   }
 
-  async deleteCartItem(
-    itemId: number,
-  ): Promise<CommonResponseDto> {
-    this.logger.log(
-      `[CART] Xóa CartItem ID: ${itemId}`,
-    );
+  async deleteCartItem(itemId: number): Promise<CommonResponseDto> {
+    this.logger.log(`[CART] Xóa CartItem ID: ${itemId}`);
 
-    const cartItem =
-      await this.cartItemRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: itemId,
-          },
-          relations: {
-            cart: {
-              user: true,
-            },
-          },
-        });
+    const cartItem = await this.cartItemRepository.getRepository().findOne({
+      where: {
+        id: itemId,
+      },
+      relations: {
+        cart: {
+          user: true,
+        },
+      },
+    });
 
     if (!cartItem) {
-      throw new NotFoundException(
-        `CartItem not found with ID: ${itemId}`,
-      );
+      throw new NotFoundException(`CartItem not found with ID: ${itemId}`);
     }
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    if (
-      cartItem.cart?.user?.id !==
-      currentUser.id
-    ) {
+    if (cartItem.cart?.user?.id !== currentUser.id) {
       throw new ForbiddenException(
         'You do not have permission to delete this cart item',
       );
     }
 
-    await this.cartItemRepository
-      .getRepository()
-      .remove(cartItem);
+    await this.cartItemRepository.getRepository().remove(cartItem);
 
-    this.logger.log(
-      `[CART] Xóa thành công CartItem ID: ${itemId}`,
-    );
+    this.logger.log(`[CART] Xóa thành công CartItem ID: ${itemId}`);
 
     return {
       status: true,

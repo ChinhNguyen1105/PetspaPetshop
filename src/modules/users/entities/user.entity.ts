@@ -1,4 +1,5 @@
-﻿import {
+﻿
+import {
   Column,
   Entity,
   JoinColumn,
@@ -8,18 +9,17 @@
   PrimaryColumn,
 } from 'typeorm';
 
-import { FlagUserDateAuditing } from '../../../common/entities/flag-user-date-auditing.entity';
+import { FlagUserDateAuditing } from 'src/common/entities/flag-user-date-auditing.entity';
+import { GenderEnum } from 'src/common/constants/gender.enum';
 
-import { GenderEnum } from '../../../common/constants/gender.enum';
-
-import { Pet } from '../../pets/entities/pet.entity';
-import { Booking } from '../../bookings/entities/booking.entity';
-import { Order } from '../../orders/entities/order.entity';
-import { Role } from '../../roles/entities/role.entity';
-import { ShippingAddress } from '../../shipping/entities/shipping-address.entity';
-import { ProductReview } from '../../reviews/entities/product-review.entity';
-import { PetServiceReview } from '../../reviews/entities/pet-service-review.entity';
-import { Cart } from '../../cart/entities/cart.entity';
+import { Pet } from 'src/modules/pets/entities/pet.entity';
+import { Booking } from 'src/modules/bookings/entities/booking.entity';
+import { Order } from 'src/modules/orders/entities/order.entity';
+import { Role } from 'src/modules/roles/entities/role.entity';
+import { ShippingAddress } from 'src/modules/shipping/entities/shipping-address.entity';
+import { ProductReview } from 'src/modules/reviews/entities/product-review.entity';
+import { PetServiceReview } from 'src/modules/reviews/entities/pet-service-review.entity';
+import { Cart } from 'src/modules/cart/entities/cart.entity';
 
 @Entity('tbl_users')
 export class User extends FlagUserDateAuditing {
@@ -97,13 +97,19 @@ export class User extends FlagUserDateAuditing {
   })
   role: Role;
 
-  @OneToMany(() => ShippingAddress, (shippingAddress) => shippingAddress.user)
+  @OneToMany(
+    () => ShippingAddress,
+    (shippingAddress) => shippingAddress.user,
+  )
   shippingAddresses: ShippingAddress[];
 
   @OneToMany(() => ProductReview, (review) => review.user)
   reviews: ProductReview[];
 
-  @OneToMany(() => PetServiceReview, (review) => review.user)
+  @OneToMany(
+    () => PetServiceReview,
+    (review) => review.user,
+  )
   petServiceReviews: PetServiceReview[];
 
   @OneToOne(() => Cart, (cart) => cart.user)

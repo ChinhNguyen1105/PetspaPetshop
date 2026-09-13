@@ -4,11 +4,13 @@
   Delete,
   Get,
   HttpStatus,
+  Inject,
   Param,
-  Patch,
   Post,
   Query,
 } from '@nestjs/common';
+
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
@@ -21,36 +23,23 @@ import type { PetServiceReviewService } from 'src/modules/reviews/service/pet-se
 @Controller()
 export class PetServiceReviewController {
   constructor(
+    @Inject(PROVIDER_TOKEN.PET_SERVICE_REVIEW_SERVICE)
     private readonly reviewService: PetServiceReviewService,
   ) {}
 
-  @Post(
-    UrlConstant.PetServiceReviews.CREATE_REVIEW,
-  )
-  async createReview(
-    @Body() req: ReqCreateServiceReviewDto,
-  ) {
+  @Post(UrlConstant.PetServiceReviews.CREATE_REVIEW)
+  async createReview(@Body() req: ReqCreateServiceReviewDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.CREATED,
       await this.reviewService.createReview(req),
     );
   }
 
-  @Delete(
-    UrlConstant.PetServiceReviews.DELETE_REVIEW.replace(
-      '{id}',
-      ':id',
-    ),
-  )
-  async deleteReview(
-    @Param('id') id: number,
-  ) {
+  @Delete(UrlConstant.PetServiceReviews.DELETE_REVIEW.replace('{id}', ':id'))
+  async deleteReview(@Param('id') id: number) {
     await this.reviewService.deleteReview(id);
 
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.NO_CONTENT,
-      null,
-    );
+    return VsResponseUtil.successWithStatus(HttpStatus.NO_CONTENT, null);
   }
 
   @Get(
@@ -80,14 +69,10 @@ export class PetServiceReviewController {
       ':serviceId',
     ),
   )
-  async getAverageRating(
-    @Param('serviceId') serviceId: number,
-  ) {
+  async getAverageRating(@Param('serviceId') serviceId: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.reviewService.getAverageRating(
-        Number(serviceId),
-      ),
+      await this.reviewService.getAverageRating(Number(serviceId)),
     );
   }
 
@@ -97,14 +82,10 @@ export class PetServiceReviewController {
       ':serviceId',
     ),
   )
-  async getReviewCount(
-    @Param('serviceId') serviceId: number,
-  ) {
+  async getReviewCount(@Param('serviceId') serviceId: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.reviewService.getReviewCount(
-        Number(serviceId),
-      ),
+      await this.reviewService.getReviewCount(Number(serviceId)),
     );
   }
 }

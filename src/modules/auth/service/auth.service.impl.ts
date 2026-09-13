@@ -1,13 +1,21 @@
-﻿import { Injectable, Inject } from '@nestjs/common';
+﻿
+import { randomUUID } from 'crypto';
+
+import {
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 
 import { BadRequestException } from 'src/common/exceptions/bad-request.exception';
 import { ConflictException } from 'src/common/exceptions/conflict.exception';
 import { RoleConstant } from 'src/common/constants/role.constant';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { ReqLoginDto } from 'src/modules/auth/dto/request/req-login.dto';
 import { ReqRegisterDto } from 'src/modules/auth/dto/request/req-register.dto';
+
 import { LoginResultDto } from 'src/modules/auth/dto/response/login-result.dto';
 import {
   ResLoginDto,
@@ -19,28 +27,34 @@ import { JwtTokenProvider } from 'src/modules/auth/security/jwt-token-provider';
 import { UserPrincipal } from 'src/modules/auth/security/user-principal';
 
 import { AuthService } from 'src/modules/auth/service/auth.service';
+
 import type { UserService } from 'src/modules/users/service/user.service';
-
 import { UserRepository } from 'src/modules/users/repositories/user.repository';
-import { RoleRepository } from 'src/modules/roles/repositories/role.repository';
-
 import { UserDto } from 'src/modules/users/dto/response/user.dto';
 import { User } from 'src/modules/users/entities/user.entity';
+
+import { RoleRepository } from 'src/modules/roles/repositories/role.repository';
 
 @Injectable()
 export class AuthServiceImpl implements AuthService {
   private readonly refreshExpiration: number;
 
   constructor(
-    @Inject('USER_SERVICE')
+    @Inject(PROVIDER_TOKEN.USER_SERVICE)
     private readonly userService: UserService,
+
     private readonly jwtTokenProvider: JwtTokenProvider,
+
     private readonly userRepository: UserRepository,
+
     private readonly roleRepository: RoleRepository,
+
     private readonly configService: ConfigService,
   ) {
-    this.refreshExpiration = this.configService.getOrThrow<number>(
-      'jwt.refresh.expiration_time',
+    this.refreshExpiration = Number(
+      this.configService.getOrThrow<string>(
+        'JWT_REFRESH_EXPIRATION',
+      ),
     );
   }
 
@@ -48,25 +62,40 @@ export class AuthServiceImpl implements AuthService {
     req: ReqLoginDto,
     request: import('express').Request,
   ): Promise<LoginResultDto> {
-    const user = await this.userService.getUserByEmail(req.email);
+    const user =
+      await this.userService.getUserByEmail(
+        req.email,
+      );
 
-    const passwordMatches = await bcrypt.compare(req.password, user.password);
+    const passwordMatches =
+      await bcrypt.compare(
+        req.password,
+        user.password,
+      );
 
     if (!passwordMatches) {
-      throw new BadRequestException('Tài khoản hoặc mật khẩu không chính xác');
+      throw new BadRequestException(
+        'Tài khoản hoặc mật khẩu không chính xác',
+      );
     }
 
     if (user.email === null) {
-      throw new BadRequestException('Email của tài khoản không hợp lệ');
+      throw new BadRequestException(
+        'Email của tài khoản không hợp lệ',
+      );
     }
 
-    const userPrincipal = UserPrincipal.create(user);
+    const userPrincipal =
+      UserPrincipal.create(user);
 
     request.user = userPrincipal;
 
-    const resLoginDto = new ResLoginDto();
+    const resLoginDto =
+      new ResLoginDto();
 
-    const userLoginDto = new UserLoginDto();
+    const userLoginDto =
+      new UserLoginDto();
+
     userLoginDto.id = user.id;
     userLoginDto.email = user.email;
     userLoginDto.name = user.name;
@@ -74,25 +103,38 @@ export class AuthServiceImpl implements AuthService {
 
     resLoginDto.user = userLoginDto;
 
-    const accessToken = this.jwtTokenProvider.generateToken(
-      userPrincipal,
-      false,
+    const accessToken =
+      this.jwtTokenProvider.generateToken(
+        userPrincipal,
+        false,
+      );
+
+    resLoginDto.accessToken =
+      accessToken;
+
+    const refreshToken =
+      this.jwtTokenProvider.generateToken(
+        userPrincipal,
+        true,
+      );
+
+    await this.userService.updateUserToken(
+      refreshToken,
+      req.email,
     );
 
-    resLoginDto.accessToken = accessToken;
+    const responseCookie =
+      new ResponseCookieDto();
 
-    const refreshToken = this.jwtTokenProvider.generateToken(
-      userPrincipal,
-      true,
-    );
+    responseCookie.name =
+      'refresh_token';
 
-    await this.userService.updateUserToken(refreshToken, req.email);
+    responseCookie.value =
+      refreshToken;
 
-    const responseCookie = new ResponseCookieDto();
+    responseCookie.maxAge =
+      this.refreshExpiration;
 
-    responseCookie.name = 'refresh_token';
-    responseCookie.value = refreshToken;
-    responseCookie.maxAge = this.refreshExpiration;
     responseCookie.domain = null;
     responseCookie.path = '/';
     responseCookie.secure = true;
@@ -100,60 +142,109 @@ export class AuthServiceImpl implements AuthService {
     responseCookie.partitioned = false;
     responseCookie.sameSite = null;
 
-    const loginResult = new LoginResultDto();
+    const loginResult =
+      new LoginResultDto();
 
-    loginResult.resLoginDTO = resLoginDto;
-    loginResult.responseCookie = responseCookie;
+    loginResult.resLoginDTO =
+      resLoginDto;
+
+    loginResult.responseCookie =
+      responseCookie;
 
     return loginResult;
   }
 
-  async getNewRefreshToken(refreshToken: string): Promise<ResLoginDto> {
+  async getNewRefreshToken(
+    refreshToken: string,
+  ): Promise<ResLoginDto> {
     return null as unknown as ResLoginDto;
   }
 
-  async register(reqRegister: ReqRegisterDto): Promise<UserDto> {
-    const exists = await this.userRepository.existsByEmailAndDeleteFlagFalse(
-      reqRegister.email,
-    );
+  async register(
+    reqRegister: ReqRegisterDto,
+  ): Promise<UserDto> {
+    const exists =
+      await this.userRepository
+        .existsByEmailAndDeleteFlagFalse(
+          reqRegister.email,
+        );
 
     if (exists) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException(
+        'Email already exists',
+      );
     }
 
-    if (reqRegister.password !== reqRegister.confirmPassword) {
+    if (
+      reqRegister.password !==
+      reqRegister.confirmPassword
+    ) {
       throw new BadRequestException(
         'Password and confirm password do not match',
       );
     }
 
-    const registerUser = new User();
+    const registerUser =
+      new User();
 
-    registerUser.name = reqRegister.name;
-    registerUser.email = reqRegister.email;
+    registerUser.id =
+      randomUUID();
 
-    registerUser.password = await bcrypt.hash(reqRegister.password, 10);
+    registerUser.name =
+      reqRegister.name;
 
-    registerUser.role = (await this.roleRepository.findByNameAndDeleteFlagFalse(
-      RoleConstant.USER,
-    )) as User['role'];
+    registerUser.email =
+      reqRegister.email;
 
-    const savedUser = await this.userRepository
-      .getRepository()
-      .save(registerUser);
+    registerUser.password =
+      await bcrypt.hash(
+        reqRegister.password,
+        10,
+      );
 
-    const registerResponseDto = new UserDto();
+    registerUser.role =
+      (await this.roleRepository
+        .findByNameAndDeleteFlagFalse(
+          RoleConstant.USER,
+        )) as User['role'];
 
-    registerResponseDto.id = savedUser.id;
-    registerResponseDto.dateOfBirth = savedUser.dateOfBirth;
-    registerResponseDto.email = savedUser.email;
-    registerResponseDto.gender = savedUser.gender;
-    registerResponseDto.name = savedUser.name;
-    registerResponseDto.avatarUrl = savedUser.avatarUrl;
-    registerResponseDto.createdDate = savedUser.createdDate;
-    registerResponseDto.lastModifiedDate = savedUser.lastModifiedDate;
-    registerResponseDto.createdBy = savedUser.createdBy;
-    registerResponseDto.lastModifiedBy = savedUser.lastModifiedBy;
+    const savedUser =
+      await this.userRepository
+        .getRepository()
+        .save(registerUser);
+
+    const registerResponseDto =
+      new UserDto();
+
+    registerResponseDto.id =
+      savedUser.id;
+
+    registerResponseDto.dateOfBirth =
+      savedUser.dateOfBirth;
+
+    registerResponseDto.email =
+      savedUser.email;
+
+    registerResponseDto.gender =
+      savedUser.gender;
+
+    registerResponseDto.name =
+      savedUser.name;
+
+    registerResponseDto.avatarUrl =
+      savedUser.avatarUrl;
+
+    registerResponseDto.createdDate =
+      savedUser.createdDate;
+
+    registerResponseDto.lastModifiedDate =
+      savedUser.lastModifiedDate;
+
+    registerResponseDto.createdBy =
+      savedUser.createdBy;
+
+    registerResponseDto.lastModifiedBy =
+      savedUser.lastModifiedBy;
 
     return registerResponseDto;
   }

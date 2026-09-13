@@ -1,6 +1,9 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿import { Injectable, Inject } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 
 import { OrderStatus } from 'src/common/constants/order-status.enum';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+
 import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
 import { BadRequestException } from 'src/common/exceptions/bad-request.exception';
 import { ForbiddenException } from 'src/common/exceptions/forbidden.exception';
@@ -8,8 +11,10 @@ import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 import { FilterProcessor } from 'src/common/specification/filter-processor';
 import { SpecificationBuilder } from 'src/common/specification/specification-builder';
 
-import { ProductRepository } from 'src/modules/catalogue/products/repositories/product.repository';
+import { Product } from 'src/modules/catalogue/products/entities/product.entity';
+
 import { OrderDetailRepository } from 'src/modules/orders/repositories/order-detail.repository';
+
 import { ReqCreateProductReviewDto } from 'src/modules/reviews/dto/request/req-create-product-review.dto';
 import { ReqUpdateProductReviewDto } from 'src/modules/reviews/dto/request/req-update-product-review.dto';
 import { ProductReviewResponseDto } from 'src/modules/reviews/dto/response/product-review-response.dto';
@@ -17,35 +22,35 @@ import { ProductReviewDto } from 'src/modules/reviews/dto/response/product-revie
 import { ProductReview } from 'src/modules/reviews/entities/product-review.entity';
 import { ProductReviewMapper } from 'src/modules/reviews/mapper/product-review.mapper';
 import { ProductReviewRepository } from 'src/modules/reviews/repositories/product-review.repository';
-import { ProductReviewService } from 'src/modules/reviews/service/product-review.service';
+import type { ProductReviewService } from 'src/modules/reviews/service/product-review.service';
+
 import type { UserService } from 'src/modules/users/service/user.service';
 
 @Injectable()
-export class ProductReviewServiceImpl
-  implements ProductReviewService
-{
+export class ProductReviewServiceImpl implements ProductReviewService {
   constructor(
     private readonly productReviewRepository: ProductReviewRepository,
+
+    @Inject(PROVIDER_TOKEN.USER_SERVICE)
     private readonly userService: UserService,
-    private readonly productRepository: ProductRepository,
+
+    private readonly dataSource: DataSource,
+
     private readonly orderDetailRepository: OrderDetailRepository,
+
     private readonly productReviewMapper: ProductReviewMapper,
   ) {}
 
   async createReview(
     req: ReqCreateProductReviewDto,
   ): Promise<ProductReviewDto> {
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    const product =
-      await this.productRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: req.productId,
-          },
-        });
+    const product = await this.dataSource.getRepository(Product).findOne({
+      where: {
+        id: req.productId,
+      },
+    });
 
     if (!product) {
       throw new NotFoundException(
@@ -54,12 +59,11 @@ export class ProductReviewServiceImpl
     }
 
     const hasPurchased =
-      await this.orderDetailRepository
-        .existsByProductIdAndOrderUserIdAndOrderStatus(
-          req.productId,
-          currentUser.id,
-          OrderStatus.DELIVERED,
-        );
+      await this.orderDetailRepository.existsByProductIdAndOrderUserIdAndOrderStatus(
+        req.productId,
+        currentUser.id,
+        OrderStatus.DELIVERED,
+      );
 
     if (!hasPurchased) {
       throw new BadRequestException(
@@ -68,11 +72,10 @@ export class ProductReviewServiceImpl
     }
 
     const alreadyReviewed =
-      await this.productReviewRepository
-        .existsByUserIdAndProductIdAndDeleteFlagFalse(
-          currentUser.id,
-          req.productId,
-        );
+      await this.productReviewRepository.existsByUserIdAndProductIdAndDeleteFlagFalse(
+        currentUser.id,
+        req.productId,
+      );
 
     if (alreadyReviewed) {
       throw new BadRequestException(
@@ -87,27 +90,20 @@ export class ProductReviewServiceImpl
     review.rating = req.rating;
     review.comment = req.comment;
 
-    const saved =
-      await this.productReviewRepository
-        .getRepository()
-        .save(review);
+    const saved = await this.productReviewRepository
+      .getRepository()
+      .save(review);
 
-    const newTotalReviews =
-      product.totalReviews + 1;
+    const newTotalReviews = product.totalReviews + 1;
 
     const newAvgRating =
-      (
-        product.avgRating * product.totalReviews +
-        req.rating
-      ) / newTotalReviews;
+      (product.avgRating * product.totalReviews + req.rating) / newTotalReviews;
 
     product.totalReviews = newTotalReviews;
-    product.avgRating =
-      Math.round(newAvgRating * 10) / 10;
 
-    await this.productRepository
-      .getRepository()
-      .save(product);
+    product.avgRating = Math.round(newAvgRating * 10) / 10;
+
+    await this.dataSource.getRepository(Product).save(product);
 
     return this.productReviewMapper.toDto(saved);
   }
@@ -115,33 +111,25 @@ export class ProductReviewServiceImpl
   async updateReview(
     req: ReqUpdateProductReviewDto,
   ): Promise<ProductReviewDto> {
-    const review =
-      await this.productReviewRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: req.reviewId,
-          },
-          relations: {
-            user: true,
-            product: true,
-          },
-        });
+    const review = await this.productReviewRepository.getRepository().findOne({
+      where: {
+        id: req.reviewId,
+      },
+      relations: {
+        user: true,
+        product: true,
+      },
+    });
 
     if (!review) {
-      throw new NotFoundException(
-        `Review with ID: ${req.reviewId} not found`,
-      );
+      throw new NotFoundException(`Review with ID: ${req.reviewId} not found`);
     }
 
     if (review.deleteFlag) {
-      throw new NotFoundException(
-        `Review with ID: ${req.reviewId} not found`,
-      );
+      throw new NotFoundException(`Review with ID: ${req.reviewId} not found`);
     }
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
     if (review.user.id !== currentUser.id) {
       throw new ForbiddenException(
@@ -156,69 +144,51 @@ export class ProductReviewServiceImpl
 
     if (oldRating !== newRating) {
       const newAvgRating =
-        (
-          product.avgRating * product.totalReviews -
-          oldRating +
-          newRating
-        ) / product.totalReviews;
+        (product.avgRating * product.totalReviews - oldRating + newRating) /
+        product.totalReviews;
 
-      product.avgRating =
-        Math.round(newAvgRating * 10) / 10;
+      product.avgRating = Math.round(newAvgRating * 10) / 10;
 
-      await this.productRepository
-        .getRepository()
-        .save(product);
+      await this.dataSource.getRepository(Product).save(product);
     }
 
     review.rating = newRating;
     review.comment = req.comment;
 
-    const saved =
-      await this.productReviewRepository
-        .getRepository()
-        .save(review);
+    const saved = await this.productReviewRepository
+      .getRepository()
+      .save(review);
 
     return this.productReviewMapper.toDto(saved);
   }
 
-  async deleteReview(
-    reviewId: number,
-  ): Promise<{ status: boolean; message: string }> {
-    const review =
-      await this.productReviewRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: reviewId,
-          },
-          relations: {
-            user: true,
-            product: true,
-          },
-        });
+  async deleteReview(reviewId: number): Promise<{
+    status: boolean;
+    message: string;
+  }> {
+    const review = await this.productReviewRepository.getRepository().findOne({
+      where: {
+        id: reviewId,
+      },
+      relations: {
+        user: true,
+        product: true,
+      },
+    });
 
     if (!review) {
-      throw new NotFoundException(
-        `Review with ID: ${reviewId} not found`,
-      );
+      throw new NotFoundException(`Review with ID: ${reviewId} not found`);
     }
 
     if (review.deleteFlag) {
-      throw new NotFoundException(
-        `Review with ID: ${reviewId} not found`,
-      );
+      throw new NotFoundException(`Review with ID: ${reviewId} not found`);
     }
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    const isAdmin =
-      currentUser.role?.name === 'ADMIN';
+    const isAdmin = currentUser.role?.name === 'ADMIN';
 
-    if (
-      !isAdmin &&
-      review.user.id !== currentUser.id
-    ) {
+    if (!isAdmin && review.user.id !== currentUser.id) {
       throw new ForbiddenException(
         'You do not have permission to delete this review',
       );
@@ -226,30 +196,23 @@ export class ProductReviewServiceImpl
 
     review.deleteFlag = true;
 
-    await this.productReviewRepository
-      .getRepository()
-      .save(review);
+    await this.productReviewRepository.getRepository().save(review);
 
     const product = review.product;
 
-    const newTotalReviews =
-      product.totalReviews - 1;
+    const newTotalReviews = product.totalReviews - 1;
 
     const newAvgRating =
       newTotalReviews === 0
         ? 0
-        : (
-            product.avgRating * product.totalReviews -
-            review.rating
-          ) / newTotalReviews;
+        : (product.avgRating * product.totalReviews - review.rating) /
+          newTotalReviews;
 
     product.totalReviews = newTotalReviews;
-    product.avgRating =
-      Math.round(newAvgRating * 10) / 10;
 
-    await this.productRepository
-      .getRepository()
-      .save(product);
+    product.avgRating = Math.round(newAvgRating * 10) / 10;
+
+    await this.dataSource.getRepository(Product).save(product);
 
     return {
       status: true,
@@ -262,34 +225,24 @@ export class ProductReviewServiceImpl
     page: number,
     pageSize: number,
   ): Promise<ProductReviewResponseDto> {
-    const product =
-      await this.productRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: productId,
-          },
-        });
+    const product = await this.dataSource.getRepository(Product).findOne({
+      where: {
+        id: productId,
+      },
+    });
 
     if (!product) {
-      throw new NotFoundException(
-        `Product with ID: ${productId} not found`,
-      );
+      throw new NotFoundException(`Product with ID: ${productId} not found`);
     }
 
-    const [
-      reviews,
-      total,
-    ] =
-      await this.productReviewRepository
-        .findByProductIdAndDeleteFlagFalse(
-          productId,
-          page,
-          pageSize,
-        );
+    const [reviews, total] =
+      await this.productReviewRepository.findByProductIdAndDeleteFlagFalse(
+        productId,
+        page,
+        pageSize,
+      );
 
-    const paginationDto =
-      new ResultPaginationDto();
+    const paginationDto = new ResultPaginationDto();
 
     paginationDto.meta = {
       page,
@@ -298,14 +251,14 @@ export class ProductReviewServiceImpl
       total,
     };
 
-    paginationDto.result =
-      this.productReviewMapper.toDtoList(reviews);
+    paginationDto.result = this.productReviewMapper.toDtoList(reviews);
 
-    const response =
-      new ProductReviewResponseDto();
+    const response = new ProductReviewResponseDto();
 
     response.avgRating = product.avgRating;
+
     response.totalReviews = product.totalReviews;
+
     response.reviews = paginationDto;
 
     return response;
@@ -316,52 +269,28 @@ export class ProductReviewServiceImpl
     page: number,
     pageSize: number,
   ): Promise<ResultPaginationDto> {
-    const specificationBuilder =
-      new SpecificationBuilder<ProductReview>();
+    const specificationBuilder = new SpecificationBuilder<ProductReview>();
 
-    FilterProcessor.process(
-      specificationBuilder,
-      filter,
-    );
+    FilterProcessor.process(specificationBuilder, filter);
 
-    const queryBuilder =
-      this.productReviewRepository
-        .getRepository()
-        .createQueryBuilder('review')
-        .leftJoinAndSelect(
-          'review.user',
-          'user',
-        )
-        .leftJoinAndSelect(
-          'review.product',
-          'product',
-        )
-        .where(
-          'review.deleteFlag = :deleteFlag',
-          {
-            deleteFlag: false,
-          },
-        )
-        .orderBy(
-          'review.createdDate',
-          'DESC',
-        );
+    const queryBuilder = this.productReviewRepository
+      .getRepository()
+      .createQueryBuilder('review')
+      .leftJoinAndSelect('review.user', 'user')
+      .leftJoinAndSelect('review.product', 'product')
+      .where('review.deleteFlag = :deleteFlag', {
+        deleteFlag: false,
+      })
+      .orderBy('review.createdDate', 'DESC');
 
-    specificationBuilder.apply(
-      queryBuilder,
-      'review',
-    );
+    specificationBuilder.apply(queryBuilder, 'review');
 
-    const [
-      reviews,
-      total,
-    ] = await queryBuilder
+    const [reviews, total] = await queryBuilder
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount();
 
-    const result =
-      new ResultPaginationDto();
+    const result = new ResultPaginationDto();
 
     result.meta = {
       page,
@@ -370,10 +299,7 @@ export class ProductReviewServiceImpl
       total,
     };
 
-    result.result =
-      this.productReviewMapper.toDtoList(
-        reviews,
-      );
+    result.result = this.productReviewMapper.toDtoList(reviews);
 
     return result;
   }

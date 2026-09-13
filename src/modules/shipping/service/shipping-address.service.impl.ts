@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+﻿import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
 import { ForbiddenException } from 'src/common/exceptions/forbidden.exception';
@@ -11,20 +11,19 @@ import { ShippingAddress } from 'src/modules/shipping/entities/shipping-address.
 import { ShippingAddressMapper } from 'src/modules/shipping/mapper/shipping-address.mapper';
 import { ShippingAddressRepository } from 'src/modules/shipping/repositories/shipping-address.repository';
 import { ShippingAddressService } from 'src/modules/shipping/service/shipping-address.service';
-
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 import type { UserService } from 'src/modules/users/service/user.service';
 
 @Injectable()
-export class ShippingAddressServiceImpl
-  implements ShippingAddressService
-{
-  private readonly logger = new Logger(
-    ShippingAddressServiceImpl.name,
-  );
+export class ShippingAddressServiceImpl implements ShippingAddressService {
+  private readonly logger = new Logger(ShippingAddressServiceImpl.name);
 
   constructor(
     private readonly shippingAddressRepository: ShippingAddressRepository,
+
+    @Inject(PROVIDER_TOKEN.USER_SERVICE)
     private readonly userService: UserService,
+
     private readonly shippingAddressMapper: ShippingAddressMapper,
   ) {}
 
@@ -34,16 +33,15 @@ export class ShippingAddressServiceImpl
     const currentUser = await this.userService.getUserLogin();
 
     const exists =
-      await this.shippingAddressRepository
-        .existsByUserIdAndFullNameAndPhoneAndProvinceAndDistrictAndWardAndAddressDetail(
-          String(currentUser.id),
-          req.fullName,
-          req.phone,
-          req.province,
-          req.district,
-          req.ward,
-          req.addressDetail,
-        );
+      await this.shippingAddressRepository.existsByUserIdAndFullNameAndPhoneAndProvinceAndDistrictAndWardAndAddressDetail(
+        String(currentUser.id),
+        req.fullName,
+        req.phone,
+        req.province,
+        req.district,
+        req.ward,
+        req.addressDetail,
+      );
 
     if (exists) {
       throw new ForbiddenException(
@@ -51,10 +49,9 @@ export class ShippingAddressServiceImpl
       );
     }
 
-    const countAddress =
-      await this.shippingAddressRepository.countByUserId(
-        String(currentUser.id),
-      );
+    const countAddress = await this.shippingAddressRepository.countByUserId(
+      String(currentUser.id),
+    );
 
     const shippingAddress = new ShippingAddress();
 
@@ -67,9 +64,7 @@ export class ShippingAddressServiceImpl
     shippingAddress.user = currentUser;
 
     if (countAddress === 0) {
-      this.logger.log(
-        '[ADDRESS] Địa chỉ đầu tiên → auto set isDefault = true',
-      );
+      this.logger.log('[ADDRESS] Địa chỉ đầu tiên → auto set isDefault = true');
 
       shippingAddress.isDefault = true;
     } else if (req.isDefault === true) {
@@ -78,10 +73,9 @@ export class ShippingAddressServiceImpl
       );
 
       const oldDefaultAddress =
-        await this.shippingAddressRepository
-          .findByUserIdAndIsDefaultTrue(
-            String(currentUser.id),
-          );
+        await this.shippingAddressRepository.findByUserIdAndIsDefaultTrue(
+          String(currentUser.id),
+        );
 
       if (oldDefaultAddress) {
         oldDefaultAddress.isDefault = false;
@@ -96,10 +90,9 @@ export class ShippingAddressServiceImpl
       shippingAddress.isDefault = false;
     }
 
-    const savedAddress =
-      await this.shippingAddressRepository
-        .getRepository()
-        .save(shippingAddress);
+    const savedAddress = await this.shippingAddressRepository
+      .getRepository()
+      .save(shippingAddress);
 
     this.logger.log(
       `[ADDRESS] Thêm địa chỉ thành công | User ID: ${currentUser.id}`,
@@ -113,17 +106,16 @@ export class ShippingAddressServiceImpl
   ): Promise<ShippingAddressDto> {
     const currentUser = await this.userService.getUserLogin();
 
-    const shippingAddress =
-      await this.shippingAddressRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: req.id,
-          },
-          relations: {
-            user: true,
-          },
-        });
+    const shippingAddress = await this.shippingAddressRepository
+      .getRepository()
+      .findOne({
+        where: {
+          id: req.id,
+        },
+        relations: {
+          user: true,
+        },
+      });
 
     if (!shippingAddress) {
       throw new NotFoundException(
@@ -131,28 +123,19 @@ export class ShippingAddressServiceImpl
       );
     }
 
-    if (
-      String(currentUser.id) !==
-      String(shippingAddress.user.id)
-    ) {
+    if (String(currentUser.id) !== String(shippingAddress.user.id)) {
       throw new ForbiddenException(
         'You are not allowed to update this shipping address',
       );
     }
 
-    if (
-      req.isDefault === true &&
-      shippingAddress.isDefault !== true
-    ) {
-      this.logger.log(
-        '[ADDRESS] Đổi default → bỏ default địa chỉ cũ',
-      );
+    if (req.isDefault === true && shippingAddress.isDefault !== true) {
+      this.logger.log('[ADDRESS] Đổi default → bỏ default địa chỉ cũ');
 
       const oldDefaultAddress =
-        await this.shippingAddressRepository
-          .findByUserIdAndIsDefaultTrue(
-            String(currentUser.id),
-          );
+        await this.shippingAddressRepository.findByUserIdAndIsDefaultTrue(
+          String(currentUser.id),
+        );
 
       if (oldDefaultAddress) {
         oldDefaultAddress.isDefault = false;
@@ -171,28 +154,24 @@ export class ShippingAddressServiceImpl
     shippingAddress.province = req.province;
     shippingAddress.isDefault = req.isDefault;
 
-    const updatedAddress =
-      await this.shippingAddressRepository
-        .getRepository()
-        .save(shippingAddress);
+    const updatedAddress = await this.shippingAddressRepository
+      .getRepository()
+      .save(shippingAddress);
 
     return this.shippingAddressMapper.toDto(updatedAddress);
   }
 
-  async deleteShippingAddress(
-    addressId: number,
-  ): Promise<CommonResponseDto> {
-    const shippingAddress =
-      await this.shippingAddressRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: addressId,
-          },
-          relations: {
-            user: true,
-          },
-        });
+  async deleteShippingAddress(addressId: number): Promise<CommonResponseDto> {
+    const shippingAddress = await this.shippingAddressRepository
+      .getRepository()
+      .findOne({
+        where: {
+          id: addressId,
+        },
+        relations: {
+          user: true,
+        },
+      });
 
     if (!shippingAddress) {
       throw new NotFoundException(
@@ -202,20 +181,16 @@ export class ShippingAddressServiceImpl
 
     const currentUser = await this.userService.getUserLogin();
 
-    if (
-      String(currentUser.id) !==
-      String(shippingAddress.user.id)
-    ) {
+    if (String(currentUser.id) !== String(shippingAddress.user.id)) {
       throw new ForbiddenException(
         'You are not allowed to delete this shipping address',
       );
     }
 
     if (shippingAddress.isDefault === true) {
-      const addresses =
-        await this.shippingAddressRepository.findByUserId(
-          String(currentUser.id),
-        );
+      const addresses = await this.shippingAddressRepository.findByUserId(
+        String(currentUser.id),
+      );
 
       const newDefault = addresses.find(
         (address) => address.id !== shippingAddress.id,
@@ -224,9 +199,7 @@ export class ShippingAddressServiceImpl
       if (newDefault) {
         newDefault.isDefault = true;
 
-        await this.shippingAddressRepository
-          .getRepository()
-          .save(newDefault);
+        await this.shippingAddressRepository.getRepository().save(newDefault);
 
         this.logger.log(
           `[ADDRESS] Set địa chỉ ID: ${newDefault.id} làm default mới`,
@@ -244,15 +217,12 @@ export class ShippingAddressServiceImpl
     };
   }
 
-  async getAllShippingAddress(): Promise<
-    ShippingAddressDto[]
-  > {
+  async getAllShippingAddress(): Promise<ShippingAddressDto[]> {
     const currentUser = await this.userService.getUserLogin();
 
-    const addresses =
-      await this.shippingAddressRepository.findByUserId(
-        String(currentUser.id),
-      );
+    const addresses = await this.shippingAddressRepository.findByUserId(
+      String(currentUser.id),
+    );
 
     return addresses.map((address) =>
       this.shippingAddressMapper.toDto(address),
@@ -262,23 +232,20 @@ export class ShippingAddressServiceImpl
   async setDefaultShippingAddress(
     addressId: number,
   ): Promise<CommonResponseDto> {
-    this.logger.log(
-      `[ADDRESS] Đặt địa chỉ ID: ${addressId} làm mặc định`,
-    );
+    this.logger.log(`[ADDRESS] Đặt địa chỉ ID: ${addressId} làm mặc định`);
 
     const currentUser = await this.userService.getUserLogin();
 
-    const address =
-      await this.shippingAddressRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: addressId,
-          },
-          relations: {
-            user: true,
-          },
-        });
+    const address = await this.shippingAddressRepository
+      .getRepository()
+      .findOne({
+        where: {
+          id: addressId,
+        },
+        relations: {
+          user: true,
+        },
+      });
 
     if (!address) {
       throw new NotFoundException(
@@ -287,9 +254,7 @@ export class ShippingAddressServiceImpl
     }
 
     if (address.isDefault === true) {
-      this.logger.log(
-        `[ADDRESS] Địa chỉ ID: ${addressId} đã là mặc định`,
-      );
+      this.logger.log(`[ADDRESS] Địa chỉ ID: ${addressId} đã là mặc định`);
 
       return {
         status: true,
@@ -297,15 +262,11 @@ export class ShippingAddressServiceImpl
       };
     }
 
-    if (
-      String(currentUser.id) ===
-      String(address.user.id)
-    ) {
+    if (String(currentUser.id) === String(address.user.id)) {
       const oldDefaultAddress =
-        await this.shippingAddressRepository
-          .findByUserIdAndIsDefaultTrue(
-            String(currentUser.id),
-          );
+        await this.shippingAddressRepository.findByUserIdAndIsDefaultTrue(
+          String(currentUser.id),
+        );
 
       if (oldDefaultAddress) {
         oldDefaultAddress.isDefault = false;
@@ -321,9 +282,7 @@ export class ShippingAddressServiceImpl
 
       address.isDefault = true;
 
-      await this.shippingAddressRepository
-        .getRepository()
-        .save(address);
+      await this.shippingAddressRepository.getRepository().save(address);
 
       this.logger.log(
         `[ADDRESS] Đặt thành công địa chỉ ID: ${addressId} làm mặc định`,

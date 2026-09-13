@@ -24,19 +24,14 @@ import { InventoryTransactionMapper } from 'src/modules/inventory/mapper/invento
 import { InventoryRepository } from 'src/modules/inventory/repositories/inventory.repository';
 import { InventoryTransactionRepository } from 'src/modules/inventory/repositories/inventory-transaction.repository';
 
-import { ProductRepository } from 'src/modules/catalogue/products/repositories/product.repository';
-
 import type { InventoryService } from 'src/modules/inventory/service/inventory.service';
 
 @Injectable()
 export class InventoryServiceImpl implements InventoryService {
-  private readonly logger = new Logger(
-    InventoryServiceImpl.name,
-  );
+  private readonly logger = new Logger(InventoryServiceImpl.name);
 
   constructor(
     private readonly inventoryRepository: InventoryRepository,
-    private readonly productRepository: ProductRepository,
     private readonly inventoryTransactionRepository: InventoryTransactionRepository,
     private readonly mapper: InventoryTransactionMapper,
     private readonly inventoryMapper: InventoryMapper,
@@ -47,13 +42,11 @@ export class InventoryServiceImpl implements InventoryService {
     reqInventoryProduct: ReqInventoryProductDto,
   ): Promise<InventoryTransactionDto> {
     return this.dataSource.transaction(async (manager) => {
-      const product = await manager
-        .getRepository(Product)
-        .findOne({
-          where: {
-            id: reqInventoryProduct.productId,
-          },
-        });
+      const product = await manager.getRepository(Product).findOne({
+        where: {
+          id: reqInventoryProduct.productId,
+        },
+      });
 
       if (!product) {
         throw new NotFoundException(
@@ -73,41 +66,31 @@ export class InventoryServiceImpl implements InventoryService {
       }
 
       if (reqInventoryProduct.quantity <= 0) {
-        throw new BadRequestException(
-          'Invalid quantity is negative (<= 0)',
-        );
+        throw new BadRequestException('Invalid quantity is negative (<= 0)');
       }
 
       const oldQty = inventory.quantity ?? 0;
-      const newQty =
-        oldQty + reqInventoryProduct.quantity;
+      const newQty = oldQty + reqInventoryProduct.quantity;
 
       inventory.quantity = newQty;
 
-      await manager
-        .getRepository(Inventory)
-        .save(inventory);
+      await manager.getRepository(Inventory).save(inventory);
 
-      this.logger.log(
-        `[IMPORT] Tồn kho thay đổi ${oldQty} → ${newQty}`,
+      this.logger.log(`[IMPORT] Tồn kho thay đổi ${oldQty} → ${newQty}`);
+
+      const inventoryTransaction = await this.createInventoryTransaction(
+        manager,
+        inventory,
+        reqInventoryProduct.quantity,
+        TypeInventory.IMPORT,
+        reqInventoryProduct.note,
       );
-
-      const inventoryTransaction =
-        await this.createInventoryTransaction(
-          manager,
-          inventory,
-          reqInventoryProduct.quantity,
-          TypeInventory.IMPORT,
-          reqInventoryProduct.note,
-        );
 
       this.logger.log(
         `[IMPORT] Ghi transaction thành công | Product ID: ${reqInventoryProduct.productId} | quantity: ${reqInventoryProduct.quantity}`,
       );
 
-      return this.mapper.toInventoryTransactionDto(
-        inventoryTransaction,
-      );
+      return this.mapper.toInventoryTransactionDto(inventoryTransaction);
     });
   }
 
@@ -115,13 +98,11 @@ export class InventoryServiceImpl implements InventoryService {
     reqInventoryProduct: ReqInventoryProductDto,
   ): Promise<InventoryTransactionDto> {
     return this.dataSource.transaction(async (manager) => {
-      const product = await manager
-        .getRepository(Product)
-        .findOne({
-          where: {
-            id: reqInventoryProduct.productId,
-          },
-        });
+      const product = await manager.getRepository(Product).findOne({
+        where: {
+          id: reqInventoryProduct.productId,
+        },
+      });
 
       if (!product) {
         throw new NotFoundException(
@@ -141,54 +122,40 @@ export class InventoryServiceImpl implements InventoryService {
       }
 
       if (reqInventoryProduct.quantity <= 0) {
-        throw new BadRequestException(
-          'Invalid quantity is negative (<= 0)',
-        );
+        throw new BadRequestException('Invalid quantity is negative (<= 0)');
       }
 
       const oldQty = inventory.quantity ?? 0;
 
-      if (
-        oldQty < reqInventoryProduct.quantity
-      ) {
+      if (oldQty < reqInventoryProduct.quantity) {
         this.logger.log(
           `[EXPORT] Tồn kho không đủ | Product ID: ${reqInventoryProduct.productId} | quantity: ${reqInventoryProduct.quantity} | current stock: ${oldQty}`,
         );
 
-        throw new BadRequestException(
-          'Not enough quantity in stock',
-        );
+        throw new BadRequestException('Not enough quantity in stock');
       }
 
-      const newQty =
-        oldQty - reqInventoryProduct.quantity;
+      const newQty = oldQty - reqInventoryProduct.quantity;
 
       inventory.quantity = newQty;
 
-      await manager
-        .getRepository(Inventory)
-        .save(inventory);
+      await manager.getRepository(Inventory).save(inventory);
 
-      this.logger.log(
-        `[EXPORT] Tồn kho thay đổi ${oldQty} → ${newQty}`,
+      this.logger.log(`[EXPORT] Tồn kho thay đổi ${oldQty} → ${newQty}`);
+
+      const inventoryTransaction = await this.createInventoryTransaction(
+        manager,
+        inventory,
+        reqInventoryProduct.quantity,
+        TypeInventory.EXPORT,
+        reqInventoryProduct.note,
       );
-
-      const inventoryTransaction =
-        await this.createInventoryTransaction(
-          manager,
-          inventory,
-          reqInventoryProduct.quantity,
-          TypeInventory.EXPORT,
-          reqInventoryProduct.note,
-        );
 
       this.logger.log(
         `[EXPORT] Ghi transaction thành công | Product ID: ${reqInventoryProduct.productId} | quantity: ${reqInventoryProduct.quantity}`,
       );
 
-      return this.mapper.toInventoryTransactionDto(
-        inventoryTransaction,
-      );
+      return this.mapper.toInventoryTransactionDto(inventoryTransaction);
     });
   }
 
@@ -196,13 +163,11 @@ export class InventoryServiceImpl implements InventoryService {
     reqAdjustProduct: ReqAdjustProductDto,
   ): Promise<InventoryTransactionDto> {
     return this.dataSource.transaction(async (manager) => {
-      const product = await manager
-        .getRepository(Product)
-        .findOne({
-          where: {
-            id: reqAdjustProduct.productId,
-          },
-        });
+      const product = await manager.getRepository(Product).findOne({
+        where: {
+          id: reqAdjustProduct.productId,
+        },
+      });
 
       if (!product) {
         throw new NotFoundException(
@@ -222,14 +187,11 @@ export class InventoryServiceImpl implements InventoryService {
       }
 
       if (reqAdjustProduct.newQuantity < 0) {
-        throw new BadRequestException(
-          'Invalid quantity is negative (<= 0)',
-        );
+        throw new BadRequestException('Invalid quantity is negative (<= 0)');
       }
 
       const oldQty = inventory.quantity ?? 0;
-      const newQty =
-        reqAdjustProduct.newQuantity;
+      const newQty = reqAdjustProduct.newQuantity;
 
       const delta = newQty - oldQty;
 
@@ -245,67 +207,44 @@ export class InventoryServiceImpl implements InventoryService {
 
       inventory.quantity = newQty;
 
-      await manager
-        .getRepository(Inventory)
-        .save(inventory);
+      await manager.getRepository(Inventory).save(inventory);
 
-      const note =
-        `[${delta > 0 ? '+' : ''}${delta}] ${reqAdjustProduct.note}`;
+      const note = `[${delta > 0 ? '+' : ''}${delta}] ${reqAdjustProduct.note}`;
 
-      const inventoryTransaction =
-        await this.createInventoryTransaction(
-          manager,
-          inventory,
-          Math.abs(delta),
-          TypeInventory.ADJUST,
-          note,
-        );
+      const inventoryTransaction = await this.createInventoryTransaction(
+        manager,
+        inventory,
+        Math.abs(delta),
+        TypeInventory.ADJUST,
+        note,
+      );
 
       this.logger.log(
         `[ADJUST] Ghi transaction thành công | Product ID: ${reqAdjustProduct.productId} | delta: ${delta}`,
       );
 
-      return this.mapper.toInventoryTransactionDto(
-        inventoryTransaction,
-      );
+      return this.mapper.toInventoryTransactionDto(inventoryTransaction);
     });
   }
 
-  async getInventoryByProductId(
-    productId: number,
-  ): Promise<InventoryDto> {
-    this.logger.log(
-      `[INVENTORY] Xem tồn kho cho Product ID: ${productId}`,
-    );
+  async getInventoryByProductId(productId: number): Promise<InventoryDto> {
+    this.logger.log(`[INVENTORY] Xem tồn kho cho Product ID: ${productId}`);
 
-    const product =
-      await this.productRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: productId,
-          },
-        });
+    const product = await this.dataSource.getRepository(Product).findOne({
+      where: {
+        id: productId,
+      },
+    });
 
     if (!product) {
-      throw new NotFoundException(
-        `Product not found with id: ${productId}`,
-      );
+      throw new NotFoundException(`Product not found with id: ${productId}`);
     }
 
-    if (
-      product.deleteFlag === true ||
-      product.activeFlag === false
-    ) {
-      throw new NotFoundException(
-        `Product not found with id: ${productId}`,
-      );
+    if (product.deleteFlag === true || product.activeFlag === false) {
+      throw new NotFoundException(`Product not found with id: ${productId}`);
     }
 
-    const inventory =
-      await this.inventoryRepository.findByProductId(
-        productId,
-      );
+    const inventory = await this.inventoryRepository.findByProductId(productId);
 
     if (!inventory) {
       throw new NotFoundException(
@@ -328,44 +267,22 @@ export class InventoryServiceImpl implements InventoryService {
     const specificationBuilder =
       new SpecificationBuilder<InventoryTransaction>();
 
-    FilterProcessor.process(
-      specificationBuilder,
-      filter,
-    );
+    FilterProcessor.process(specificationBuilder, filter);
 
-    const queryBuilder =
-      this.inventoryTransactionRepository
-        .getRepository()
-        .createQueryBuilder('transaction')
-        .leftJoinAndSelect(
-          'transaction.inventory',
-          'inventory',
-        )
-        .leftJoinAndSelect(
-          'inventory.product',
-          'product',
-        )
-        .orderBy(
-          'transaction.createdDate',
-          'DESC',
-        );
+    const queryBuilder = this.inventoryTransactionRepository
+      .getRepository()
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.inventory', 'inventory')
+      .leftJoinAndSelect('inventory.product', 'product')
+      .orderBy('transaction.createdDate', 'DESC');
 
-    specificationBuilder.apply(
-      queryBuilder,
-      'transaction',
-    );
+    specificationBuilder.apply(queryBuilder, 'transaction');
 
-    queryBuilder
-      .skip((page - 1) * pageSize)
-      .take(pageSize);
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
 
-    const [transactions, total] =
-      await queryBuilder.getManyAndCount();
+    const [transactions, total] = await queryBuilder.getManyAndCount();
 
-    const dtoList =
-      this.mapper.toListInventoryTransaction(
-        transactions,
-      );
+    const dtoList = this.mapper.toListInventoryTransaction(transactions);
 
     return {
       result: dtoList,
@@ -385,14 +302,8 @@ export class InventoryServiceImpl implements InventoryService {
     return manager
       .getRepository(Inventory)
       .createQueryBuilder('inventory')
-      .leftJoinAndSelect(
-        'inventory.product',
-        'product',
-      )
-      .where(
-        'product.id = :productId',
-        { productId },
-      )
+      .leftJoinAndSelect('inventory.product', 'product')
+      .where('product.id = :productId', { productId })
       .getOne();
   }
 
@@ -403,8 +314,7 @@ export class InventoryServiceImpl implements InventoryService {
     type: TypeInventory,
     note: string,
   ): Promise<InventoryTransaction> {
-    const inventoryTransaction =
-      new InventoryTransaction();
+    const inventoryTransaction = new InventoryTransaction();
 
     inventoryTransaction.quantity = quantity;
     inventoryTransaction.type = type;

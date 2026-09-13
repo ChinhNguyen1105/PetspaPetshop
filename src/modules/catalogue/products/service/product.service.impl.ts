@@ -15,7 +15,6 @@ import { ProductDto } from 'src/modules/catalogue/products/dto/response/product.
 import { Product } from 'src/modules/catalogue/products/entities/product.entity';
 import { ProductMapper } from 'src/modules/catalogue/products/mapper/product.mapper';
 import { ProductRepository } from 'src/modules/catalogue/products/repositories/product.repository';
-import { ProductService } from 'src/modules/catalogue/products/service/product.service';
 
 import { Inventory } from 'src/modules/inventory/entities/inventory.entity';
 import { InventoryTransaction } from 'src/modules/inventory/entities/inventory-transaction.entity';
@@ -23,7 +22,9 @@ import { InventoryRepository } from 'src/modules/inventory/repositories/inventor
 import { InventoryTransactionRepository } from 'src/modules/inventory/repositories/inventory-transaction.repository';
 
 import type { RecommendationService } from 'src/modules/recommendation/service/recommendation.service';
-
+import { Inject } from '@nestjs/common';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+import type { ProductService } from 'src/modules/catalogue/products/service/product.service';
 @Injectable()
 export class ProductServiceImpl implements ProductService {
   private readonly logger = new Logger(ProductServiceImpl.name);
@@ -34,25 +35,18 @@ export class ProductServiceImpl implements ProductService {
     private readonly categoryRepository: CategoryRepository,
     private readonly inventoryRepository: InventoryRepository,
     private readonly inventoryTransactionRepository: InventoryTransactionRepository,
+    @Inject(PROVIDER_TOKEN.RECOMMENDATION_SERVICE)
     private readonly recommendationService: RecommendationService,
   ) {}
 
-  private async checkExistProductByName(
-    name: string,
-  ): Promise<void> {
-    this.logger.log(
-      `[CHECK] Kiểm tra trùng lặp tên sản phẩm: '${name}'`,
-    );
+  private async checkExistProductByName(name: string): Promise<void> {
+    this.logger.log(`[CHECK] Kiểm tra trùng lặp tên sản phẩm: '${name}'`);
 
     const exists =
-      await this.productRepository.existsByNameAndDeleteFlagFalse(
-        name,
-      );
+      await this.productRepository.existsByNameAndDeleteFlagFalse(name);
 
     if (exists) {
-      throw new ConflictException(
-        `Product already exists with name: ${name}`,
-      );
+      throw new ConflictException(`Product already exists with name: ${name}`);
     }
   }
 
@@ -63,19 +57,15 @@ export class ProductServiceImpl implements ProductService {
       `[CREATE] Bắt đầu tạo sản phẩm: '${reqCreateProduct.name}'`,
     );
 
-    await this.checkExistProductByName(
-      reqCreateProduct.name,
-    );
+    await this.checkExistProductByName(reqCreateProduct.name);
 
-    const product =
-      this.productMapper.toProduct(reqCreateProduct);
+    const product = this.productMapper.toProduct(reqCreateProduct);
 
-    const category =
-      await this.categoryRepository.getRepository().findOne({
-        where: {
-          id: reqCreateProduct.categoryId,
-        },
-      });
+    const category = await this.categoryRepository.getRepository().findOne({
+      where: {
+        id: reqCreateProduct.categoryId,
+      },
+    });
 
     if (!category) {
       throw new NotFoundException(
@@ -85,22 +75,20 @@ export class ProductServiceImpl implements ProductService {
 
     product.category = category;
 
-    const savedProduct =
-      await this.productRepository.getRepository().save(product);
+    const savedProduct = await this.productRepository
+      .getRepository()
+      .save(product);
 
-    this.logger.log(
-      `[CREATE] Product created with ID: ${savedProduct.id}`,
-    );
+    this.logger.log(`[CREATE] Product created with ID: ${savedProduct.id}`);
 
     const inventory = new Inventory();
 
     inventory.quantity = reqCreateProduct.quantity ?? 0;
     inventory.product = savedProduct;
 
-    const savedInventory =
-      await this.inventoryRepository.getRepository().save(
-        inventory,
-      );
+    const savedInventory = await this.inventoryRepository
+      .getRepository()
+      .save(inventory);
 
     savedProduct.inventory = savedInventory;
 
@@ -123,20 +111,17 @@ export class ProductServiceImpl implements ProductService {
   async updateProduct(
     reqUpdateProduct: ReqUpdateProductDto,
   ): Promise<ProductDto> {
-    this.logger.log(
-      `[UPDATE] Cập nhật sản phẩm ID: ${reqUpdateProduct.id}`,
-    );
+    this.logger.log(`[UPDATE] Cập nhật sản phẩm ID: ${reqUpdateProduct.id}`);
 
-    const product =
-      await this.productRepository.getRepository().findOne({
-        where: {
-          id: reqUpdateProduct.id,
-        },
-        relations: {
-          category: true,
-          inventory: true,
-        },
-      });
+    const product = await this.productRepository.getRepository().findOne({
+      where: {
+        id: reqUpdateProduct.id,
+      },
+      relations: {
+        category: true,
+        inventory: true,
+      },
+    });
 
     if (!product) {
       throw new NotFoundException(
@@ -144,19 +129,14 @@ export class ProductServiceImpl implements ProductService {
       );
     }
 
-    if (
-      product.activeFlag === false ||
-      product.deleteFlag === true
-    ) {
+    if (product.activeFlag === false || product.deleteFlag === true) {
       throw new NotFoundException(
         `Product not found with id: ${reqUpdateProduct.id}`,
       );
     }
 
     if (product.name !== reqUpdateProduct.name) {
-      await this.checkExistProductByName(
-        reqUpdateProduct.name,
-      );
+      await this.checkExistProductByName(reqUpdateProduct.name);
     }
 
     product.name = reqUpdateProduct.name;
@@ -164,14 +144,11 @@ export class ProductServiceImpl implements ProductService {
     product.price = reqUpdateProduct.price;
 
     if (reqUpdateProduct.categoryId !== null) {
-      const category =
-        await this.categoryRepository
-          .getRepository()
-          .findOne({
-            where: {
-              id: reqUpdateProduct.categoryId,
-            },
-          });
+      const category = await this.categoryRepository.getRepository().findOne({
+        where: {
+          id: reqUpdateProduct.categoryId,
+        },
+      });
 
       if (!category) {
         throw new NotFoundException(
@@ -194,10 +171,9 @@ export class ProductServiceImpl implements ProductService {
         inventory.quantity = reqUpdateProduct.quantity;
         inventory.product = product;
 
-        inventory =
-          await this.inventoryRepository
-            .getRepository()
-            .save(inventory);
+        inventory = await this.inventoryRepository
+          .getRepository()
+          .save(inventory);
 
         product.inventory = inventory;
 
@@ -217,23 +193,16 @@ export class ProductServiceImpl implements ProductService {
         if (delta !== 0) {
           inventory.quantity = newQuantity;
 
-          await this.inventoryRepository
-            .getRepository()
-            .save(inventory);
+          await this.inventoryRepository.getRepository().save(inventory);
         }
 
-        const type =
-          delta > 0
-            ? TypeInventory.IMPORT
-            : TypeInventory.EXPORT;
+        const type = delta > 0 ? TypeInventory.IMPORT : TypeInventory.EXPORT;
 
-        const inventoryTransaction =
-          new InventoryTransaction();
+        const inventoryTransaction = new InventoryTransaction();
 
         inventoryTransaction.quantity = Math.abs(delta);
         inventoryTransaction.type = type;
-        inventoryTransaction.note =
-          'Cập nhật kho khi cập nhật sản phẩm';
+        inventoryTransaction.note = 'Cập nhật kho khi cập nhật sản phẩm';
         inventoryTransaction.inventory = inventory;
 
         await this.inventoryTransactionRepository
@@ -242,30 +211,24 @@ export class ProductServiceImpl implements ProductService {
       }
     }
 
-    const updatedProduct =
-      await this.productRepository.getRepository().save(product);
+    const updatedProduct = await this.productRepository
+      .getRepository()
+      .save(product);
 
     return this.productMapper.toProductDto(updatedProduct);
   }
 
-  async deleteProduct(
-    id: number,
-  ): Promise<CommonResponseDto> {
-    this.logger.log(
-      `[DELETE] Xóa mềm sản phẩm ID: ${id}`,
-    );
+  async deleteProduct(id: number): Promise<CommonResponseDto> {
+    this.logger.log(`[DELETE] Xóa mềm sản phẩm ID: ${id}`);
 
-    const product =
-      await this.productRepository.getRepository().findOne({
-        where: {
-          id,
-        },
-      });
+    const product = await this.productRepository.getRepository().findOne({
+      where: {
+        id,
+      },
+    });
 
     if (!product) {
-      throw new NotFoundException(
-        `Product not found with id: ${id}`,
-      );
+      throw new NotFoundException(`Product not found with id: ${id}`);
     }
 
     product.deleteFlag = true;
@@ -279,21 +242,18 @@ export class ProductServiceImpl implements ProductService {
   }
 
   async getProductById(id: number): Promise<ProductDto> {
-    const product =
-      await this.productRepository.getRepository().findOne({
-        where: {
-          id,
-        },
-        relations: {
-          category: true,
-          inventory: true,
-        },
-      });
+    const product = await this.productRepository.getRepository().findOne({
+      where: {
+        id,
+      },
+      relations: {
+        category: true,
+        inventory: true,
+      },
+    });
 
     if (!product || product.deleteFlag === true) {
-      throw new NotFoundException(
-        `Product not found with id: ${id}`,
-      );
+      throw new NotFoundException(`Product not found with id: ${id}`);
     }
 
     return this.productMapper.toProductDto(product);
@@ -304,8 +264,7 @@ export class ProductServiceImpl implements ProductService {
     page: number,
     pageSize: number,
   ): Promise<ResultPaginationDto> {
-    const repository =
-      this.productRepository.getRepository();
+    const repository = this.productRepository.getRepository();
 
     const queryBuilder = repository
       .createQueryBuilder('product')
@@ -313,25 +272,15 @@ export class ProductServiceImpl implements ProductService {
       .leftJoinAndSelect('product.inventory', 'inventory')
       .where('product.deleteFlag = false');
 
-    const specificationBuilder =
-      new SpecificationBuilder<Product>();
+    const specificationBuilder = new SpecificationBuilder<Product>();
 
-    FilterProcessor.process(
-      specificationBuilder,
-      filter,
-    );
+    FilterProcessor.process(specificationBuilder, filter);
 
-    specificationBuilder.apply(
-      queryBuilder,
-      'product',
-    );
+    specificationBuilder.apply(queryBuilder, 'product');
 
-    queryBuilder
-      .skip((page - 1) * pageSize)
-      .take(pageSize);
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
 
-    const [products, total] =
-      await queryBuilder.getManyAndCount();
+    const [products, total] = await queryBuilder.getManyAndCount();
 
     return {
       result: this.productMapper.productDtos(products),
@@ -344,12 +293,8 @@ export class ProductServiceImpl implements ProductService {
     };
   }
 
-  async getRecommendedProductIds(
-    productIds: number[],
-  ): Promise<number[]> {
-    return this.recommendationService.recommendProducts(
-      productIds,
-    );
+  async getRecommendedProductIds(productIds: number[]): Promise<number[]> {
+    return this.recommendationService.recommendProducts(productIds);
   }
 
   private async createInventoryTransaction(
@@ -358,8 +303,7 @@ export class ProductServiceImpl implements ProductService {
     type: TypeInventory,
     note: string,
   ): Promise<void> {
-    const inventoryTransaction =
-      new InventoryTransaction();
+    const inventoryTransaction = new InventoryTransaction();
 
     inventoryTransaction.quantity = quantity;
     inventoryTransaction.type = type;

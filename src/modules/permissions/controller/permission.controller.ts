@@ -16,35 +16,30 @@ import { UrlConstant } from 'src/common/constants/url.constant';
 
 import { Permission } from 'src/modules/permissions/entities/permission.entity';
 import type { PermissionService } from 'src/modules/permissions/service/permission.service';
+import { Inject } from '@nestjs/common';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 @RestApiV1()
 @Controller()
 export class PermissionController {
   constructor(
+    @Inject(PROVIDER_TOKEN.PERMISSION_SERVICE)
     private readonly permissionService: PermissionService,
   ) {}
 
   @Post(UrlConstant.Permission.CREATE_PERMISSION)
-  async createPermission(
-    @Body() permission: Permission,
-  ) {
+  async createPermission(@Body() permission: Permission) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.CREATED,
-      await this.permissionService.createPermission(
-        permission,
-      ),
+      await this.permissionService.createPermission(permission),
     );
   }
 
   @Put(UrlConstant.Permission.UPDATE_PERMISSION)
-  async updatePermission(
-    @Body() permission: Permission,
-  ) {
+  async updatePermission(@Body() permission: Permission) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.permissionService.updatePermission(
-        permission,
-      ),
+      await this.permissionService.updatePermission(permission),
     );
   }
 
@@ -64,37 +59,18 @@ export class PermissionController {
     );
   }
 
-  @Get(
-    UrlConstant.Permission.GET_PERMISSION.replace(
-      '{id}',
-      ':id',
-    ),
-  )
-  async getAPermission(
-    @Param('id') id: number,
-  ) {
+  @Get(UrlConstant.Permission.GET_PERMISSION.replace('{id}', ':id'))
+  async getAPermission(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.permissionService.fetchAPermission(
-        id,
-      ),
+      await this.permissionService.fetchAPermission(id),
     );
   }
 
-  @Delete(
-    UrlConstant.Permission.DELETE_PERMISSION.replace(
-      '{id}',
-      ':id',
-    ),
-  )
-  async deleteAPermission(
-    @Param('id') id: number,
-  ) {
+  @Delete(UrlConstant.Permission.DELETE_PERMISSION.replace('{id}', ':id'))
+  async deleteAPermission(@Param('id') id: number) {
     await this.permissionService.deletePermission(id);
 
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      null,
-    );
+    return VsResponseUtil.successWithStatus(HttpStatus.OK, null);
   }
 }
