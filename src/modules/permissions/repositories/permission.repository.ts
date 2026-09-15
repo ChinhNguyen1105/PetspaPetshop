@@ -15,13 +15,31 @@ export class PermissionRepository {
     apiPath: string,
     method: string,
     module: string,
-  ) {
-    return this.repository
+    excludeId?: number,
+  ): Promise<boolean> {
+    const queryBuilder = this.repository
       .createQueryBuilder('permission')
-      .where('LOWER(permission.apiPath) = LOWER(:apiPath)', { apiPath })
-      .andWhere('LOWER(permission.method) = LOWER(:method)', { method })
-      .andWhere('LOWER(permission.module) = LOWER(:module)', { module })
-      .getExists();
+      .where(
+        'LOWER(permission.apiPath) = LOWER(:apiPath)',
+        { apiPath },
+      )
+      .andWhere(
+        'LOWER(permission.method) = LOWER(:method)',
+        { method },
+      )
+      .andWhere(
+        'LOWER(permission.module) = LOWER(:module)',
+        { module },
+      );
+
+    if (excludeId !== undefined) {
+      queryBuilder.andWhere(
+        'permission.id != :excludeId',
+        { excludeId },
+      );
+    }
+
+    return queryBuilder.getExists();
   }
 
   findByApiPathAndMethod(
@@ -30,15 +48,26 @@ export class PermissionRepository {
   ): Promise<Permission | null> {
     return this.repository
       .createQueryBuilder('permission')
-      .where('LOWER(permission.apiPath) = LOWER(:apiPath)', { apiPath })
-      .andWhere('LOWER(permission.method) = LOWER(:method)', { method })
+      .where(
+        'LOWER(permission.apiPath) = LOWER(:apiPath)',
+        { apiPath },
+      )
+      .andWhere(
+        'LOWER(permission.method) = LOWER(:method)',
+        { method },
+      )
       .getOne();
   }
 
-  findByIdIn(ids: number[]) {
+  findByIdIn(
+    ids: number[],
+  ): Promise<Permission[]> {
     return this.repository
       .createQueryBuilder('permission')
-      .where('permission.id IN (:...ids)', { ids })
+      .where(
+        'permission.id IN (:...ids)',
+        { ids },
+      )
       .getMany();
   }
 

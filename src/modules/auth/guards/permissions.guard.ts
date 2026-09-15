@@ -16,18 +16,31 @@ import type { PermissionService } from 'src/modules/permissions/service/permissi
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
+  // Các route không yêu cầu JWT và permission.
   private readonly publicRoutes = [
     { path: '/api/v1/auth/register', method: 'POST' },
     { path: '/api/v1/auth/login', method: 'POST' },
+
     { path: '/api/v1/categories', method: 'GET', prefix: true },
     { path: '/api/v1/services', method: 'GET', prefix: true },
     { path: '/api/v1/menus', method: 'GET', prefix: true },
     { path: '/api/v1/products', method: 'GET', prefix: true },
     { path: '/api/v1/product-images', method: 'GET', prefix: true },
+
     { path: '/upload', method: 'GET', prefix: true },
+
     { path: '/api/v1/bookings/occupied-times', method: 'GET' },
-    { path: '/api/v1/service-images/service', method: 'GET', prefix: true },
-    { path: '/api/v1/payment/vnpay/return', method: 'ALL' },
+
+    {
+      path: '/api/v1/service-images/service',
+      method: 'GET',
+      prefix: true,
+    },
+
+    {
+      path: '/api/v1/payment/vnpay/return',
+      method: 'ALL',
+    },
   ];
 
   constructor(
@@ -38,13 +51,20 @@ export class PermissionsGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
+    // OPTIONS là CORS preflight request, không yêu cầu JWT hoặc permission.
+    if (request.method === 'OPTIONS') {
+      return true;
+    }
+
+    // Kiểm tra public route.
     const isPublic = this.publicRoutes.some((route) => {
       const pathMatches = route.prefix
         ? request.path.startsWith(route.path)
         : request.path === route.path;
 
       const methodMatches =
-        route.method === 'ALL' || request.method === route.method;
+        route.method === 'ALL' ||
+        request.method === route.method;
 
       return pathMatches && methodMatches;
     });
@@ -53,6 +73,7 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
+    // Các route còn lại bắt buộc phải có user đã xác thực.
     const user = request.user as UserPrincipal | undefined;
 
     if (!user) {
@@ -61,6 +82,7 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
+    // Lấy route pattern của controller.
     const routePath = request.route?.path;
 
     if (!routePath) {
@@ -69,6 +91,7 @@ export class PermissionsGuard implements CanActivate {
 
     const apiPath = this.normalizeApiPath(routePath);
     const method = request.method;
+
     const authorities = user.getAuthorities() ?? [];
 
     // ADMIN được phép truy cập mọi endpoint.
@@ -87,8 +110,10 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
+    // Kiểm tra user có permission tương ứng hay không.
     const hasPermission =
-      permission.name !== null && authorities.includes(permission.name);
+      permission.name !== null &&
+      authorities.includes(permission.name);
 
     if (!hasPermission) {
       throw new ForbiddenException(
@@ -104,6 +129,8 @@ export class PermissionsGuard implements CanActivate {
       return routePath;
     }
 
-    return `/api/v1${routePath.startsWith('/') ? '' : '/'}${routePath}`;
+    return `/api/v1${
+      routePath.startsWith('/') ? '' : '/'
+    }${routePath}`;
   }
 }

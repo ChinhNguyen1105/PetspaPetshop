@@ -4,6 +4,9 @@ import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination
 import { ConflictException } from 'src/common/exceptions/conflict.exception';
 import { FilterProcessor } from 'src/common/specification/filter-processor';
 import { SpecificationBuilder } from 'src/common/specification/specification-builder';
+
+import { ReqPermissionDto } from 'src/modules/permissions/dto/request/req-permission.dto';
+import { ReqUpdatePermissionDto } from 'src/modules/permissions/dto/request/req-update-permission.dto';
 import { Permission } from 'src/modules/permissions/entities/permission.entity';
 import { PermissionMapper } from 'src/modules/permissions/mapper/permission.mapper';
 import { PermissionRepository } from 'src/modules/permissions/repositories/permission.repository';
@@ -20,6 +23,7 @@ export class PermissionServiceImpl implements PermissionService {
     apiPath: string,
     method: string,
     module: string,
+    excludeId?: number,
   ): Promise<void> {
     const exists =
       await this.permissionRepository
@@ -27,6 +31,7 @@ export class PermissionServiceImpl implements PermissionService {
           apiPath,
           method,
           module,
+          excludeId,
         );
 
     if (exists) {
@@ -37,18 +42,25 @@ export class PermissionServiceImpl implements PermissionService {
   }
 
   async createPermission(
-    permission: Permission,
+    permission: ReqPermissionDto,
   ) {
     await this.checkValidExistPermission(
-      permission.apiPath as string,
-      permission.method as string,
-      permission.module as string,
+      permission.apiPath,
+      permission.method,
+      permission.module,
+    );
+
+    const permissionEntity = new Permission(
+      permission.name,
+      permission.apiPath,
+      permission.method,
+      permission.module,
     );
 
     const savedPermission =
       await this.permissionRepository
         .getRepository()
-        .save(permission);
+        .save(permissionEntity);
 
     return this.permissionMapper.toDto(
       savedPermission,
@@ -56,7 +68,7 @@ export class PermissionServiceImpl implements PermissionService {
   }
 
   async updatePermission(
-    permission: Permission,
+    permission: ReqUpdatePermissionDto,
   ) {
     const permissionRepository =
       this.permissionRepository.getRepository();
@@ -75,9 +87,10 @@ export class PermissionServiceImpl implements PermissionService {
     }
 
     await this.checkValidExistPermission(
-      permission.apiPath as string,
-      permission.method as string,
-      permission.module as string,
+      permission.apiPath,
+      permission.method,
+      permission.module,
+      permission.id,
     );
 
     permissionDb.name = permission.name;
@@ -86,7 +99,9 @@ export class PermissionServiceImpl implements PermissionService {
     permissionDb.module = permission.module;
 
     const savedPermission =
-      await permissionRepository.save(permissionDb);
+      await permissionRepository.save(
+        permissionDb,
+      );
 
     return this.permissionMapper.toDto(
       savedPermission,
