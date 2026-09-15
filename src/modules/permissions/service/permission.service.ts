@@ -16,4 +16,9 @@ export interface PermissionService {
   ): Promise<ResultPaginationDto>;
 
   fetchAPermission(id: number): Promise<PermissionDto>;
+
+  findByApiPathAndMethod(
+    apiPath: string,
+    method: string,
+  ): Promise<Permission | null>;
 }

@@ -6,9 +6,9 @@
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-import { UserDateAuditing } from '../../../common/entities/user-date-auditing.entity';
+import { UserDateAuditing } from 'src/common/entities/user-date-auditing.entity';
 
-import { User } from '../../users/entities/user.entity';
+import { User } from 'src/modules/users/entities/user.entity';
 
 @Entity('tbl_shipping_addresses')
 export class ShippingAddress extends UserDateAuditing {
@@ -19,7 +19,7 @@ export class ShippingAddress extends UserDateAuditing {
   id: number;
 
   @Column({
-    name: 'fullName',
+    name: 'full_name',
     nullable: false,
   })
   fullName: string;
@@ -31,7 +31,7 @@ export class ShippingAddress extends UserDateAuditing {
   phone: string;
 
   @Column({
-    name: 'addressDetail',
+    name: 'address_detail',
     nullable: false,
   })
   addressDetail: string;
@@ -61,10 +61,7 @@ export class ShippingAddress extends UserDateAuditing {
   })
   isDefault: boolean;
 
-  @ManyToOne(
-    () => User,
-    (user) => user.shippingAddresses,
-  )
+  @ManyToOne(() => User, (user) => user.shippingAddresses)
   @JoinColumn({
     name: 'user_id',
   })

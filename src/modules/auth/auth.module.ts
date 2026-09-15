@@ -4,18 +4,16 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 
 import { UsersModule } from 'src/modules/users/users.module';
-
 import { RoleModule } from 'src/modules/roles/role.module';
 
-import { AuthController } from './auth.controller';
+import { AuthController } from 'src/modules/auth/auth.controller';
 
 import { AuthServiceImpl } from 'src/modules/auth/service/auth.service.impl';
-
 import { CustomUserDetailsServiceImpl } from 'src/modules/auth/service/custom-user-details.service.impl';
 
-import { JwtTokenProvider } from './security/jwt-token-provider';
+import { JwtTokenProvider } from 'src/modules/auth/security/jwt-token-provider';
 
-import { JwtPreFilter } from './security/jwt-pre-filter';
+import { JwtStrategy } from 'src/modules/auth/strategies/jwt.strategy';
 
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
@@ -34,7 +32,9 @@ import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
     AuthServiceImpl,
     CustomUserDetailsServiceImpl,
     JwtTokenProvider,
-    JwtPreFilter,
+
+    // Đăng ký Passport JWT strategy với tên "jwt".
+    JwtStrategy,
 
     {
       provide: PROVIDER_TOKEN.AUTH_SERVICE,

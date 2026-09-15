@@ -1,18 +1,15 @@
-﻿import {
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+﻿import { CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 export abstract class DateAuditing {
   @CreateDateColumn({
-    name: 'createdDate',
+    name: 'created_date',
     nullable: false,
     update: false,
   })
   createdDate: Date;
 
   @UpdateDateColumn({
-    name: 'lastModifiedDate',
+    name: 'last_modified_date',
     nullable: false,
   })
   lastModifiedDate: Date;

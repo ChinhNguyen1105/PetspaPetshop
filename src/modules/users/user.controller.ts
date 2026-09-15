@@ -86,6 +86,7 @@ export class UserController {
       await this.userService.updateProfile(reqUserUpdateProfile);
     return VsResponseUtil.successWithStatus(HttpStatus.OK, userDto);
   }
+  
   @Get(UrlConstant.User.GET_PROFILE) async getUserProfile() {
     const userDto: UserDto = await this.userService.getUserProfile();
     return VsResponseUtil.successWithStatus(HttpStatus.OK, userDto);

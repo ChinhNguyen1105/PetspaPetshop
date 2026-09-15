@@ -1,19 +1,17 @@
-﻿import {
-  Column,
-} from 'typeorm';
+﻿import { Column } from 'typeorm';
 
-import { UserDateAuditing } from './user-date-auditing.entity';
+import { UserDateAuditing } from 'src/common/entities/user-date-auditing.entity';
 
 export abstract class FlagUserDateAuditing extends UserDateAuditing {
   @Column({
-    name: 'deleteFlag',
+    name: 'delete_flag',
     nullable: false,
     default: false,
   })
   deleteFlag: boolean;
 
   @Column({
-    name: 'activeFlag',
+    name: 'active_flag',
     nullable: false,
     default: true,
   })

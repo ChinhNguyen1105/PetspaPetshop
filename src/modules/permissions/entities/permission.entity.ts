@@ -1,8 +1,8 @@
 ﻿import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-import { UserDateAuditing } from '../../../common/entities/user-date-auditing.entity';
+import { UserDateAuditing } from 'src/common/entities/user-date-auditing.entity';
 
-import { Role } from '../../roles/entities/role.entity';
+import { Role } from 'src/modules/roles/entities/role.entity';
 
 @Entity('tbl_permissions')
 export class Permission extends UserDateAuditing {
@@ -21,7 +21,7 @@ export class Permission extends UserDateAuditing {
   name: string | null;
 
   @Column({
-    name: 'apiPath',
+    name: 'api_path',
     type: 'varchar',
     length: 255,
     nullable: true,

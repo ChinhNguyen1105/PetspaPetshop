@@ -9,8 +9,9 @@
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-import { FlagUserDateAuditing } from '../../../common/entities/flag-user-date-auditing.entity';
-import { Role } from '../../roles/entities/role.entity';
+import { FlagUserDateAuditing } from 'src/common/entities/flag-user-date-auditing.entity';
+
+import { Role } from 'src/modules/roles/entities/role.entity';
 
 @Entity('tbl_menus')
 export class Menu extends FlagUserDateAuditing {
@@ -45,7 +46,7 @@ export class Menu extends FlagUserDateAuditing {
   icon: string | null;
 
   @Column({
-    name: 'sortOrder',
+    name: 'sort_order',
     type: 'int',
     nullable: true,
   })

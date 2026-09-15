@@ -1,5 +1,4 @@
-﻿
-import {
+﻿import {
   Column,
   Entity,
   JoinColumn,
@@ -10,6 +9,7 @@ import {
 } from 'typeorm';
 
 import { FlagUserDateAuditing } from 'src/common/entities/flag-user-date-auditing.entity';
+
 import { GenderEnum } from 'src/common/constants/gender.enum';
 
 import { Pet } from 'src/modules/pets/entities/pet.entity';
@@ -97,19 +97,13 @@ export class User extends FlagUserDateAuditing {
   })
   role: Role;
 
-  @OneToMany(
-    () => ShippingAddress,
-    (shippingAddress) => shippingAddress.user,
-  )
+  @OneToMany(() => ShippingAddress, (shippingAddress) => shippingAddress.user)
   shippingAddresses: ShippingAddress[];
 
   @OneToMany(() => ProductReview, (review) => review.user)
   reviews: ProductReview[];
 
-  @OneToMany(
-    () => PetServiceReview,
-    (review) => review.user,
-  )
+  @OneToMany(() => PetServiceReview, (review) => review.user)
   petServiceReviews: PetServiceReview[];
 
   @OneToOne(() => Cart, (cart) => cart.user)

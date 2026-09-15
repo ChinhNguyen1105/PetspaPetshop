@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -22,6 +22,17 @@ export class PermissionRepository {
       .andWhere('LOWER(permission.method) = LOWER(:method)', { method })
       .andWhere('LOWER(permission.module) = LOWER(:module)', { module })
       .getExists();
+  }
+
+  findByApiPathAndMethod(
+    apiPath: string,
+    method: string,
+  ): Promise<Permission | null> {
+    return this.repository
+      .createQueryBuilder('permission')
+      .where('LOWER(permission.apiPath) = LOWER(:apiPath)', { apiPath })
+      .andWhere('LOWER(permission.method) = LOWER(:method)', { method })
+      .getOne();
   }
 
   findByIdIn(ids: number[]) {

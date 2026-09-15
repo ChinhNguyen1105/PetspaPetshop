@@ -17,7 +17,6 @@ import { PetServiceImage } from 'src/modules/catalogue/services/entities/pet-ser
 import { ServiceImageMapper } from 'src/modules/catalogue/services/mapper/service-image.mapper';
 import { ServiceMapper } from 'src/modules/catalogue/services/mapper/service.mapper';
 
-import { ServiceRepository } from 'src/modules/catalogue/services/repositories/service.repository';
 import { PetServiceImageRepository } from 'src/modules/catalogue/services/repositories/pet-service-image.repository';
 import { PetServiceRepository } from 'src/modules/catalogue/services/repositories/pet-service.repository';
 
@@ -41,7 +40,6 @@ import { PetServiceServiceImpl } from 'src/modules/catalogue/services/service/pe
   ],
 
   providers: [
-    ServiceRepository,
     PetServiceRepository,
     PetServiceImageRepository,
 
@@ -62,7 +60,6 @@ import { PetServiceServiceImpl } from 'src/modules/catalogue/services/service/pe
   ],
 
   exports: [
-    ServiceRepository,
     PetServiceRepository,
     PetServiceImageRepository,
 

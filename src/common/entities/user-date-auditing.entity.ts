@@ -1,10 +1,11 @@
 ﻿import { Column } from 'typeorm';
-import { DateAuditing } from './date-auditing.entity';
+
+import { DateAuditing } from 'src/common/entities/date-auditing.entity';
 
 export abstract class UserDateAuditing extends DateAuditing {
   @Column({
-    name: 'createdBy',
-    type: 'varchar', // Bắt buộc khai báo kiểu dữ liệu
+    name: 'created_by',
+    type: 'varchar',
     length: 255,
     nullable: true,
     update: false,
@@ -12,8 +13,8 @@ export abstract class UserDateAuditing extends DateAuditing {
   createdBy: string | null;
 
   @Column({
-    name: 'lastModifiedBy',
-    type: 'varchar', // Bắt buộc khai báo kiểu dữ liệu
+    name: 'last_modified_by',
+    type: 'varchar',
     length: 255,
     nullable: true,
   })

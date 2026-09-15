@@ -1,5 +1,4 @@
-﻿
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -24,7 +23,6 @@ import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-stat
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
 
 import type { OrderService } from 'src/modules/orders/service/order.service';
-
 @RestApiV1()
 @Controller()
 export class OrderController {
@@ -32,21 +30,6 @@ export class OrderController {
     @Inject(PROVIDER_TOKEN.ORDER_SERVICE)
     private readonly orderService: OrderService,
   ) {}
-
-  @Get(
-    UrlConstant.Order.GET_ORDER_DETAIL.replace(
-      '{id}',
-      ':id',
-    ),
-  )
-  async getOrderDetail(
-    @Param('id') id: number,
-  ) {
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      await this.orderService.getOrderDetail(id),
-    );
-  }
 
   @Get(UrlConstant.Order.GET_ALL_ORDERS)
   async getAllOrders(
@@ -64,66 +47,33 @@ export class OrderController {
     );
   }
 
-  @Post(
-    UrlConstant.Order.CREATE_ORDER_FROM_CART,
-  )
-  async createOrderFromCart(
-    @Body() req: ReqCreateOrderFromCartDto,
-  ) {
-    const orderDto =
-      await this.orderService.createOrderFromCart(
-        req,
-      );
+  @Post(UrlConstant.Order.CREATE_ORDER_FROM_CART)
+  async createOrderFromCart(@Body() req: ReqCreateOrderFromCartDto) {
+    const orderDto = await this.orderService.createOrderFromCart(req);
 
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      orderDto,
-    );
+    return VsResponseUtil.successWithStatus(HttpStatus.OK, orderDto);
   }
 
-  @Post(
-    UrlConstant.Order.CREATE_ORDER_FROM_BUY_NOW,
-  )
-  async createOrderFromBuyNow(
-    @Body() req: ReqCreateOrderBuyNowDto,
-  ) {
-    const orderDto =
-      await this.orderService.createOrderFromBuyNow(
-        req,
-      );
+  @Post(UrlConstant.Order.CREATE_ORDER_FROM_BUY_NOW)
+  async createOrderFromBuyNow(@Body() req: ReqCreateOrderBuyNowDto) {
+    const orderDto = await this.orderService.createOrderFromBuyNow(req);
 
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      orderDto,
-    );
+    return VsResponseUtil.successWithStatus(HttpStatus.OK, orderDto);
   }
 
-  @Patch(
-    UrlConstant.Order.CANCEL_ORDER.replace(
-      '{id}',
-      ':id',
-    ),
-  )
-  async cancelOrder(
-    @Param('id') id: number,
-  ) {
+  @Patch(UrlConstant.Order.CANCEL_ORDER.replace('{id}', ':id'))
+  async cancelOrder(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.cancelOrder(id),
     );
   }
 
-  @Patch(
-    UrlConstant.Order.UPDATE_ORDER_STATUS,
-  )
-  async updateOrderStatus(
-    @Body() req: ReqUpdateOrderStatusDto,
-  ) {
+  @Patch(UrlConstant.Order.UPDATE_ORDER_STATUS)
+  async updateOrderStatus(@Body() req: ReqUpdateOrderStatusDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.orderService.updateOrderStatus(
-        req,
-      ),
+      await this.orderService.updateOrderStatus(req),
     );
   }
 
@@ -144,6 +94,14 @@ export class OrderController {
         Number(page),
         Number(pageSize),
       ),
+    );
+  }
+
+  @Get(UrlConstant.Order.GET_ORDER_DETAIL.replace('{id}', ':id'))
+  async getOrderDetail(@Param('id') id: number) {
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      await this.orderService.getOrderDetail(id),
     );
   }
 }

@@ -210,4 +210,14 @@ export class PermissionServiceImpl implements PermissionService {
       permission,
     );
   }
+
+  async findByApiPathAndMethod(
+    apiPath: string,
+    method: string,
+  ): Promise<Permission | null> {
+    return this.permissionRepository.findByApiPathAndMethod(
+      apiPath,
+      method,
+    );
+  }
 }

@@ -1,4 +1,5 @@
-﻿import { User } from 'src/modules/users/entities/user.entity';
+﻿
+import { User } from 'src/modules/users/entities/user.entity';
 
 export class UserPrincipal {
   private readonly id: string | null;
@@ -45,12 +46,24 @@ export class UserPrincipal {
     }
   }
 
-  static create(user: User): UserPrincipal {
+  // SỬA: Nhận thêm permissionNames để đưa quyền vào authorities.
+  static create(
+    user: User,
+    permissionNames: string[] = [],
+  ): UserPrincipal {
     const authorities: string[] = [];
 
+    // Giữ role hiện tại.
     if (user.role?.name) {
       authorities.push(user.role.name);
     }
+
+    // SỬA: Thêm tên Permission vào authorities.
+    authorities.push(
+      ...permissionNames.filter(
+        (permission) => !authorities.includes(permission),
+      ),
+    );
 
     return new UserPrincipal(
       user.id,
@@ -73,7 +86,9 @@ export class UserPrincipal {
   }
 
   getAuthorities(): string[] | null {
-    return this.authorities ? [...this.authorities] : null;
+    return this.authorities
+      ? [...this.authorities]
+      : null;
   }
 
   isAccountNonExpired(): boolean {
@@ -108,3 +123,4 @@ export class UserPrincipal {
     return this.id ?? '';
   }
 }
+
