@@ -1,4 +1,5 @@
-﻿import {
+﻿
+import {
   Body,
   Controller,
   Delete,
@@ -16,6 +17,7 @@ import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
 import { ReqCreateOrderFromCartDto } from 'src/modules/orders/dto/request/req-create-order-from-cart.dto';
 import { ReqCreateOrderBuyNowDto } from 'src/modules/orders/dto/request/req-create-order-buy-now.dto';
@@ -23,6 +25,7 @@ import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-stat
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
 
 import type { OrderService } from 'src/modules/orders/service/order.service';
+
 @RestApiV1()
 @Controller()
 export class OrderController {
@@ -34,35 +37,53 @@ export class OrderController {
   @Get(UrlConstant.Order.GET_ALL_ORDERS)
   async getAllOrders(
     @Query('filter') filter: string[] | undefined,
-    @Query('page') page = 1,
-    @Query('pageSize') pageSize = 10,
+    @Query() pagination: PaginationDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.getAllOrders(
         filter ?? [],
-        Number(page),
-        Number(pageSize),
+        pagination.page,
+        pagination.pageSize,
       ),
     );
   }
 
   @Post(UrlConstant.Order.CREATE_ORDER_FROM_CART)
-  async createOrderFromCart(@Body() req: ReqCreateOrderFromCartDto) {
-    const orderDto = await this.orderService.createOrderFromCart(req);
+  async createOrderFromCart(
+    @Body() req: ReqCreateOrderFromCartDto,
+  ) {
+    const orderDto =
+      await this.orderService.createOrderFromCart(req);
 
-    return VsResponseUtil.successWithStatus(HttpStatus.OK, orderDto);
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      orderDto,
+    );
   }
 
   @Post(UrlConstant.Order.CREATE_ORDER_FROM_BUY_NOW)
-  async createOrderFromBuyNow(@Body() req: ReqCreateOrderBuyNowDto) {
-    const orderDto = await this.orderService.createOrderFromBuyNow(req);
+  async createOrderFromBuyNow(
+    @Body() req: ReqCreateOrderBuyNowDto,
+  ) {
+    const orderDto =
+      await this.orderService.createOrderFromBuyNow(req);
 
-    return VsResponseUtil.successWithStatus(HttpStatus.OK, orderDto);
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      orderDto,
+    );
   }
 
-  @Patch(UrlConstant.Order.CANCEL_ORDER.replace('{id}', ':id'))
-  async cancelOrder(@Param('id') id: number) {
+  @Patch(
+    UrlConstant.Order.CANCEL_ORDER.replace(
+      '{id}',
+      ':id',
+    ),
+  )
+  async cancelOrder(
+    @Param('id') id: number,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.cancelOrder(id),
@@ -70,7 +91,9 @@ export class OrderController {
   }
 
   @Patch(UrlConstant.Order.UPDATE_ORDER_STATUS)
-  async updateOrderStatus(@Body() req: ReqUpdateOrderStatusDto) {
+  async updateOrderStatus(
+    @Body() req: ReqUpdateOrderStatusDto,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.updateOrderStatus(req),
@@ -80,8 +103,7 @@ export class OrderController {
   @Get(UrlConstant.Order.GET_MY_ORDERS)
   async getMyOrders(
     @Query('status') status: string | undefined,
-    @Query('page') page = 1,
-    @Query('pageSize') pageSize = 10,
+    @Query() pagination: PaginationDto,
   ) {
     const orderStatus: ReqOrderStatusDto = {
       status: status ?? null,
@@ -91,14 +113,21 @@ export class OrderController {
       HttpStatus.OK,
       await this.orderService.getMyOrders(
         orderStatus,
-        Number(page),
-        Number(pageSize),
+        pagination.page,
+        pagination.pageSize,
       ),
     );
   }
 
-  @Get(UrlConstant.Order.GET_ORDER_DETAIL.replace('{id}', ':id'))
-  async getOrderDetail(@Param('id') id: number) {
+  @Get(
+    UrlConstant.Order.GET_ORDER_DETAIL.replace(
+      '{id}',
+      ':id',
+    ),
+  )
+  async getOrderDetail(
+    @Param('id') id: number,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.getOrderDetail(id),

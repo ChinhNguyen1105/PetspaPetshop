@@ -95,7 +95,7 @@ export class PermissionsGuard implements CanActivate {
     const authorities = user.getAuthorities() ?? [];
 
     // ADMIN được phép truy cập mọi endpoint.
-    if (authorities.includes('ADMIN')) {
+    if (authorities.includes('ROLE_ADMIN')) {
       return true;
     }
 

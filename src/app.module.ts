@@ -55,7 +55,7 @@ import { ReviewsModule } from 'src/modules/reviews/reviews.module';
       autoLoadEntities: true,
 
       // Development hiện tại
-      synchronize: true,
+      synchronize: false,
     }),
 
     // 3. Infrastructure / security

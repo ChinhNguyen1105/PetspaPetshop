@@ -16,6 +16,7 @@ import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
 import { ReqCreateServiceDto } from 'src/modules/catalogue/services/dto/request/req-create-service.dto';
 import { ReqUpdateServiceDto } from 'src/modules/catalogue/services/dto/request/req-update-service.dto';
@@ -34,9 +35,7 @@ export class PetServiceController {
   ) {}
 
   @Post(UrlConstant.PetService.CREATE_SERVICE)
-  async createService(
-    @Body() req: ReqCreateServiceDto,
-  ) {
+  async createService(@Body() req: ReqCreateServiceDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.CREATED,
       await this.petServiceService.createService(req),
@@ -44,9 +43,7 @@ export class PetServiceController {
   }
 
   @Put(UrlConstant.PetService.UPDATE_SERVICE)
-  async updateService(
-    @Body() req: ReqUpdateServiceDto,
-  ) {
+  async updateService(@Body() req: ReqUpdateServiceDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.petServiceService.updateService(req),
@@ -54,14 +51,9 @@ export class PetServiceController {
   }
 
   @Get(
-    UrlConstant.PetService.GET_SERVICE.replace(
-      '{id}',
-      ':id',
-    ),
+    UrlConstant.PetService.GET_SERVICE.replace('{id}', ':id'),
   )
-  async getService(
-    @Param('id') id: number,
-  ) {
+  async getService(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.petServiceService.getServiceById(id),
@@ -71,15 +63,14 @@ export class PetServiceController {
   @Get(UrlConstant.PetService.GET_ALL_SERVICES)
   async getAllServices(
     @Query('filter') filter: string[] | undefined,
-    @Query('page') page = 1,
-    @Query('pageSize') pageSize = 10,
+    @Query() pagination: PaginationDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.petServiceService.getAllServices(
         filter ?? [],
-        Number(page),
-        Number(pageSize),
+        pagination.page,
+        pagination.pageSize,
       ),
     );
   }
@@ -87,15 +78,14 @@ export class PetServiceController {
   @Get(UrlConstant.PetService.SEARCH_SERVICES)
   async searchServices(
     @Query('keyword') keyword: string,
-    @Query('page') page = 1,
-    @Query('pageSize') pageSize = 10,
+    @Query() pagination: PaginationDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.petServiceService.searchServices(
         keyword,
-        Number(page),
-        Number(pageSize),
+        pagination.page,
+        pagination.pageSize,
       ),
     );
   }
@@ -108,28 +98,22 @@ export class PetServiceController {
   )
   async getServicesByCategory(
     @Param('categoryId') categoryId: number,
-    @Query('page') page = 1,
-    @Query('pageSize') pageSize = 10,
+    @Query() pagination: PaginationDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.petServiceService.getServicesByCategory(
         Number(categoryId),
-        Number(page),
-        Number(pageSize),
+        pagination.page,
+        pagination.pageSize,
       ),
     );
   }
 
   @Delete(
-    UrlConstant.PetService.DELETE_SERVICE.replace(
-      '{id}',
-      ':id',
-    ),
+    UrlConstant.PetService.DELETE_SERVICE.replace('{id}', ':id'),
   )
-  async deleteService(
-    @Param('id') id: number,
-  ) {
+  async deleteService(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.NO_CONTENT,
       await this.petServiceService.deleteService(id),
@@ -137,30 +121,20 @@ export class PetServiceController {
   }
 
   @Get(UrlConstant.PetService.GET_TOP_SERVICES)
-  async getTopServices(
-    @Query('limit') limit = 6,
-  ) {
+  async getTopServices(@Query('limit') limit = 6) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.petServiceService.getTopServices(
-        Number(limit),
-      ),
+      await this.petServiceService.getTopServices(Number(limit)),
     );
   }
 
   @Post(UrlConstant.PetService.GET_RECOMMENDATIONS)
-  async recommendServices(
-    @Body() req: ReqRecommendationDto,
-  ) {
+  async recommendServices(@Body() req: ReqRecommendationDto) {
     const recommendedItemIds =
-      await this.petServiceService.getRecommendedServiceIds(
-        req.itemIds,
-      );
+      await this.petServiceService.getRecommendedServiceIds(req.itemIds);
 
     const response = new ResRecommendationDto();
-
-    response.recommendedItemIds =
-      recommendedItemIds;
+    response.recommendedItemIds = recommendedItemIds;
 
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,

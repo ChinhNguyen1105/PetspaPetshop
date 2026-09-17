@@ -13,12 +13,9 @@
 
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
-
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 import { UrlConstant } from 'src/common/constants/url.constant';
-
 import { ReqForMenuDto } from 'src/modules/menu/dto/request/req-for-menu.dto';
-
 import type { MenuService } from 'src/modules/menu/service/menu.service';
 
 @RestApiV1()
@@ -53,14 +50,7 @@ export class MenuController {
     );
   }
 
-  @Get(UrlConstant.Menu.GET_MENU.replace('{id}', ':id'))
-  async getMenu(@Param('id') id: number) {
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      await this.menuService.getMenuById(id),
-    );
-  }
-
+  // Các route cụ thể phải đặt trước /menus/:id
   @Get(UrlConstant.Menu.GET_MENUS_TREE)
   async getMenuTree() {
     return VsResponseUtil.successWithStatus(
@@ -82,6 +72,15 @@ export class MenuController {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.menuService.getAllMenus(Number(page), Number(pageSize)),
+    );
+  }
+
+  // Route động /menus/:id phải đặt sau các route cụ thể
+  @Get(UrlConstant.Menu.GET_MENU.replace('{id}', ':id'))
+  async getMenu(@Param('id') id: number) {
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      await this.menuService.getMenuById(id),
     );
   }
 }

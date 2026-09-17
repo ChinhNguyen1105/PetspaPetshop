@@ -1,12 +1,13 @@
 ﻿import {
   Body,
+  DefaultValuePipe,
   Get,
   HttpStatus,
   Inject,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
-  Put,
   Query,
 } from '@nestjs/common';
 
@@ -37,7 +38,10 @@ export class BookingController {
   }
 
   @Get(UrlConstant.Booking.GET_BOOKING)
-  async getBooking(@Param('id') id: number) {
+  async getBooking(
+    @Param('id', ParseIntPipe)
+    id: number,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.bookingService.getBookingById(id),
@@ -46,8 +50,11 @@ export class BookingController {
 
   @Get(UrlConstant.Booking.GET_MY_BOOKINGS)
   async getMyBookings(
-    @Query('page') page: number,
-    @Query('pageSize') pageSize: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe)
+    page: number,
+
+    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe)
+    pageSize: number,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
@@ -57,9 +64,14 @@ export class BookingController {
 
   @Get(UrlConstant.Booking.GET_BOOKINGS_BY_STATUS)
   async getBookingsByStatus(
-    @Query('status') status: string,
-    @Query('page') page: number,
-    @Query('pageSize') pageSize: number,
+    @Query('status')
+    status: string,
+
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe)
+    page: number,
+
+    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe)
+    pageSize: number,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
@@ -69,8 +81,11 @@ export class BookingController {
 
   @Get(UrlConstant.Booking.GET_ALL_BOOKINGS)
   async getAllBookings(
-    @Query('page') page: number,
-    @Query('pageSize') pageSize: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe)
+    page: number,
+
+    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe)
+    pageSize: number,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
@@ -87,7 +102,10 @@ export class BookingController {
   }
 
   @Patch(UrlConstant.Booking.CANCEL_BOOKING)
-  async cancelBooking(@Param('id') id: number) {
+  async cancelBooking(
+    @Param('id', ParseIntPipe)
+    id: number,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.bookingService.cancelBooking(id),
@@ -96,8 +114,11 @@ export class BookingController {
 
   @Patch(UrlConstant.Booking.UPDATE_BOOKING_STATUS)
   async updateBookingStatus(
-    @Param('id') id: number,
-    @Query('status') status: string,
+    @Param('id', ParseIntPipe)
+    id: number,
+
+    @Query('status')
+    status: string,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
