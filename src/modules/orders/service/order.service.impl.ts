@@ -836,13 +836,42 @@ export class OrderServiceImpl implements OrderService {
             )
             .trim();
 
+        if (!key || !value) {
+          continue;
+        }
+
+        const allowedColumns: Record<
+          string,
+          string
+        > = {
+          id: 'order.id',
+          shippingName: 'order.shipping_name',
+          shippingPhone: 'order.shipping_phone',
+          shippingAddressFull:
+            'order.shipping_address_full',
+          totalAmount: 'order.total_amount',
+          status: 'order.status',
+          orderType: 'order.order_type',
+          paymentId: 'order.payment_id',
+          userId: 'order.user_id',
+          createdDate: 'order.created_date',
+          lastModifiedDate:
+            'order.last_modified_date',
+          deleteFlag: 'order.delete_flag',
+          activeFlag: 'order.active_flag',
+        };
+
+        const column =
+          allowedColumns[key];
+
+        if (!column) {
+          continue;
+        }
+
         const parameter =
           `filter_${Math.random()
             .toString(36)
             .slice(2, 10)}`;
-
-        const column =
-          `order.${key}`;
 
         switch (separator) {
           case ':':
@@ -894,10 +923,7 @@ export class OrderServiceImpl implements OrderService {
     }
 
     queryBuilder
-      .orderBy(
-        'order.createdDate',
-        'DESC',
-      )
+      .orderBy('order.createdDate', 'DESC')
       .skip((page - 1) * pageSize)
       .take(pageSize);
 

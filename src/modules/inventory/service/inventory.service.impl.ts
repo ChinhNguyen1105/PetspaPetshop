@@ -259,6 +259,41 @@ export class InventoryServiceImpl implements InventoryService {
     return this.inventoryMapper.toDto(inventory);
   }
 
+  async getInventoryList(
+    filter: string[],
+    page: number,
+    pageSize: number,
+  ): Promise<ResultPaginationDto> {
+    const specificationBuilder =
+      new SpecificationBuilder<Inventory>();
+
+    FilterProcessor.process(specificationBuilder, filter);
+
+    const queryBuilder = this.inventoryRepository
+      .getRepository()
+      .createQueryBuilder('inventory')
+      .leftJoinAndSelect('inventory.product', 'product')
+      .orderBy('inventory.id', 'DESC');
+
+    specificationBuilder.apply(queryBuilder, 'inventory');
+
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
+
+    const [inventories, total] = await queryBuilder.getManyAndCount();
+
+    const dtoList = this.inventoryMapper.toListInventory(inventories);
+
+    return {
+      result: dtoList,
+      meta: {
+        page,
+        pageSize,
+        pages: Math.ceil(total / pageSize),
+        total,
+      },
+    };
+  }
+
   async getInventoryTransactionHistory(
     filter: string[],
     page: number,

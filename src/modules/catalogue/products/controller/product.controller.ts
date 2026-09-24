@@ -28,7 +28,7 @@ export class ProductController {
     private readonly productService: ProductService,
   ) {}
 
-  @Get(UrlConstant.Product.GET_PRODUCT.replace('{id}', ':id'))
+  @Get(UrlConstant.Product.GET_PRODUCT)
   async getProduct(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
@@ -52,7 +52,7 @@ export class ProductController {
     );
   }
 
-  @Delete(UrlConstant.Product.DELETE_PRODUCT.replace('{id}', ':id'))
+  @Delete(UrlConstant.Product.DELETE_PRODUCT)
   async deleteProduct(@Param('id') id: number) {
     const commonResponseDto = await this.productService.deleteProduct(id);
 

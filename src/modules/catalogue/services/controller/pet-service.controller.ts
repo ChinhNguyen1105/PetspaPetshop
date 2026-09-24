@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Inject,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -50,16 +51,6 @@ export class PetServiceController {
     );
   }
 
-  @Get(
-    UrlConstant.PetService.GET_SERVICE.replace('{id}', ':id'),
-  )
-  async getService(@Param('id') id: number) {
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      await this.petServiceService.getServiceById(id),
-    );
-  }
-
   @Get(UrlConstant.PetService.GET_ALL_SERVICES)
   async getAllServices(
     @Query('filter') filter: string[] | undefined,
@@ -90,41 +81,28 @@ export class PetServiceController {
     );
   }
 
-  @Get(
-    UrlConstant.PetService.GET_SERVICES_BY_CATEGORY.replace(
-      '{categoryId}',
-      ':categoryId',
-    ),
-  )
+  @Get(UrlConstant.PetService.GET_SERVICES_BY_CATEGORY)
   async getServicesByCategory(
-    @Param('categoryId') categoryId: number,
+    @Param('categoryId', ParseIntPipe) categoryId: number,
     @Query() pagination: PaginationDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.petServiceService.getServicesByCategory(
-        Number(categoryId),
+        categoryId,
         pagination.page,
         pagination.pageSize,
       ),
     );
   }
 
-  @Delete(
-    UrlConstant.PetService.DELETE_SERVICE.replace('{id}', ':id'),
-  )
-  async deleteService(@Param('id') id: number) {
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.NO_CONTENT,
-      await this.petServiceService.deleteService(id),
-    );
-  }
-
   @Get(UrlConstant.PetService.GET_TOP_SERVICES)
-  async getTopServices(@Query('limit') limit = 6) {
+  async getTopServices(
+    @Query('limit', ParseIntPipe) limit: number,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.petServiceService.getTopServices(Number(limit)),
+      await this.petServiceService.getTopServices(limit),
     );
   }
 
@@ -141,5 +119,24 @@ export class PetServiceController {
       response,
     );
   }
-}
 
+  @Get(UrlConstant.PetService.GET_SERVICE)
+  async getService(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      await this.petServiceService.getServiceById(id),
+    );
+  }
+
+  @Delete(UrlConstant.PetService.DELETE_SERVICE)
+  async deleteService(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.NO_CONTENT,
+      await this.petServiceService.deleteService(id),
+    );
+  }
+}

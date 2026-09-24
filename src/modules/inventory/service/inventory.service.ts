@@ -21,6 +21,12 @@ export interface InventoryService {
     productId: number,
   ): Promise<InventoryDto>;
 
+  getInventoryList(
+    filter: string[],
+    page: number,
+    pageSize: number,
+  ): Promise<ResultPaginationDto>;
+
   getInventoryTransactionHistory(
     filter: string[],
     page: number,

@@ -4,22 +4,23 @@
   Delete,
   Get,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
 import { ReqCreateCategoryDto } from 'src/modules/catalogue/categories/dto/req-create-category.dto';
 import { ReqUpdateCategoryDto } from 'src/modules/catalogue/categories/dto/request/req-update-category.dto';
+
 import type { CategoryService } from 'src/modules/catalogue/categories/service/category.service';
-import { Inject } from '@nestjs/common';
-
-import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
-
 
 @RestApiV1()
 @Controller()
@@ -31,15 +32,22 @@ export class CategoryController {
 
   // Public
   @Get(UrlConstant.Category.GET_CATEGORIES)
-  async getCategories() {
+  async getCategories(
+    @Query('filter') filter: string[] | undefined,
+    @Query() pagination: PaginationDto,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.categoryService.getCategories(),
+      await this.categoryService.getCategories(
+        filter ?? [],
+        pagination.page,
+        pagination.pageSize,
+      ),
     );
   }
 
   @Get(UrlConstant.Category.GET_CATEGORY)
-  async getCategoryDetail(@Param('id') id: string) {
+  async getCategoryDetail(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.categoryService.getCategoryDetail(Number(id)),
@@ -57,7 +65,10 @@ export class CategoryController {
 
   @Put(UrlConstant.Category.UPDATE_CATEGORY)
   async updateCategory(@Body() req: ReqUpdateCategoryDto) {
-    return this.categoryService.updateCategory(req);
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      await this.categoryService.updateCategory(req),
+    );
   }
 
   @Delete(UrlConstant.Category.DELETE_CATEGORY)
