@@ -1,5 +1,4 @@
-﻿
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 
@@ -31,9 +30,7 @@ import { RecommendationModule } from 'src/modules/recommendation/recommendation.
       Product,
       ProductImage,
     ]),
-
     ConfigModule,
-
     CategoriesModule,
     FilesModule,
     InventoryModule,
@@ -84,4 +81,3 @@ import { RecommendationModule } from 'src/modules/recommendation/recommendation.
   ],
 })
 export class ProductsModule {}
-

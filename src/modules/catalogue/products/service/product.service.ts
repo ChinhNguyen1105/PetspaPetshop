@@ -1,5 +1,7 @@
-﻿import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
-import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
+﻿import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
+import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
+
+import { ProductQueryDto } from 'src/modules/catalogue/products/dto/request/product-query.dto';
 import { ReqCreateProductDto } from 'src/modules/catalogue/products/dto/request/req-create-product.dto';
 import { ReqUpdateProductDto } from 'src/modules/catalogue/products/dto/request/req-update-product.dto';
 import { ProductDto } from 'src/modules/catalogue/products/dto/response/product.dto';
@@ -18,9 +20,7 @@ export interface ProductService {
   getProductById(id: number): Promise<ProductDto>;
 
   getAllProduct(
-    filter: string[],
-    page: number,
-    pageSize: number,
+    query: ProductQueryDto,
   ): Promise<ResultPaginationDto>;
 
   getRecommendedProductIds(

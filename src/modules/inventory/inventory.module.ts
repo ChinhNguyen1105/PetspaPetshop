@@ -1,5 +1,4 @@
-﻿
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
@@ -58,4 +57,3 @@ import { InventoryServiceImpl } from 'src/modules/inventory/service/inventory.se
   ],
 })
 export class InventoryModule {}
-
