@@ -1,6 +1,4 @@
-﻿import {
-  IsDefined,
-} from 'class-validator';
+﻿import { IsDefined } from 'class-validator';
 
 export class ReqSetThumbnailProductDto {
   @IsDefined({ message: 'Product ID is required' })

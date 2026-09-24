@@ -4,22 +4,26 @@
   Delete,
   Get,
   HttpStatus,
+  Inject,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
   UploadedFiles,
   UseInterceptors,
-  Inject,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 
-import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
-import { UrlConstant } from 'src/common/constants/url.constant';
-import { ReqSetThumbnailProductDto } from 'src/modules/catalogue/products/dto/request/req-set-thumbnail-product.dto';
-import type { ProductImageService } from 'src/modules/catalogue/products/service/product-image.service';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+import { UrlConstant } from 'src/common/constants/url.constant';
+import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
+
+import { ReqSetThumbnailProductDto } from 'src/modules/catalogue/products/dto/request/req-set-thumbnail-product.dto';
+
+import type { ProductImageService } from 'src/modules/catalogue/products/service/product-image.service';
+
 @RestApiV1()
 @Controller()
 export class ProductImageController {
@@ -31,24 +35,35 @@ export class ProductImageController {
   @Post(UrlConstant.ProductImages.ADD_IMAGES)
   @UseInterceptors(FilesInterceptor('files'))
   async addImages(
-    @Query('productId') productId: number,
+    @Query('productId', ParseIntPipe) productId: number,
     @UploadedFiles()
     files: Express.Multer.File[],
   ) {
-    const commonResponseDto = await this.productImageService.addImages(
-      Number(productId),
-      files,
-    );
+    const response =
+      await this.productImageService.addImages(
+        productId,
+        files,
+      );
 
-    return VsResponseUtil.successWithStatus(HttpStatus.OK, commonResponseDto);
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      response,
+    );
   }
 
-  @Delete(UrlConstant.ProductImages.DELETE_IMAGE.replace('{id}', ':id'))
-  async deleteImage(@Param('id') imageId: number) {
-    const commonResponseDto =
-      await this.productImageService.deleteImage(imageId);
+  @Delete(UrlConstant.ProductImages.DELETE_IMAGE)
+  async deleteImage(
+    @Param('id', ParseIntPipe) imageId: number,
+  ) {
+    const response =
+      await this.productImageService.deleteImage(
+        imageId,
+      );
 
-    return VsResponseUtil.successWithStatus(HttpStatus.OK, commonResponseDto);
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      response,
+    );
   }
 
   @Put(UrlConstant.ProductImages.SET_MAIN_IMAGE)
@@ -57,17 +72,28 @@ export class ProductImageController {
     reqSetMainImage: ReqSetThumbnailProductDto,
   ) {
     const response =
-      await this.productImageService.changeMainImage(reqSetMainImage);
+      await this.productImageService.changeMainImage(
+        reqSetMainImage,
+      );
 
-    return VsResponseUtil.successWithStatus(HttpStatus.OK, response);
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      response,
+    );
   }
 
-  @Get(
-    UrlConstant.ProductImages.GET_IMAGES.replace('{productId}', ':productId'),
-  )
-  async getImages(@Param('productId') productId: number) {
-    const images = await this.productImageService.getProductImages(productId);
+  @Get(UrlConstant.ProductImages.GET_IMAGES)
+  async getImages(
+    @Param('productId', ParseIntPipe) productId: number,
+  ) {
+    const images =
+      await this.productImageService.getProductImages(
+        productId,
+      );
 
-    return VsResponseUtil.successWithStatus(HttpStatus.OK, images);
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      images,
+    );
   }
 }

@@ -1,10 +1,13 @@
 ﻿import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { CategoriesModule } from 'src/modules/catalogue/categories/categories.module';
+import { FilesModule } from 'src/modules/files/files.module';
+import { InventoryModule } from 'src/modules/inventory/inventory.module';
+import { RecommendationModule } from 'src/modules/recommendation/recommendation.module';
 
 import { ProductController } from 'src/modules/catalogue/products/controller/product.controller';
 import { ProductImageController } from 'src/modules/catalogue/products/controller/product-image.controller';
@@ -19,10 +22,6 @@ import { ProductImageRepository } from 'src/modules/catalogue/products/repositor
 
 import { ProductServiceImpl } from 'src/modules/catalogue/products/service/product.service.impl';
 import { ProductImageServiceImpl } from 'src/modules/catalogue/products/service/product-image.service.impl';
-
-import { FilesModule } from 'src/modules/files/files.module';
-import { InventoryModule } from 'src/modules/inventory/inventory.module';
-import { RecommendationModule } from 'src/modules/recommendation/recommendation.module';
 
 @Module({
   imports: [

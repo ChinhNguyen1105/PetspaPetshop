@@ -1,34 +1,46 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+﻿import {
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
+
 import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 
 import { ReqSetThumbnailProductDto } from 'src/modules/catalogue/products/dto/request/req-set-thumbnail-product.dto';
+
 import { ProductImageDto } from 'src/modules/catalogue/products/dto/response/product-image.dto';
 
-import { Product } from 'src/modules/catalogue/products/entities/product.entity';
 import { ProductImage } from 'src/modules/catalogue/products/entities/product-image.entity';
 
 import { ProductImageRepository } from 'src/modules/catalogue/products/repositories/product-image.repository';
 import { ProductRepository } from 'src/modules/catalogue/products/repositories/product.repository';
 
+import { ProductImageService } from 'src/modules/catalogue/products/service/product-image.service';
+
 import type { FileService } from 'src/modules/files/service/file.service';
 
-import { ProductImageService } from 'src/modules/catalogue/products/service/product-image.service';
-import { Inject } from '@nestjs/common';
-import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 @Injectable()
-export class ProductImageServiceImpl implements ProductImageService {
-  private readonly logger = new Logger(ProductImageServiceImpl.name);
+export class ProductImageServiceImpl
+  implements ProductImageService
+{
+  private readonly logger =
+    new Logger(ProductImageServiceImpl.name);
 
   constructor(
     @Inject(PROVIDER_TOKEN.FILE_SERVICE)
     private readonly fileService: FileService,
+
     private readonly productRepository: ProductRepository,
+
     private readonly productImageRepository: ProductImageRepository,
+
     private readonly configService: ConfigService,
   ) {}
 
@@ -36,65 +48,81 @@ export class ProductImageServiceImpl implements ProductImageService {
     productId: number,
     files: Express.Multer.File[],
   ): Promise<CommonResponseDto> {
-    const product = await this.productRepository.getRepository().findOne({
-      where: {
-        id: productId,
-      },
-    });
+    const product =
+      await this.productRepository
+        .getRepository()
+        .findOne({
+          where: {
+            id: productId,
+          },
+        });
 
     if (!product) {
-      throw new NotFoundException(`Product not found with id: ${productId}`);
+      throw new NotFoundException(
+        `Product not found with id: ${productId}`,
+      );
     }
 
-    const uploadFileResultDto = await this.fileService.uploadListFile(
-      files,
-      'products',
-    );
+    const uploadFileResultDto =
+      await this.fileService.uploadListFile(
+        files,
+        'products',
+      );
+
+    const uploadedFiles =
+      uploadFileResultDto.resUploadFileDtoList;
 
     if (
-      uploadFileResultDto.resUploadFileDtoList != null &&
-      uploadFileResultDto.resUploadFileDtoList.length > 0
+      !uploadedFiles ||
+      uploadedFiles.length === 0
     ) {
-      const images = uploadFileResultDto.resUploadFileDtoList.map(
-        (resUploadFileDto) => {
-          const productImage = new ProductImage();
-
-          productImage.product = product;
-          productImage.imageUrl = resUploadFileDto.fileName;
-
-          return productImage;
-        },
-      );
-
-      await this.productImageRepository.getRepository().save(images);
-
-      this.logger.log(
-        `[PRODUCT_IMAGE] Đã thêm ${images.length} ảnh cho Product ID: ${productId}`,
-      );
-
       return {
-        status: true,
-        message: 'Thêm ảnh sản phẩm thành công',
+        status: false,
+        message:
+          'Không có ảnh nào được thêm (file lỗi hoặc trống)',
       };
     }
 
+    const images = uploadedFiles.map(
+      (resUploadFileDto) => {
+        const productImage = new ProductImage();
+
+        productImage.product = product;
+        productImage.imageUrl =
+          resUploadFileDto.fileName;
+
+        return productImage;
+      },
+    );
+
+    await this.productImageRepository
+      .getRepository()
+      .save(images);
+
+    this.logger.log(
+      `[PRODUCT_IMAGE] Đã thêm ${images.length} ảnh cho Product ID: ${productId}`,
+    );
+
     return {
-      status: false,
-      message: 'Không có ảnh nào được thêm (file lỗi hoặc trống',
+      status: true,
+      message: 'Thêm ảnh sản phẩm thành công',
     };
   }
 
-  async deleteImage(imageId: number): Promise<CommonResponseDto> {
-    const productImage = await this.productImageRepository
-      .getRepository()
-      .findOne({
-        where: {
-          id: imageId,
-        },
-        relations: {
-          product: true,
-        },
-      });
+  async deleteImage(
+    imageId: number,
+  ): Promise<CommonResponseDto> {
+    const productImage =
+      await this.productImageRepository
+        .getRepository()
+        .findOne({
+          where: {
+            id: imageId,
+          },
+          relations: {
+            product: true,
+          },
+        });
 
     if (!productImage) {
       throw new NotFoundException(
@@ -102,13 +130,18 @@ export class ProductImageServiceImpl implements ProductImageService {
       );
     }
 
-    const baseUri = this.configService.get<string>(
-      'hoang.upload-file.base-uri',
-    );
+    const baseUri =
+      this.configService.get<string>(
+        'hoang.upload-file.base-uri',
+      );
 
     if (baseUri) {
       try {
-        const filePath = join(baseUri, 'products', productImage.imageUrl ?? '');
+        const filePath = join(
+          baseUri,
+          'products',
+          productImage.imageUrl ?? '',
+        );
 
         await fs.unlink(filePath);
 
@@ -127,13 +160,17 @@ export class ProductImageServiceImpl implements ProductImageService {
         } else {
           this.logger.error(
             `[PRODUCT_IMAGE] Lỗi khi xóa file vật lý | Image ID: ${imageId}`,
-            error instanceof Error ? error.stack : undefined,
+            error instanceof Error
+              ? error.stack
+              : undefined,
           );
         }
       }
     }
 
-    await this.productImageRepository.getRepository().remove(productImage);
+    await this.productImageRepository
+      .getRepository()
+      .remove(productImage);
 
     return {
       status: true,
@@ -144,11 +181,14 @@ export class ProductImageServiceImpl implements ProductImageService {
   async changeMainImage(
     reqSetMainImage: ReqSetThumbnailProductDto,
   ): Promise<CommonResponseDto> {
-    const productExists = await this.productRepository.getRepository().exists({
-      where: {
-        id: reqSetMainImage.productId,
-      },
-    });
+    const productExists =
+      await this.productRepository
+        .getRepository()
+        .exists({
+          where: {
+            id: reqSetMainImage.productId,
+          },
+        });
 
     if (!productExists) {
       throw new NotFoundException(
@@ -156,16 +196,17 @@ export class ProductImageServiceImpl implements ProductImageService {
       );
     }
 
-    const targetImage = await this.productImageRepository
-      .getRepository()
-      .findOne({
-        where: {
-          id: reqSetMainImage.imageId,
-        },
-        relations: {
-          product: true,
-        },
-      });
+    const targetImage =
+      await this.productImageRepository
+        .getRepository()
+        .findOne({
+          where: {
+            id: reqSetMainImage.imageId,
+          },
+          relations: {
+            product: true,
+          },
+        });
 
     if (!targetImage) {
       throw new NotFoundException(
@@ -173,42 +214,57 @@ export class ProductImageServiceImpl implements ProductImageService {
       );
     }
 
-    if (targetImage.product?.id !== reqSetMainImage.productId) {
+    if (
+      targetImage.product?.id !==
+      reqSetMainImage.productId
+    ) {
       return {
         status: false,
         message: 'Ảnh không thuộc về sản phẩm này',
       };
     }
 
-    await this.productImageRepository.resetMainImageByProductId(
-      reqSetMainImage.productId,
-    );
+    await this.productImageRepository
+      .resetMainImageByProductId(
+        reqSetMainImage.productId,
+      );
 
     targetImage.isThumbnail = true;
 
-    await this.productImageRepository.getRepository().save(targetImage);
+    await this.productImageRepository
+      .getRepository()
+      .save(targetImage);
 
     return {
       status: true,
-      message: 'Thay đổi ảnh đại diện sản phẩm thành công',
+      message:
+        'Thay đổi ảnh đại diện sản phẩm thành công',
     };
   }
 
-  async getProductImages(productId: number): Promise<ProductImageDto[]> {
+  async getProductImages(
+    productId: number,
+  ): Promise<ProductImageDto[]> {
     const product =
-      await this.productRepository.findByIdAndDeleteFlagFalse(productId);
+      await this.productRepository
+        .findByIdAndDeleteFlagFalse(productId);
 
     if (!product) {
-      throw new NotFoundException(`Product not found with id: ${productId}`);
+      throw new NotFoundException(
+        `Product not found with id: ${productId}`,
+      );
     }
 
-    const images = await this.productImageRepository.findByProductId(productId);
+    const images =
+      await this.productImageRepository
+        .findByProductId(productId);
 
     return images.map((image) => ({
       id: image.id,
       imageUrl: image.imageUrl ?? '',
       isThumbnail: image.isThumbnail,
-      productId: image.product?.id ?? productId,
+      productId:
+        image.product?.id ?? productId,
     }));
   }
 }

@@ -48,14 +48,11 @@ export class ProductController {
   async createProduct(
     @Body() reqCreateProduct: ReqCreateProductDto,
   ) {
-    const productDto =
-      await this.productService.createProduct(
-        reqCreateProduct,
-      );
-
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      productDto,
+      await this.productService.createProduct(
+        reqCreateProduct,
+      ),
     );
   }
 
@@ -75,12 +72,9 @@ export class ProductController {
   async deleteProduct(
     @Param('id', ParseIntPipe) id: number,
   ) {
-    const commonResponseDto =
-      await this.productService.deleteProduct(id);
-
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      commonResponseDto,
+      await this.productService.deleteProduct(id),
     );
   }
 
@@ -105,8 +99,7 @@ export class ProductController {
 
     const response = new ResRecommendationDto();
 
-    response.recommendedItemIds =
-      recommendedItemIds;
+    response.recommendedItemIds = recommendedItemIds;
 
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,

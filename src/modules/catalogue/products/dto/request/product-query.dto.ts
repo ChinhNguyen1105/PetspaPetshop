@@ -10,7 +10,19 @@ export class ProductQueryDto extends PaginationDto {
       return undefined;
     }
 
-    return Array.isArray(value) ? value : [value];
+    if (Array.isArray(value)) {
+      return value.flatMap((item) =>
+        String(item)
+          .split(',')
+          .map((filter) => filter.trim())
+          .filter((filter) => filter.length > 0),
+      );
+    }
+
+    return String(value)
+      .split(',')
+      .map((filter) => filter.trim())
+      .filter((filter) => filter.length > 0);
   })
   @IsString({ each: true })
   filter?: string[];
