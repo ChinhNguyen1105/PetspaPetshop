@@ -1,5 +1,4 @@
-﻿
-import { Inject, Injectable } from '@nestjs/common';
+﻿import { Inject, Injectable } from '@nestjs/common';
 
 import { BadRequestException } from 'src/common/exceptions/bad-request.exception';
 import { ForbiddenException } from 'src/common/exceptions/forbidden.exception';
@@ -19,6 +18,7 @@ import {
 
 import { ReqCreateOrderFromCartDto } from 'src/modules/orders/dto/request/req-create-order-from-cart.dto';
 import { ReqCreateOrderBuyNowDto } from 'src/modules/orders/dto/request/req-create-order-buy-now.dto';
+import { OrderQueryDto } from 'src/modules/orders/dto/request/order-query.dto';
 import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-status.dto';
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
 import { OrderDto } from 'src/modules/orders/dto/response/order.dto';
@@ -771,10 +771,12 @@ export class OrderServiceImpl implements OrderService {
   }
 
   async getAllOrders(
-    filter: string[],
-    page: number,
-    pageSize: number,
+    query: OrderQueryDto,
   ): Promise<ResultPaginationDto> {
+    const page = query.page;
+    const pageSize = query.pageSize;
+    const filter = query.filter ?? [];
+
     const queryBuilder =
       this.orderRepository
         .getRepository()
@@ -964,4 +966,3 @@ export class OrderServiceImpl implements OrderService {
     return result;
   }
 }
-

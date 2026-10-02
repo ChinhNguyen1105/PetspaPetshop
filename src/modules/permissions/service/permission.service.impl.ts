@@ -5,6 +5,7 @@ import { ConflictException } from 'src/common/exceptions/conflict.exception';
 import { FilterProcessor } from 'src/common/specification/filter-processor';
 import { SpecificationBuilder } from 'src/common/specification/specification-builder';
 
+import { PermissionQueryDto } from 'src/modules/permissions/dto/request/permission-query.dto';
 import { ReqPermissionDto } from 'src/modules/permissions/dto/request/req-permission.dto';
 import { ReqUpdatePermissionDto } from 'src/modules/permissions/dto/request/req-update-permission.dto';
 import { Permission } from 'src/modules/permissions/entities/permission.entity';
@@ -153,10 +154,12 @@ export class PermissionServiceImpl implements PermissionService {
   }
 
   async fetchAllPermission(
-    filter: string[],
-    page: number,
-    pageSize: number,
+    query: PermissionQueryDto,
   ): Promise<ResultPaginationDto> {
+    const page = query.page;
+    const pageSize = query.pageSize;
+    const filter = query.filter ?? [];
+
     const specificationBuilder =
       new SpecificationBuilder<Permission>();
 

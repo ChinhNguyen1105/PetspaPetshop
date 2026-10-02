@@ -17,10 +17,10 @@ import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
-import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
 import { ReqCreateServiceDto } from 'src/modules/catalogue/services/dto/request/req-create-service.dto';
 import { ReqUpdateServiceDto } from 'src/modules/catalogue/services/dto/request/req-update-service.dto';
+import { ServiceQueryDto } from 'src/modules/catalogue/services/dto/request/service-query.dto';
 
 import { ReqRecommendationDto } from 'src/modules/recommendation/dto/request/req-recommendation.dto';
 import { ResRecommendationDto } from 'src/modules/recommendation/dto/response/res-recommendation.dto';
@@ -52,47 +52,10 @@ export class PetServiceController {
   }
 
   @Get(UrlConstant.PetService.GET_ALL_SERVICES)
-  async getAllServices(
-    @Query('filter') filter: string[] | undefined,
-    @Query() pagination: PaginationDto,
-  ) {
+  async getAllServices(@Query() query: ServiceQueryDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.petServiceService.getAllServices(
-        filter ?? [],
-        pagination.page,
-        pagination.pageSize,
-      ),
-    );
-  }
-
-  @Get(UrlConstant.PetService.SEARCH_SERVICES)
-  async searchServices(
-    @Query('keyword') keyword: string,
-    @Query() pagination: PaginationDto,
-  ) {
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      await this.petServiceService.searchServices(
-        keyword,
-        pagination.page,
-        pagination.pageSize,
-      ),
-    );
-  }
-
-  @Get(UrlConstant.PetService.GET_SERVICES_BY_CATEGORY)
-  async getServicesByCategory(
-    @Param('categoryId', ParseIntPipe) categoryId: number,
-    @Query() pagination: PaginationDto,
-  ) {
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      await this.petServiceService.getServicesByCategory(
-        categoryId,
-        pagination.page,
-        pagination.pageSize,
-      ),
+      await this.petServiceService.getAllServices(query),
     );
   }
 

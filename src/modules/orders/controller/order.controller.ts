@@ -1,15 +1,12 @@
-﻿
-import {
+﻿import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpStatus,
   Inject,
   Param,
   Patch,
   Post,
-  Put,
   Query,
 } from '@nestjs/common';
 
@@ -21,7 +18,8 @@ import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
 import { ReqCreateOrderFromCartDto } from 'src/modules/orders/dto/request/req-create-order-from-cart.dto';
 import { ReqCreateOrderBuyNowDto } from 'src/modules/orders/dto/request/req-create-order-buy-now.dto';
-import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-status.dto';
+import { OrderQueryDto } from 'src/modules/orders/dto/request/order-query.dto';
+import { ReqOrderStatusDto } from '../dto/request/req-order-status.dto';
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
 
 import type { OrderService } from 'src/modules/orders/service/order.service';
@@ -36,16 +34,11 @@ export class OrderController {
 
   @Get(UrlConstant.Order.GET_ALL_ORDERS)
   async getAllOrders(
-    @Query('filter') filter: string[] | undefined,
-    @Query() pagination: PaginationDto,
+    @Query() query: OrderQueryDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.orderService.getAllOrders(
-        filter ?? [],
-        pagination.page,
-        pagination.pageSize,
-      ),
+      await this.orderService.getAllOrders(query),
     );
   }
 
@@ -76,10 +69,7 @@ export class OrderController {
   }
 
   @Patch(
-    UrlConstant.Order.CANCEL_ORDER.replace(
-      '{id}',
-      ':id',
-    ),
+    UrlConstant.Order.CANCEL_ORDER
   )
   async cancelOrder(
     @Param('id') id: number,
@@ -120,10 +110,7 @@ export class OrderController {
   }
 
   @Get(
-    UrlConstant.Order.GET_ORDER_DETAIL.replace(
-      '{id}',
-      ':id',
-    ),
+    UrlConstant.Order.GET_ORDER_DETAIL
   )
   async getOrderDetail(
     @Param('id') id: number,
@@ -134,4 +121,3 @@ export class OrderController {
     );
   }
 }
-

@@ -1,5 +1,7 @@
 ﻿import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
+
+import { ServiceQueryDto } from 'src/modules/catalogue/services/dto/request/service-query.dto';
 import { ReqCreateServiceDto } from 'src/modules/catalogue/services/dto/request/req-create-service.dto';
 import { ReqUpdateServiceDto } from 'src/modules/catalogue/services/dto/request/req-update-service.dto';
 import { ServiceDto } from 'src/modules/catalogue/services/dto/response/service.dto';
@@ -18,21 +20,7 @@ export interface PetServiceService {
   getServiceById(id: number): Promise<ServiceDto>;
 
   getAllServices(
-    filter: string[],
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto>;
-
-  searchServices(
-    keyword: string,
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto>;
-
-  getServicesByCategory(
-    categoryId: number,
-    page: number,
-    pageSize: number,
+    query: ServiceQueryDto,
   ): Promise<ResultPaginationDto>;
 
   getTopServices(limit: number): Promise<ServiceDto[]>;

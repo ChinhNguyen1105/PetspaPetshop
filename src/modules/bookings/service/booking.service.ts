@@ -1,5 +1,6 @@
 ﻿import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
 
+import { BookingQueryDto } from 'src/modules/bookings/dto/request/booking-query.dto';
 import { ReqCreateBookingDto } from 'src/modules/bookings/dto/request/req-create-booking.dto';
 import { BookingDto } from 'src/modules/bookings/dto/response/booking.dto';
 import { BookingTimeSlotDto } from 'src/modules/bookings/dto/response/booking-time-slot.dto';
@@ -25,8 +26,7 @@ export interface BookingService {
   ): Promise<ResultPaginationDto>;
 
   getAllBookings(
-    page: number,
-    pageSize: number,
+    query: BookingQueryDto,
   ): Promise<ResultPaginationDto>;
 
   getBookedTimeSlots(

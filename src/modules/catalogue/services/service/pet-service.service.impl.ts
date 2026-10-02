@@ -10,6 +10,7 @@ import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { CategoryRepository } from 'src/modules/catalogue/categories/repositories/category.repository';
 import { PetService } from 'src/modules/catalogue/services/entities/pet-service.entity';
+import { ServiceQueryDto } from 'src/modules/catalogue/services/dto/request/service-query.dto';
 import { ReqCreateServiceDto } from 'src/modules/catalogue/services/dto/request/req-create-service.dto';
 import { ReqUpdateServiceDto } from 'src/modules/catalogue/services/dto/request/req-update-service.dto';
 import { ServiceDto } from 'src/modules/catalogue/services/dto/response/service.dto';
@@ -181,14 +182,17 @@ export class PetServiceServiceImpl implements PetServiceService {
   }
 
   async getAllServices(
-    filter: string[],
-    page: number,
-    pageSize: number,
+    query: ServiceQueryDto,
   ): Promise<ResultPaginationDto> {
     this.logger.log('[SERVICE] Getting all services with pagination');
 
-    const queryBuilder = this.petServiceRepository
-      .getRepository()
+    const repository = this.petServiceRepository.getRepository();
+
+    const page = query.page;
+    const pageSize = query.pageSize;
+    const filter = query.filter ?? [];
+
+    const queryBuilder = repository
       .createQueryBuilder('service')
       .leftJoinAndSelect('service.category', 'category')
       .leftJoinAndSelect('service.serviceImages', 'serviceImages')
@@ -197,97 +201,22 @@ export class PetServiceServiceImpl implements PetServiceService {
 
     const specificationBuilder = new SpecificationBuilder<PetService>();
 
-    FilterProcessor.process(specificationBuilder, filter);
+    FilterProcessor.process(
+      specificationBuilder,
+      filter,
+    );
 
-    specificationBuilder.apply(queryBuilder, 'service');
+    specificationBuilder.apply(
+      queryBuilder,
+      'service',
+    );
 
-    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
-
-    const [services, total] = await queryBuilder.getManyAndCount();
-
-    const dtos: ServiceDto[] = [];
-
-    for (const service of services) {
-      const dto = this.serviceMapper.toDto(service);
-
-      await this.enrichServiceDto(dto);
-
-      dtos.push(dto);
-    }
-
-    return {
-      result: dtos,
-      meta: {
-        page,
-        pageSize,
-        pages: Math.ceil(total / pageSize),
-        total,
-      },
-    };
-  }
-
-  async searchServices(
-    keyword: string,
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto> {
-    this.logger.log(`[SERVICE] Searching services with keyword: ${keyword}`);
-
-    const [services, total] = await this.petServiceRepository
-      .getRepository()
-      .createQueryBuilder('service')
-      .leftJoinAndSelect('service.category', 'category')
-      .leftJoinAndSelect('service.serviceImages', 'serviceImages')
-      .where('service.deleteFlag = false')
-      .andWhere('service.activeFlag = true')
-      .andWhere('LOWER(service.name) LIKE LOWER(:keyword)', {
-        keyword: `%${keyword}%`,
-      })
+    queryBuilder
       .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+      .take(pageSize);
 
-    const dtos: ServiceDto[] = [];
-
-    for (const service of services) {
-      const dto = this.serviceMapper.toDto(service);
-
-      await this.enrichServiceDto(dto);
-
-      dtos.push(dto);
-    }
-
-    return {
-      result: dtos,
-      meta: {
-        page,
-        pageSize,
-        pages: Math.ceil(total / pageSize),
-        total,
-      },
-    };
-  }
-
-  async getServicesByCategory(
-    categoryId: number,
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto> {
-    this.logger.log(`[SERVICE] Getting services by category: ${categoryId}`);
-
-    const [services, total] = await this.petServiceRepository
-      .getRepository()
-      .createQueryBuilder('service')
-      .leftJoinAndSelect('service.category', 'category')
-      .leftJoinAndSelect('service.serviceImages', 'serviceImages')
-      .where('service.deleteFlag = false')
-      .andWhere('service.activeFlag = true')
-      .andWhere('category.id = :categoryId', {
-        categoryId,
-      })
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+    const [services, total] =
+      await queryBuilder.getManyAndCount();
 
     const dtos: ServiceDto[] = [];
 

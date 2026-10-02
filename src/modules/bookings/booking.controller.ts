@@ -17,6 +17,7 @@ import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 import { UrlConstant } from 'src/common/constants/url.constant';
 
+import { BookingQueryDto } from 'src/modules/bookings/dto/request/booking-query.dto';
 import { ReqBookingDateDto } from 'src/modules/bookings/dto/request/req-booking-date.dto';
 import { ReqCreateBookingDto } from 'src/modules/bookings/dto/request/req-create-booking.dto';
 
@@ -37,14 +38,13 @@ export class BookingController {
     );
   }
 
-  @Get(UrlConstant.Booking.GET_BOOKING)
-  async getBooking(
-    @Param('id', ParseIntPipe)
-    id: number,
+  @Get(UrlConstant.Booking.GET_ALL_BOOKINGS)
+  async getAllBookings(
+    @Query() query: BookingQueryDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.getBookingById(id),
+      await this.bookingService.getAllBookings(query),
     );
   }
 
@@ -75,29 +75,34 @@ export class BookingController {
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.getBookingsByStatus(status, page, pageSize),
-    );
-  }
-
-  @Get(UrlConstant.Booking.GET_ALL_BOOKINGS)
-  async getAllBookings(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe)
-    page: number,
-
-    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe)
-    pageSize: number,
-  ) {
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      await this.bookingService.getAllBookings(page, pageSize),
+      await this.bookingService.getBookingsByStatus(
+        status,
+        page,
+        pageSize,
+      ),
     );
   }
 
   @Get(UrlConstant.Booking.GET_BOOKED_TIMES)
-  async getOccupiedBookingTimes(@Query() reqDto: ReqBookingDateDto) {
+  async getOccupiedBookingTimes(
+    @Query() reqDto: ReqBookingDateDto,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.getBookedTimeSlots(reqDto.bookingDate),
+      await this.bookingService.getBookedTimeSlots(
+        reqDto.bookingDate,
+      ),
+    );
+  }
+
+  @Get(UrlConstant.Booking.GET_BOOKING)
+  async getBooking(
+    @Param('id', ParseIntPipe)
+    id: number,
+  ) {
+    return VsResponseUtil.successWithStatus(
+      HttpStatus.OK,
+      await this.bookingService.getBookingById(id),
     );
   }
 
@@ -122,7 +127,10 @@ export class BookingController {
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.updateBookingStatus(id, status),
+      await this.bookingService.updateBookingStatus(
+        id,
+        status,
+      ),
     );
   }
 }

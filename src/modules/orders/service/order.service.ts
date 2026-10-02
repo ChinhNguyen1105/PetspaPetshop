@@ -1,8 +1,11 @@
 ﻿import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
+
 import { ReqCreateOrderBuyNowDto } from 'src/modules/orders/dto/request/req-create-order-buy-now.dto';
 import { ReqCreateOrderFromCartDto } from 'src/modules/orders/dto/request/req-create-order-from-cart.dto';
+import { OrderQueryDto } from 'src/modules/orders/dto/request/order-query.dto';
 import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-status.dto';
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
+
 import { OrderDto } from 'src/modules/orders/dto/response/order.dto';
 
 export interface OrderService {
@@ -29,8 +32,6 @@ export interface OrderService {
   ): Promise<OrderDto>;
 
   getAllOrders(
-    filter: string[],
-    page: number,
-    pageSize: number,
+    query: OrderQueryDto,
   ): Promise<ResultPaginationDto>;
 }

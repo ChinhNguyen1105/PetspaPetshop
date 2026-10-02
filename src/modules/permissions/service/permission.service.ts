@@ -1,5 +1,6 @@
 ﻿import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
 
+import { PermissionQueryDto } from 'src/modules/permissions/dto/request/permission-query.dto';
 import { ReqPermissionDto } from 'src/modules/permissions/dto/request/req-permission.dto';
 import { ReqUpdatePermissionDto } from 'src/modules/permissions/dto/request/req-update-permission.dto';
 import { PermissionDto } from 'src/modules/permissions/dto/response/permission.dto';
@@ -17,9 +18,7 @@ export interface PermissionService {
   deletePermission(id: number): Promise<void>;
 
   fetchAllPermission(
-    filter: string[],
-    page: number,
-    pageSize: number,
+    query: PermissionQueryDto,
   ): Promise<ResultPaginationDto>;
 
   fetchAPermission(id: number): Promise<PermissionDto>;

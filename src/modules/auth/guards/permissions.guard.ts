@@ -6,37 +6,63 @@
   Injectable,
 } from '@nestjs/common';
 
-import { Request } from 'express';
+import type { Request } from 'express';
 
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 
 import { UserPrincipal } from 'src/modules/auth/security/user-principal';
-
 import type { PermissionService } from 'src/modules/permissions/service/permission.service';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  // Các route không yêu cầu JWT và permission.
   private readonly publicRoutes = [
-    { path: '/api/v1/auth/register', method: 'POST' },
-    { path: '/api/v1/auth/login', method: 'POST' },
-
-    { path: '/api/v1/categories', method: 'GET', prefix: true },
-    { path: '/api/v1/services', method: 'GET', prefix: true },
-    { path: '/api/v1/menus', method: 'GET', prefix: true },
-    { path: '/api/v1/products', method: 'GET', prefix: true },
-    { path: '/api/v1/product-images', method: 'GET', prefix: true },
-
-    { path: '/upload', method: 'GET', prefix: true },
-
-    { path: '/api/v1/bookings/occupied-times', method: 'GET' },
-
+    {
+      path: '/api/v1/auth/register',
+      method: 'POST',
+    },
+    {
+      path: '/api/v1/auth/login',
+      method: 'POST',
+    },
+    {
+      path: '/api/v1/categories',
+      method: 'GET',
+      prefix: true,
+    },
+    {
+      path: '/api/v1/services',
+      method: 'GET',
+      prefix: true,
+    },
+    {
+      path: '/api/v1/menus',
+      method: 'GET',
+      prefix: true,
+    },
+    {
+      path: '/api/v1/products',
+      method: 'GET',
+      prefix: true,
+    },
+    {
+      path: '/api/v1/product-images',
+      method: 'GET',
+      prefix: true,
+    },
+    {
+      path: '/upload',
+      method: 'GET',
+      prefix: true,
+    },
+    {
+      path: '/api/v1/bookings/occupied-times',
+      method: 'GET',
+    },
     {
       path: '/api/v1/service-images/service',
       method: 'GET',
       prefix: true,
     },
-
     {
       path: '/api/v1/payment/vnpay/return',
       method: 'ALL',
@@ -48,15 +74,16 @@ export class PermissionsGuard implements CanActivate {
     private readonly permissionService: PermissionService,
   ) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+  async canActivate(
+    context: ExecutionContext,
+  ): Promise<boolean> {
+    const request =
+      context.switchToHttp().getRequest<Request>();
 
-    // OPTIONS là CORS preflight request, không yêu cầu JWT hoặc permission.
     if (request.method === 'OPTIONS') {
       return true;
     }
 
-    // Kiểm tra public route.
     const isPublic = this.publicRoutes.some((route) => {
       const pathMatches = route.prefix
         ? request.path.startsWith(route.path)
@@ -73,8 +100,8 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    // Các route còn lại bắt buộc phải có user đã xác thực.
-    const user = request.user as UserPrincipal | undefined;
+    const user =
+      request.user as UserPrincipal | undefined;
 
     if (!user) {
       throw new ForbiddenException(
@@ -82,27 +109,31 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
-    // Lấy route pattern của controller.
     const routePath = request.route?.path;
 
     if (!routePath) {
       return true;
     }
 
-    const apiPath = this.normalizeApiPath(routePath);
+    const apiPath = this.buildApiPath(
+      request,
+      routePath,
+    );
+
     const method = request.method;
 
-    const authorities = user.getAuthorities() ?? [];
+    const authorities =
+      user.getAuthorities() ?? [];
 
-    // ADMIN được phép truy cập mọi endpoint.
     if (authorities.includes('ROLE_ADMIN')) {
       return true;
     }
 
-    const permission = await this.permissionService.findByApiPathAndMethod(
-      apiPath,
-      method,
-    );
+    const permission =
+      await this.permissionService.findByApiPathAndMethod(
+        apiPath,
+        method,
+      );
 
     if (!permission) {
       throw new ForbiddenException(
@@ -110,7 +141,6 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
-    // Kiểm tra user có permission tương ứng hay không.
     const hasPermission =
       permission.name !== null &&
       authorities.includes(permission.name);
@@ -124,13 +154,46 @@ export class PermissionsGuard implements CanActivate {
     return true;
   }
 
-  private normalizeApiPath(routePath: string): string {
-    if (routePath.startsWith('/api/v1')) {
-      return routePath;
+  private buildApiPath(
+    request: Request,
+    routePath: string,
+  ): string {
+    const requestPath = request.path;
+
+    if (
+      requestPath &&
+      requestPath.startsWith('/api/v1')
+    ) {
+      return requestPath;
+    }
+
+    if (
+      requestPath &&
+      requestPath !== routePath
+    ) {
+      return this.normalizeApiPath(requestPath);
+    }
+
+    const baseUrl = request.baseUrl ?? '';
+
+    const fullPath =
+      `${baseUrl}/${routePath}`.replace(
+        /\/+/g,
+        '/',
+      );
+
+    return this.normalizeApiPath(fullPath);
+  }
+
+  private normalizeApiPath(
+    path: string,
+  ): string {
+    if (path.startsWith('/api/v1')) {
+      return path;
     }
 
     return `/api/v1${
-      routePath.startsWith('/') ? '' : '/'
-    }${routePath}`;
+      path.startsWith('/') ? '' : '/'
+    }${path}`;
   }
 }

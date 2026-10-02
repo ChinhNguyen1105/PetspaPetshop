@@ -5,19 +5,24 @@ import { BadRequestException } from 'src/common/exceptions/bad-request.exception
 import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
+import {
+  Meta,
+  ResultPaginationDto,
+} from 'src/common/dto/pagination/result-pagination.dto';
+
+import { FilterProcessor } from 'src/common/specification/filter-processor';
+import { SpecificationBuilder } from 'src/common/specification/specification-builder';
 
 import { Category } from 'src/modules/catalogue/categories/entities/category.entity';
-import { ReqCreateCategoryDto } from 'src/modules/catalogue/categories/dto/req-create-category.dto';
+import { CategoryQueryDto } from 'src/modules/catalogue/categories/dto/request/category-query.dto';
+import { ReqCreateCategoryDto } from 'src/modules/catalogue/categories/dto/request/req-create-category.dto';
 import { ReqUpdateCategoryDto } from 'src/modules/catalogue/categories/dto/request/req-update-category.dto';
 import { CategoryDto } from 'src/modules/catalogue/categories/dto/response/category.dto';
 
 import { CategoryMapper } from 'src/modules/catalogue/categories/mapper/category.mapper';
 import { CategoryRepository } from 'src/modules/catalogue/categories/repositories/category.repository';
 import { CategoryService } from 'src/modules/catalogue/categories/service/category.service';
-import {
-  Meta,
-  ResultPaginationDto,
-} from 'src/common/dto/pagination/result-pagination.dto';
+
 @Injectable()
 export class CategoryServiceImpl implements CategoryService {
   constructor(
@@ -121,102 +126,26 @@ export class CategoryServiceImpl implements CategoryService {
     };
   }
 
-  async getCategories(
-    filter: string[],
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto> {
+  async getCategories(query: CategoryQueryDto): Promise<ResultPaginationDto> {
+    const page = query.page;
+
+    const pageSize = query.pageSize;
+
+    const filter = query.filter ?? [];
+
     const queryBuilder = this.categoryRepository
       .getRepository()
       .createQueryBuilder('category');
 
-    // Chỉ lấy category chưa bị xóa
     queryBuilder.andWhere('category.delete_flag = :deleteFlag', {
       deleteFlag: false,
     });
 
-    if (filter?.length) {
-      for (const expression of filter) {
-        const separator =
-          expression.includes('>=') ||
-          expression.includes('<=') ||
-          expression.includes('!')
-            ? expression.includes('>=')
-              ? '>='
-              : expression.includes('<=')
-                ? '<='
-                : '!'
-            : expression.includes('~')
-              ? '~'
-              : expression.includes(':')
-                ? ':'
-                : null;
+    const specificationBuilder = new SpecificationBuilder<Category>();
 
-        if (!separator) {
-          continue;
-        }
+    FilterProcessor.process(specificationBuilder, filter);
 
-        const index = expression.indexOf(separator);
-
-        const key = expression.substring(0, index).trim();
-
-        const value = expression.substring(index + separator.length).trim();
-
-        if (!key || !value) {
-          continue;
-        }
-
-        const allowedColumns: Record<string, string> = {
-          id: 'category.id',
-          name: 'category.name',
-          categoryType: 'category.category_type',
-          deleteFlag: 'category.delete_flag',
-          activeFlag: 'category.active_flag',
-          createdDate: 'category.created_date',
-          lastModifiedDate: 'category.last_modified_date',
-        };
-
-        const column = allowedColumns[key];
-
-        if (!column) {
-          continue;
-        }
-
-        const parameter = `filter_${Math.random().toString(36).slice(2, 10)}`;
-
-        switch (separator) {
-          case ':':
-            queryBuilder.andWhere(`${column} = :${parameter}`, {
-              [parameter]: value,
-            });
-            break;
-
-          case '!':
-            queryBuilder.andWhere(`${column} != :${parameter}`, {
-              [parameter]: value,
-            });
-            break;
-
-          case '>=':
-            queryBuilder.andWhere(`${column} >= :${parameter}`, {
-              [parameter]: value,
-            });
-            break;
-
-          case '<=':
-            queryBuilder.andWhere(`${column} <= :${parameter}`, {
-              [parameter]: value,
-            });
-            break;
-
-          case '~':
-            queryBuilder.andWhere(`${column} LIKE :${parameter}`, {
-              [parameter]: `%${value}%`,
-            });
-            break;
-        }
-      }
-    }
+    specificationBuilder.apply(queryBuilder, 'category');
 
     queryBuilder
       .orderBy('category.created_date', 'DESC')
@@ -254,6 +183,7 @@ export class CategoryServiceImpl implements CategoryService {
 
     return this.categoryMapper.toDto(category);
   }
+
   private buildPaginationResponse(
     data: CategoryDto[],
     page: number,

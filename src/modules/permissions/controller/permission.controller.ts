@@ -16,6 +16,7 @@ import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 
+import { PermissionQueryDto } from 'src/modules/permissions/dto/request/permission-query.dto';
 import { ReqPermissionDto } from 'src/modules/permissions/dto/request/req-permission.dto';
 import { ReqUpdatePermissionDto } from 'src/modules/permissions/dto/request/req-update-permission.dto';
 import type { PermissionService } from 'src/modules/permissions/service/permission.service';
@@ -54,25 +55,18 @@ export class PermissionController {
 
   @Get(UrlConstant.Permission.GET_ALL_PERMISSION)
   async getAllPermission(
-    @Query('filter') filter: string[] | undefined,
-    @Query('page') page = 1,
-    @Query('pageSize') pageSize = 10,
+    @Query() query: PermissionQueryDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.permissionService.fetchAllPermission(
-        filter ?? [],
-        Number(page),
-        Number(pageSize),
+        query,
       ),
     );
   }
 
   @Get(
-    UrlConstant.Permission.GET_PERMISSION.replace(
-      '{id}',
-      ':id',
-    ),
+    UrlConstant.Permission.GET_PERMISSION
   )
   async getAPermission(
     @Param('id') id: number,
@@ -86,10 +80,7 @@ export class PermissionController {
   }
 
   @Delete(
-    UrlConstant.Permission.DELETE_PERMISSION.replace(
-      '{id}',
-      ':id',
-    ),
+    UrlConstant.Permission.DELETE_PERMISSION
   )
   async deleteAPermission(
     @Param('id') id: number,

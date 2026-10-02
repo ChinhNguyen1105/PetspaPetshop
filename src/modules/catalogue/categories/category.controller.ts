@@ -15,9 +15,9 @@ import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
-import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
-import { ReqCreateCategoryDto } from 'src/modules/catalogue/categories/dto/req-create-category.dto';
+import { ReqCreateCategoryDto } from 'src/modules/catalogue/categories/dto/request/req-create-category.dto';
+import { CategoryQueryDto } from 'src/modules/catalogue/categories/dto/request/category-query.dto';
 import { ReqUpdateCategoryDto } from 'src/modules/catalogue/categories/dto/request/req-update-category.dto';
 
 import type { CategoryService } from 'src/modules/catalogue/categories/service/category.service';
@@ -30,19 +30,20 @@ export class CategoryController {
     private readonly categoryService: CategoryService,
   ) {}
 
-  // Public
+  /*
+  |--------------------------------------------------------------------------
+  | PUBLIC
+  |--------------------------------------------------------------------------
+  */
+
   @Get(UrlConstant.Category.GET_CATEGORIES)
   async getCategories(
-    @Query('filter') filter: string[] | undefined,
-    @Query() pagination: PaginationDto,
+    @Query()
+    query: CategoryQueryDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.categoryService.getCategories(
-        filter ?? [],
-        pagination.page,
-        pagination.pageSize,
-      ),
+      await this.categoryService.getCategories(query),
     );
   }
 
@@ -54,9 +55,17 @@ export class CategoryController {
     );
   }
 
-  // Admin
+  /*
+  |--------------------------------------------------------------------------
+  | ADMIN
+  |--------------------------------------------------------------------------
+  */
+
   @Post(UrlConstant.Category.CREATE_CATEGORY)
-  async createCategory(@Body() req: ReqCreateCategoryDto) {
+  async createCategory(
+    @Body()
+    req: ReqCreateCategoryDto,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.CREATED,
       await this.categoryService.createCategory(req),
@@ -64,7 +73,10 @@ export class CategoryController {
   }
 
   @Put(UrlConstant.Category.UPDATE_CATEGORY)
-  async updateCategory(@Body() req: ReqUpdateCategoryDto) {
+  async updateCategory(
+    @Body()
+    req: ReqUpdateCategoryDto,
+  ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.categoryService.updateCategory(req),

@@ -27,7 +27,7 @@ export class MenuServiceImpl implements MenuService {
     menu.icon = req.icon;
 
     if (req.parentId !== null) {
-      menu.parent =
+      const parent =
         await this.menuRepository
           .getRepository()
           .findOne({
@@ -35,6 +35,14 @@ export class MenuServiceImpl implements MenuService {
               id: req.parentId,
             },
           });
+
+      if (!parent) {
+        throw new NotFoundException(
+          `Parent menu not found with ID: ${req.parentId}`,
+        );
+      }
+
+      menu.parent = parent;
     } else {
       menu.parent = null;
     }
@@ -50,6 +58,7 @@ export class MenuServiceImpl implements MenuService {
         .findOne({
           where: { id: saved.id },
           relations: {
+            parent: true,
             children: true,
             roles: true,
           },
@@ -78,7 +87,13 @@ export class MenuServiceImpl implements MenuService {
     menu.icon = req.icon;
 
     if (req.parentId !== null) {
-      menu.parent =
+      if (req.parentId === id) {
+        throw new NotFoundException(
+          'Menu cannot be its own parent',
+        );
+      }
+
+      const parent =
         await this.menuRepository
           .getRepository()
           .findOne({
@@ -86,6 +101,14 @@ export class MenuServiceImpl implements MenuService {
               id: req.parentId,
             },
           });
+
+      if (!parent) {
+        throw new NotFoundException(
+          `Parent menu not found with ID: ${req.parentId}`,
+        );
+      }
+
+      menu.parent = parent;
     } else {
       menu.parent = null;
     }
@@ -101,6 +124,7 @@ export class MenuServiceImpl implements MenuService {
         .findOne({
           where: { id: updated.id },
           relations: {
+            parent: true,
             children: true,
             roles: true,
           },
@@ -144,6 +168,7 @@ export class MenuServiceImpl implements MenuService {
         .findOne({
           where: { id },
           relations: {
+            parent: true,
             children: true,
             roles: true,
           },
@@ -161,6 +186,7 @@ export class MenuServiceImpl implements MenuService {
       await this.menuRepository
         .getRepository()
         .createQueryBuilder('menu')
+        .leftJoinAndSelect('menu.parent', 'parent')
         .leftJoinAndSelect('menu.roles', 'role')
         .where('menu.deleteFlag = :deleteFlag', {
           deleteFlag: false,
@@ -175,22 +201,45 @@ export class MenuServiceImpl implements MenuService {
 
     for (const menu of menus) {
       menu.children = [];
-      menuMap.set(menu.id, menu);
+      menuMap.set(Number(menu.id), menu);
     }
 
     const roots: Menu[] = [];
 
     for (const menu of menus) {
-      if (menu.parent?.id) {
-        const parent = menuMap.get(menu.parent.id);
+      const parentId = menu.parent?.id;
+
+      if (
+        parentId !== null &&
+        parentId !== undefined
+      ) {
+        const parent = menuMap.get(
+          Number(parentId),
+        );
 
         if (parent) {
           parent.children.push(menu);
+        } else {
+          roots.push(menu);
         }
       } else {
         roots.push(menu);
       }
     }
+
+    for (const menu of menuMap.values()) {
+      menu.children.sort(
+        (a, b) =>
+          Number(a.sortOrder ?? 0) -
+          Number(b.sortOrder ?? 0),
+      );
+    }
+
+    roots.sort(
+      (a, b) =>
+        Number(a.sortOrder ?? 0) -
+        Number(b.sortOrder ?? 0),
+    );
 
     return this.menuMapper.toDtos(roots);
   }

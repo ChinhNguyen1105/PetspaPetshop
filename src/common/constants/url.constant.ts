@@ -98,8 +98,6 @@
     UPDATE_SERVICE: '/services',
     GET_SERVICE: '/services/:id',
     GET_ALL_SERVICES: '/services',
-    SEARCH_SERVICES: '/services/search',
-    GET_SERVICES_BY_CATEGORY: '/services/category/:categoryId',
     DELETE_SERVICE: '/services/:id',
     GET_TOP_SERVICES: '/services/top',
     GET_RECOMMENDATIONS: '/services/recommendations',

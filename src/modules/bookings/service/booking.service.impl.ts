@@ -20,6 +20,7 @@ import {
   ResultPaginationDto,
 } from 'src/common/dto/pagination/result-pagination.dto';
 
+import { BookingQueryDto } from 'src/modules/bookings/dto/request/booking-query.dto';
 import { ReqCreateBookingDto } from 'src/modules/bookings/dto/request/req-create-booking.dto';
 import { BookingDto } from 'src/modules/bookings/dto/response/booking.dto';
 import { BookingTimeSlotDto } from 'src/modules/bookings/dto/response/booking-time-slot.dto';
@@ -416,15 +417,134 @@ export class BookingServiceImpl implements BookingService {
   }
 
   async getAllBookings(
-    page: number,
-    pageSize: number,
+    query: BookingQueryDto,
   ): Promise<ResultPaginationDto> {
+    const page = query.page;
+    const pageSize = query.pageSize;
+    const filters = query.filter ?? [];
+
     const queryBuilder =
       this.bookingRepository
         .getRepository()
         .createQueryBuilder('booking')
-        .skip((page - 1) * pageSize)
-        .take(pageSize);
+        .leftJoinAndSelect('booking.user', 'user')
+        .leftJoinAndSelect('booking.pet', 'pet')
+        .leftJoinAndSelect('booking.order', 'order')
+        .leftJoinAndSelect(
+          'booking.bookingDetails',
+          'bookingDetail',
+        )
+        .leftJoinAndSelect(
+          'bookingDetail.service',
+          'service',
+        );
+
+    const allowedColumns: Record<string, string> = {
+      id: 'booking.id',
+      userId: 'user.id',
+      userName: 'user.name',
+      petId: 'pet.id',
+      petName: 'pet.name',
+      orderId: 'order.id',
+      status: 'booking.status',
+      actualPrice: 'booking.actualPrice',
+      bookingDate: 'booking.bookingDate',
+      startTime: 'booking.startTime',
+      endTime: 'booking.endTime',
+      createdDate: 'booking.createdDate',
+      lastModifiedDate: 'booking.lastModifiedDate',
+      deleteFlag: 'booking.deleteFlag',
+      activeFlag: 'booking.activeFlag',
+    };
+
+    filters.forEach((filter, index) => {
+      const matchedOperator =
+        filter.match(/^(.*?)(>=|<=|!=|~|:|!)(.*)$/);
+
+      if (!matchedOperator) {
+        throw new AppBadRequestException(
+          `[BOOKING] Invalid filter: ${filter}`,
+        );
+      }
+
+      const [, field, operator, rawValue] =
+        matchedOperator;
+
+      const column = allowedColumns[field];
+
+      if (!column) {
+        throw new AppBadRequestException(
+          `[BOOKING] Unsupported filter field: ${field}`,
+        );
+      }
+
+      const parameterName =
+        `bookingFilter${index}`;
+
+      const value = rawValue.trim();
+
+      if (operator === ':') {
+        queryBuilder.andWhere(
+          `${column} = :${parameterName}`,
+          {
+            [parameterName]: value,
+          },
+        );
+        return;
+      }
+
+      if (operator === '!') {
+        queryBuilder.andWhere(
+          `${column} != :${parameterName}`,
+          {
+            [parameterName]: value,
+          },
+        );
+        return;
+      }
+
+      if (operator === '>=') {
+        queryBuilder.andWhere(
+          `${column} >= :${parameterName}`,
+          {
+            [parameterName]: value,
+          },
+        );
+        return;
+      }
+
+      if (operator === '<=') {
+        queryBuilder.andWhere(
+          `${column} <= :${parameterName}`,
+          {
+            [parameterName]: value,
+          },
+        );
+        return;
+      }
+
+      if (operator === '~') {
+        const likeValue =
+          value
+            .replace(/^\*/, '')
+            .replace(/\*$/, '');
+
+        queryBuilder.andWhere(
+          `${column} LIKE :${parameterName}`,
+          {
+            [parameterName]: `%${likeValue}%`,
+          },
+        );
+      }
+    });
+
+    queryBuilder
+      .orderBy(
+        'booking.createdDate',
+        'DESC',
+      )
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
 
     const [bookings, total] =
       await queryBuilder.getManyAndCount();
