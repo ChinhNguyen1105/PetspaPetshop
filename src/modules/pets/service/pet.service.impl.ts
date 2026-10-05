@@ -1,25 +1,30 @@
 ﻿import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { GenderEnum } from 'src/common/constants/gender.enum';
+import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
 import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
+
 import { BadRequestException } from 'src/common/exceptions/bad-request.exception';
 import { ForbiddenException } from 'src/common/exceptions/forbidden.exception';
 import { NotFoundException } from 'src/common/exceptions/not-found.exception';
+
 import { FilterProcessor } from 'src/common/specification/filter-processor';
 import { SpecificationBuilder } from 'src/common/specification/specification-builder';
+
+import { ReqCreatePetDto } from 'src/modules/pets/dto/request/req-create-pet.dto';
+import { PetQueryDto } from 'src/modules/pets/dto/request/pet-query.dto';
+import { ReqUpdatePetDto } from 'src/modules/pets/dto/request/req-update-pet.dto';
+import { PetDto } from 'src/modules/pets/dto/response/pet.dto';
 
 import { Pet } from 'src/modules/pets/entities/pet.entity';
 import { PetMapper } from 'src/modules/pets/mapper/pet.mapper';
 import { PetRepository } from 'src/modules/pets/repositories/pet.repository';
-import { ReqCreatePetDto } from 'src/modules/pets/dto/request/req-create-pet.dto';
-import { ReqUpdatePetDto } from 'src/modules/pets/dto/request/req-update-pet.dto';
-import { PetDto } from 'src/modules/pets/dto/response/pet.dto';
-
-import type { UserService } from 'src/modules/users/service/user.service';
 
 import type { PetService } from 'src/modules/pets/service/pet.service';
-import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+import type { UserService } from 'src/modules/users/service/user.service';
+
 @Injectable()
 export class PetServiceImpl implements PetService {
   private readonly logger = new Logger(PetServiceImpl.name);
@@ -31,7 +36,10 @@ export class PetServiceImpl implements PetService {
     private readonly userService: UserService,
   ) {}
 
-  private async checkExistPet(userId: string, petName: string): Promise<void> {
+  private async checkExistPet(
+    userId: string,
+    petName: string,
+  ): Promise<void> {
     const exists =
       await this.petRepository.existsByUserIdAndNameAndDeleteFlagFalse(
         userId,
@@ -185,11 +193,9 @@ export class PetServiceImpl implements PetService {
     return this.petMapper.toDto(pet);
   }
 
-  async getAllPet(
-    filter: string[],
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto> {
+  async getAllPet(query: PetQueryDto): Promise<ResultPaginationDto> {
+    const { filter = [], page, pageSize } = query;
+
     const specificationBuilder = new SpecificationBuilder<Pet>();
 
     FilterProcessor.process(specificationBuilder, filter);
@@ -205,7 +211,9 @@ export class PetServiceImpl implements PetService {
 
     specificationBuilder.apply(queryBuilder, 'pet');
 
-    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
+    queryBuilder
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
 
     const [pets, total] = await queryBuilder.getManyAndCount();
 
@@ -243,15 +251,21 @@ export class PetServiceImpl implements PetService {
     if (!pet) {
       this.logger.warn(`[NOT_FOUND] Không tìm thấy thú cưng ID: ${petId}`);
 
-      throw new NotFoundException(`[PET] Không tìm thấy thú cưng ID: ${petId}`);
+      throw new NotFoundException(
+        `[PET] Không tìm thấy thú cưng ID: ${petId}`,
+      );
     }
 
     if (pet.deleteFlag === true) {
-      throw new NotFoundException(`[PET] Thú cưng ID: ${petId} đã bị xóa`);
+      throw new NotFoundException(
+        `[PET] Thú cưng ID: ${petId} đã bị xóa`,
+      );
     }
 
     if (pet.activeFlag === false) {
-      throw new BadRequestException(`[PET] Thú cưng ID: ${petId} đã bị khóa`);
+      throw new BadRequestException(
+        `[PET] Thú cưng ID: ${petId} đã bị khóa`,
+      );
     }
 
     return pet;

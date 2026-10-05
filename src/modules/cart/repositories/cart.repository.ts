@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -15,6 +15,9 @@ export class CartRepository {
     return this.repository
       .createQueryBuilder('cart')
       .leftJoinAndSelect('cart.user', 'user')
+      .leftJoinAndSelect('cart.cartItems', 'cartItem')
+      .leftJoinAndSelect('cartItem.product', 'product')
+      .leftJoinAndSelect('product.productImages', 'productImage')
       .where('user.id = :userId', { userId })
       .getOne();
   }

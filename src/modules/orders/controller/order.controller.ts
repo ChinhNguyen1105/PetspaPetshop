@@ -14,12 +14,12 @@ import { RestApiV1 } from 'src/common/decorators/rest-api-v1.decorator';
 import { VsResponseUtil } from 'src/common/base/vs-response.util';
 import { UrlConstant } from 'src/common/constants/url.constant';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
-import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
 import { ReqCreateOrderFromCartDto } from 'src/modules/orders/dto/request/req-create-order-from-cart.dto';
 import { ReqCreateOrderBuyNowDto } from 'src/modules/orders/dto/request/req-create-order-buy-now.dto';
 import { OrderQueryDto } from 'src/modules/orders/dto/request/order-query.dto';
-import { ReqOrderStatusDto } from '../dto/request/req-order-status.dto';
+import { OrderMyOrdersQueryDto } from 'src/modules/orders/dto/request/order-my-orders-query.dto';
+import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-status.dto';
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
 
 import type { OrderService } from 'src/modules/orders/service/order.service';
@@ -92,19 +92,18 @@ export class OrderController {
 
   @Get(UrlConstant.Order.GET_MY_ORDERS)
   async getMyOrders(
-    @Query('status') status: string | undefined,
-    @Query() pagination: PaginationDto,
+    @Query() query: OrderMyOrdersQueryDto,
   ) {
     const orderStatus: ReqOrderStatusDto = {
-      status: status ?? null,
+      status: query.status ?? null,
     };
 
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.getMyOrders(
         orderStatus,
-        pagination.page,
-        pagination.pageSize,
+        query.page,
+        query.pageSize,
       ),
     );
   }

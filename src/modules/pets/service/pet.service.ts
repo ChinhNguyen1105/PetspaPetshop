@@ -1,7 +1,9 @@
 ﻿import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
 import { ResultPaginationDto } from 'src/common/dto/pagination/result-pagination.dto';
+
 import { ReqCreatePetDto } from 'src/modules/pets/dto/request/req-create-pet.dto';
 import { ReqUpdatePetDto } from 'src/modules/pets/dto/request/req-update-pet.dto';
+import { PetQueryDto } from 'src/modules/pets/dto/request/pet-query.dto';
 import { PetDto } from 'src/modules/pets/dto/response/pet.dto';
 
 export interface PetService {
@@ -19,9 +21,5 @@ export interface PetService {
 
   getPetDetail(id: number): Promise<PetDto>;
 
-  getAllPet(
-    filter: string[],
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto>;
+  getAllPet(query: PetQueryDto): Promise<ResultPaginationDto>;
 }
