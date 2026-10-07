@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Order } from 'src/modules/orders/entities/order.entity';
 import { OrderStatus } from 'src/common/constants/order-status.enum';
+import { OrderType } from 'src/common/constants/order-type.enum';
 import { PaymentMethod } from 'src/common/constants/payment-method.enum';
 
 @Injectable()
@@ -22,8 +23,15 @@ export class OrderRepository {
     return this.repository
       .createQueryBuilder('order')
       .leftJoin('order.user', 'user')
+      .leftJoinAndSelect('order.payment', 'payment')
+      .leftJoinAndSelect('order.orderDetails', 'orderDetail')
+      .leftJoinAndSelect('orderDetail.product', 'product')
+      .leftJoinAndSelect('product.productImages', 'productImage')
       .where('user.id = :userId', { userId })
       .andWhere('order.status = :status', { status })
+      .andWhere('order.orderType = :orderType', {
+        orderType: OrderType.PRODUCT,
+      })
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount();
@@ -37,7 +45,14 @@ export class OrderRepository {
     return this.repository
       .createQueryBuilder('order')
       .leftJoin('order.user', 'user')
+      .leftJoinAndSelect('order.payment', 'payment')
+      .leftJoinAndSelect('order.orderDetails', 'orderDetail')
+      .leftJoinAndSelect('orderDetail.product', 'product')
+      .leftJoinAndSelect('product.productImages', 'productImage')
       .where('user.id = :userId', { userId })
+      .andWhere('order.orderType = :orderType', {
+        orderType: OrderType.PRODUCT,
+      })
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount();

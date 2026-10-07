@@ -5,6 +5,7 @@ import { ForbiddenException } from 'src/common/exceptions/forbidden.exception';
 import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 
 import { OrderStatus } from 'src/common/constants/order-status.enum';
+import { OrderType } from 'src/common/constants/order-type.enum';
 import { PaymentMethod } from 'src/common/constants/payment-method.enum';
 import { PaymentStatus } from 'src/common/constants/payment-status.enum';
 import { TypeInventory } from 'src/common/constants/type-inventory.enum';
@@ -63,71 +64,47 @@ export class OrderServiceImpl implements OrderService {
     private readonly productRepository: ProductRepository,
   ) {}
 
-  async createOrderFromCart(
-    req: ReqCreateOrderFromCartDto,
-  ): Promise<OrderDto> {
-    const currentUser =
-      await this.userService.getUserLogin();
+  async createOrderFromCart(req: ReqCreateOrderFromCartDto): Promise<OrderDto> {
+    const currentUser = await this.userService.getUserLogin();
 
-    const cart =
-      await this.cartRepository.findByUserId(
-        currentUser.id,
-      );
+    const cart = await this.cartRepository.findByUserId(currentUser.id);
 
     if (!cart) {
-      throw new NotFoundException(
-        '[ORDER] Bạn không có giỏ hàng nào',
-      );
+      throw new NotFoundException('[ORDER] Bạn không có giỏ hàng nào');
     }
 
-    const selectedItems =
-      (cart.cartItems ?? []).filter(
-        (item) =>
-          req.cartItemIds.includes(item.id),
-      );
+    const selectedItems = (cart.cartItems ?? []).filter((item) =>
+      req.cartItemIds.includes(item.id),
+    );
 
     if (selectedItems.length === 0) {
-      throw new BadRequestException(
-        '[ORDER] Bạn chưa chọn sản phẩm nào',
-      );
+      throw new BadRequestException('[ORDER] Bạn chưa chọn sản phẩm nào');
     }
 
-    const shippingAddress =
-      await this.shippingAddressRepository.findById(
-        req.addressId,
-      );
+    const shippingAddress = await this.shippingAddressRepository.findById(
+      req.addressId,
+    );
 
     if (!shippingAddress) {
-      throw new NotFoundException(
-        '[ORDER] Địa chỉ giao hàng không tồn tại',
-      );
+      throw new NotFoundException('[ORDER] Địa chỉ giao hàng không tồn tại');
     }
 
-    if (
-      shippingAddress.user.id !==
-      currentUser.id
-    ) {
+    if (shippingAddress.user.id !== currentUser.id) {
       throw new ForbiddenException(
         '[ORDER] Bạn không có quyền thao tác với địa chỉ giao hàng này',
       );
     }
 
     for (const item of selectedItems) {
-      const inventory =
-        await this.inventoryRepository.findByProductId(
-          item.product.id,
-        );
+      const inventory = await this.inventoryRepository.findByProductId(
+        item.product.id,
+      );
 
       if (!inventory) {
-        throw new NotFoundException(
-          '[ORDER] Sản phẩm không tồn tại',
-        );
+        throw new NotFoundException('[ORDER] Sản phẩm không tồn tại');
       }
 
-      if (
-        (inventory.quantity ?? 0) <
-        item.quantity
-      ) {
+      if ((inventory.quantity ?? 0) < item.quantity) {
         throw new NotFoundException(
           '[ORDER] Số lượng sản phẩm trong kho không đủ',
         );
@@ -137,15 +114,12 @@ export class OrderServiceImpl implements OrderService {
     const order = new Order();
 
     order.user = currentUser;
-    order.shippingName =
-      shippingAddress.fullName;
-    order.shippingPhone =
-      shippingAddress.phone;
+    order.shippingName = shippingAddress.fullName;
+    order.shippingPhone = shippingAddress.phone;
     order.shippingAddressFull =
-      this.shippingAddressMapper.buildFullAddress(
-        shippingAddress,
-      );
+      this.shippingAddressMapper.buildFullAddress(shippingAddress);
     order.status = OrderStatus.PENDING;
+    order.orderType = OrderType.PRODUCT;
     order.orderDetails = [];
 
     let totalAmount = 0;
@@ -156,145 +130,98 @@ export class OrderServiceImpl implements OrderService {
       orderDetail.order = order;
       orderDetail.product = item.product;
       orderDetail.quantity = item.quantity;
-      orderDetail.unitPrice = Number(
-        item.product.price,
-      );
+      orderDetail.unitPrice = Number(item.product.price);
 
       order.orderDetails.push(orderDetail);
 
-      totalAmount +=
-        Number(item.product.price) *
-        item.quantity;
+      totalAmount += Number(item.product.price) * item.quantity;
     }
 
     order.totalAmount = totalAmount;
 
     const payment = new Payment();
 
-    payment.paymentMethod =
-      req.paymentMethod;
+    payment.paymentMethod = req.paymentMethod;
     payment.amount = totalAmount;
     payment.status = PaymentStatus.PENDING;
 
     order.payment = payment;
 
-    const savedOrder =
-      await this.orderRepository
-        .getRepository()
-        .save(order);
+    const savedOrder = await this.orderRepository.getRepository().save(order);
 
-    await this.deductInventoryIfCod(
-      savedOrder,
+    await this.deductInventoryIfCod(savedOrder);
+
+    cart.cartItems = (cart.cartItems ?? []).filter(
+      (item) => !selectedItems.some((selected) => selected.id === item.id),
     );
 
-    cart.cartItems =
-      (cart.cartItems ?? []).filter(
-        (item) =>
-          !selectedItems.some(
-            (selected) =>
-              selected.id === item.id,
-          ),
-      );
+    await this.cartRepository.getRepository().save(cart);
 
-    await this.cartRepository
-      .getRepository()
-      .save(cart);
-
-    return this.orderMapper.toDto(
-      savedOrder,
-    );
+    return this.orderMapper.toDto(savedOrder);
   }
 
-  async createOrderFromBuyNow(
-    req: ReqCreateOrderBuyNowDto,
-  ): Promise<OrderDto> {
-    const currentUser =
-      await this.userService.getUserLogin();
+  async createOrderFromBuyNow(req: ReqCreateOrderBuyNowDto): Promise<OrderDto> {
+    const currentUser = await this.userService.getUserLogin();
 
-    const product =
-      await this.productRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: req.productId,
-          },
-        });
+    const product = await this.productRepository.getRepository().findOne({
+      where: {
+        id: req.productId,
+      },
+    });
 
     if (!product) {
-      throw new NotFoundException(
-        '[ORDER] Sản phẩm không tồn tại',
-      );
+      throw new NotFoundException('[ORDER] Sản phẩm không tồn tại');
     }
 
     if (req.quantity <= 0) {
-      throw new BadRequestException(
-        '[ORDER] Số lượng phải lớn hơn 0',
-      );
+      throw new BadRequestException('[ORDER] Số lượng phải lớn hơn 0');
     }
 
-    const inventory =
-      await this.inventoryRepository.findByProductId(
-        product.id,
-      );
+    const inventory = await this.inventoryRepository.findByProductId(
+      product.id,
+    );
 
     if (!inventory) {
-      throw new NotFoundException(
-        '[ORDER] Sản phẩm không tồn tại',
-      );
+      throw new NotFoundException('[ORDER] Sản phẩm không tồn tại');
     }
 
-    if (
-      (inventory.quantity ?? 0) <
-      req.quantity
-    ) {
+    if ((inventory.quantity ?? 0) < req.quantity) {
       throw new NotFoundException(
         '[ORDER] Số lượng sản phẩm trong kho không đủ',
       );
     }
 
-    const shippingAddress =
-      await this.shippingAddressRepository.findById(
-        req.addressId,
-      );
+    const shippingAddress = await this.shippingAddressRepository.findById(
+      req.addressId,
+    );
 
     if (!shippingAddress) {
-      throw new NotFoundException(
-        '[ORDER] Địa chỉ giao hàng không tồn tại',
-      );
+      throw new NotFoundException('[ORDER] Địa chỉ giao hàng không tồn tại');
     }
 
-    if (
-      shippingAddress.user.id !==
-      currentUser.id
-    ) {
+    if (shippingAddress.user.id !== currentUser.id) {
       throw new ForbiddenException(
         '[ORDER] Bạn không có quyền thao tác với địa chỉ giao hàng này',
       );
     }
 
-    const totalAmount =
-      Number(product.price) *
-      req.quantity;
+    const totalAmount = Number(product.price) * req.quantity;
 
     const payment = new Payment();
 
-    payment.paymentMethod =
-      req.paymentMethod;
+    payment.paymentMethod = req.paymentMethod;
     payment.status = PaymentStatus.PENDING;
     payment.amount = totalAmount;
 
     const order = new Order();
 
     order.user = currentUser;
-    order.shippingName =
-      shippingAddress.fullName;
-    order.shippingPhone =
-      shippingAddress.phone;
+    order.shippingName = shippingAddress.fullName;
+    order.shippingPhone = shippingAddress.phone;
     order.shippingAddressFull =
-      this.shippingAddressMapper.buildFullAddress(
-        shippingAddress,
-      );
+      this.shippingAddressMapper.buildFullAddress(shippingAddress);
     order.status = OrderStatus.PENDING;
+    order.orderType = OrderType.PRODUCT;
     order.totalAmount = totalAmount;
     order.payment = payment;
     order.orderDetails = [];
@@ -304,75 +231,46 @@ export class OrderServiceImpl implements OrderService {
     orderDetail.product = product;
     orderDetail.order = order;
     orderDetail.quantity = req.quantity;
-    orderDetail.unitPrice =
-      Number(product.price);
+    orderDetail.unitPrice = Number(product.price);
 
     order.orderDetails.push(orderDetail);
 
-    const savedOrder =
-      await this.orderRepository
-        .getRepository()
-        .save(order);
+    const savedOrder = await this.orderRepository.getRepository().save(order);
 
-    await this.deductInventoryIfCod(
-      savedOrder,
-    );
+    await this.deductInventoryIfCod(savedOrder);
 
-    return this.orderMapper.toDto(
-      savedOrder,
-    );
+    return this.orderMapper.toDto(savedOrder);
   }
 
-  private async deductInventoryIfCod(
-    order: Order,
-  ): Promise<void> {
-    if (
-      order.payment?.paymentMethod !==
-      PaymentMethod.COD
-    ) {
+  private async deductInventoryIfCod(order: Order): Promise<void> {
+    if (order.payment?.paymentMethod !== PaymentMethod.COD) {
       return;
     }
 
-    for (const orderDetail of
-      order.orderDetails ?? []) {
-      const productId =
-        orderDetail.product.id;
+    for (const orderDetail of order.orderDetails ?? []) {
+      const productId = orderDetail.product.id;
 
       const inventory =
-        await this.inventoryRepository.findByProductId(
-          productId,
-        );
+        await this.inventoryRepository.findByProductId(productId);
 
       if (!inventory) {
-        throw new NotFoundException(
-          '[ORDER] Sản phẩm không tồn tại trong kho',
-        );
+        throw new NotFoundException('[ORDER] Sản phẩm không tồn tại trong kho');
       }
 
-      const oldQuantity =
-        inventory.quantity ?? 0;
+      const oldQuantity = inventory.quantity ?? 0;
 
-      const newQuantity =
-        oldQuantity -
-        (orderDetail.quantity ?? 0);
+      const newQuantity = oldQuantity - (orderDetail.quantity ?? 0);
 
       inventory.quantity = newQuantity;
 
-      await this.inventoryRepository
-        .getRepository()
-        .save(inventory);
+      await this.inventoryRepository.getRepository().save(inventory);
 
-      const inventoryTransaction =
-        new InventoryTransaction();
+      const inventoryTransaction = new InventoryTransaction();
 
-      inventoryTransaction.inventory =
-        inventory;
-      inventoryTransaction.quantity =
-        orderDetail.quantity;
-      inventoryTransaction.type =
-        TypeInventory.EXPORT;
-      inventoryTransaction.note =
-        'Export product to order (COD)';
+      inventoryTransaction.inventory = inventory;
+      inventoryTransaction.quantity = orderDetail.quantity;
+      inventoryTransaction.type = TypeInventory.EXPORT;
+      inventoryTransaction.note = 'Export product to order (COD)';
 
       await this.inventoryTransactionRepository
         .getRepository()
@@ -385,46 +283,33 @@ export class OrderServiceImpl implements OrderService {
     page: number,
     pageSize: number,
   ): Promise<ResultPaginationDto> {
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
     let status: OrderStatus | null = null;
 
     if (orderStatus.status != null) {
-      const normalized =
-        orderStatus.status
-          .toUpperCase()
-          .trim();
+      const normalized = orderStatus.status.toUpperCase().trim();
 
-      if (
-        !Object.values(OrderStatus).includes(
-          normalized as OrderStatus,
-        )
-      ) {
-        throw new BadRequestException(
-          '[ORDER] Status không hợp lệ',
-        );
+      if (!Object.values(OrderStatus).includes(normalized as OrderStatus)) {
+        throw new BadRequestException('[ORDER] Status không hợp lệ');
       }
 
-      status =
-        normalized as OrderStatus;
+      status = normalized as OrderStatus;
     }
 
     const [orders, total] =
       status !== null
-        ? await this.orderRepository
-            .findByUserIdAndStatus(
-              currentUser.id,
-              status,
-              page,
-              pageSize,
-            )
-        : await this.orderRepository
-            .findByUserId(
-              currentUser.id,
-              page,
-              pageSize,
-            );
+        ? await this.orderRepository.findByUserIdAndStatus(
+            currentUser.id,
+            status,
+            page,
+            pageSize,
+          )
+        : await this.orderRepository.findByUserId(
+            currentUser.id,
+            page,
+            pageSize,
+          );
 
     return this.buildPaginationResponse(
       this.orderMapper.toDtoList(orders),
@@ -434,42 +319,29 @@ export class OrderServiceImpl implements OrderService {
     );
   }
 
-  async getOrderDetail(
-    orderId: number,
-  ): Promise<OrderDto> {
-    const order =
-      await this.orderRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: orderId,
-          },
-          relations: [
-            'user',
-            'payment',
-            'orderDetails',
-            'orderDetails.product',
-            'orderDetails.product.productImages',
-          ],
-        });
+  async getOrderDetail(orderId: number): Promise<OrderDto> {
+    const order = await this.orderRepository.getRepository().findOne({
+      where: {
+        id: orderId,
+      },
+      relations: [
+        'user',
+        'payment',
+        'orderDetails',
+        'orderDetails.product',
+        'orderDetails.product.productImages',
+      ],
+    });
 
     if (!order) {
-      throw new NotFoundException(
-        '[ORDER] Đơn hàng không tồn tại',
-      );
+      throw new NotFoundException('[ORDER] Đơn hàng không tồn tại');
     }
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    const isAdmin =
-      currentUser.role?.name ===
-      RoleConstant.ADMIN;
+    const isAdmin = currentUser.role?.name === RoleConstant.ADMIN;
 
-    if (
-      !isAdmin &&
-      order.user.id !== currentUser.id
-    ) {
+    if (!isAdmin && order.user.id !== currentUser.id) {
       throw new ForbiddenException(
         '[ORDER] Bạn không có quyền thao tác với đơn hàng này',
       );
@@ -478,91 +350,56 @@ export class OrderServiceImpl implements OrderService {
     return this.orderMapper.toDto(order);
   }
 
-  async cancelOrder(
-    orderId: number,
-  ): Promise<OrderDto> {
-    const order =
-      await this.orderRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: orderId,
-          },
-          relations: [
-            'user',
-            'payment',
-            'orderDetails',
-            'orderDetails.product',
-          ],
-        });
+  async cancelOrder(orderId: number): Promise<OrderDto> {
+    const order = await this.orderRepository.getRepository().findOne({
+      where: {
+        id: orderId,
+      },
+      relations: ['user', 'payment', 'orderDetails', 'orderDetails.product'],
+    });
 
     if (!order) {
-      throw new NotFoundException(
-        '[ORDER] Đơn hàng không tồn tại',
-      );
+      throw new NotFoundException('[ORDER] Đơn hàng không tồn tại');
     }
 
-    const currentUser =
-      await this.userService.getUserLogin();
+    const currentUser = await this.userService.getUserLogin();
 
-    if (
-      order.user.id !== currentUser.id
-    ) {
+    if (order.user.id !== currentUser.id) {
       throw new ForbiddenException(
         '[ORDER] Bạn không có quyền thao tác với đơn hàng này',
       );
     }
 
-    if (
-      order.status !==
-      OrderStatus.PENDING
-    ) {
+    if (order.status !== OrderStatus.PENDING) {
       throw new BadRequestException(
         '[ORDER] Chỉ được hủy đơn hàng ở trạng thái PENDING',
       );
     }
 
-    if (
-      order.payment?.paymentMethod ===
-      PaymentMethod.COD
-    ) {
-      for (const orderDetail of
-        order.orderDetails ?? []) {
-        const inventory =
-          await this.inventoryRepository.findByProductId(
-            orderDetail.product.id,
-          );
+    if (order.payment?.paymentMethod === PaymentMethod.COD) {
+      for (const orderDetail of order.orderDetails ?? []) {
+        const inventory = await this.inventoryRepository.findByProductId(
+          orderDetail.product.id,
+        );
 
         if (!inventory) {
-          throw new NotFoundException(
-            '[ORDER] Sản phẩm không tồn tại',
-          );
+          throw new NotFoundException('[ORDER] Sản phẩm không tồn tại');
         }
 
-        const oldQuantity =
-          inventory.quantity ?? 0;
+        const oldQuantity = inventory.quantity ?? 0;
 
-        const newQuantity =
-          oldQuantity +
-          (orderDetail.quantity ?? 0);
+        const newQuantity = oldQuantity + (orderDetail.quantity ?? 0);
 
         inventory.quantity = newQuantity;
 
-        await this.inventoryRepository
-          .getRepository()
-          .save(inventory);
+        await this.inventoryRepository.getRepository().save(inventory);
 
-        const transaction =
-          new InventoryTransaction();
+        const transaction = new InventoryTransaction();
 
-        transaction.inventory =
-          inventory;
-        transaction.quantity =
-          orderDetail.quantity;
-        transaction.type =
-          TypeInventory.IMPORT;
-        transaction.note =
-          'Import product from cancel order';
+        transaction.inventory = inventory;
+        transaction.quantity = orderDetail.quantity;
+        transaction.type = TypeInventory.IMPORT;
+        transaction.note = 'Import product from cancel order';
 
         await this.inventoryTransactionRepository
           .getRepository()
@@ -570,60 +407,31 @@ export class OrderServiceImpl implements OrderService {
       }
     }
 
-    order.status =
-      OrderStatus.CANCELLED;
+    order.status = OrderStatus.CANCELLED;
 
     if (order.payment) {
-      if (
-        order.payment.status ===
-        PaymentStatus.PENDING
-      ) {
-        order.payment.status =
-          PaymentStatus.FAILED;
-      } else if (
-        order.payment.status ===
-        PaymentStatus.SUCCESS
-      ) {
-        order.payment.status =
-          PaymentStatus.REFUNDED;
+      if (order.payment.status === PaymentStatus.PENDING) {
+        order.payment.status = PaymentStatus.FAILED;
+      } else if (order.payment.status === PaymentStatus.SUCCESS) {
+        order.payment.status = PaymentStatus.REFUNDED;
       }
     }
 
-    const updatedOrder =
-      await this.orderRepository
-        .getRepository()
-        .save(order);
+    const updatedOrder = await this.orderRepository.getRepository().save(order);
 
-    return this.orderMapper.toDto(
-      updatedOrder,
-    );
+    return this.orderMapper.toDto(updatedOrder);
   }
 
-  validateStatusTransaction(
-    current: OrderStatus,
-    next: OrderStatus,
-  ): void {
-    const validTransactions: Record<
-      OrderStatus,
-      OrderStatus[]
-    > = {
-      [OrderStatus.PENDING]: [
-        OrderStatus.PROCESSING,
-        OrderStatus.CANCELLED,
-      ],
-      [OrderStatus.PROCESSING]: [
-        OrderStatus.SHIPPED,
-        OrderStatus.CANCELLED,
-      ],
-      [OrderStatus.SHIPPED]: [
-        OrderStatus.DELIVERED,
-      ],
+  validateStatusTransaction(current: OrderStatus, next: OrderStatus): void {
+    const validTransactions: Record<OrderStatus, OrderStatus[]> = {
+      [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
       [OrderStatus.DELIVERED]: [],
       [OrderStatus.CANCELLED]: [],
     };
 
-    const allowed =
-      validTransactions[current] ?? [];
+    const allowed = validTransactions[current] ?? [];
 
     if (!allowed.includes(next)) {
       throw new BadRequestException(
@@ -632,45 +440,24 @@ export class OrderServiceImpl implements OrderService {
     }
   }
 
-  async updateOrderStatus(
-    req: ReqUpdateOrderStatusDto,
-  ): Promise<OrderDto> {
-    const normalized =
-      req.status
-        .toUpperCase()
-        .trim();
+  async updateOrderStatus(req: ReqUpdateOrderStatusDto): Promise<OrderDto> {
+    const normalized = req.status.toUpperCase().trim();
 
-    if (
-      !Object.values(OrderStatus).includes(
-        normalized as OrderStatus,
-      )
-    ) {
-      throw new BadRequestException(
-        'Trạng thái không tồn tại',
-      );
+    if (!Object.values(OrderStatus).includes(normalized as OrderStatus)) {
+      throw new BadRequestException('Trạng thái không tồn tại');
     }
 
-    const newStatus =
-      normalized as OrderStatus;
+    const newStatus = normalized as OrderStatus;
 
-    const order =
-      await this.orderRepository
-        .getRepository()
-        .findOne({
-          where: {
-            id: req.orderId,
-          },
-          relations: [
-            'payment',
-            'orderDetails',
-            'orderDetails.product',
-          ],
-        });
+    const order = await this.orderRepository.getRepository().findOne({
+      where: {
+        id: req.orderId,
+      },
+      relations: ['payment', 'orderDetails', 'orderDetails.product'],
+    });
 
     if (!order) {
-      throw new NotFoundException(
-        '[ORDER] Đơn hàng không tồn tại',
-      );
+      throw new NotFoundException('[ORDER] Đơn hàng không tồn tại');
     }
 
     if (order.status == null) {
@@ -679,52 +466,32 @@ export class OrderServiceImpl implements OrderService {
       );
     }
 
-    this.validateStatusTransaction(
-      order.status,
-      newStatus,
-    );
+    this.validateStatusTransaction(order.status, newStatus);
 
-    if (
-      newStatus ===
-      OrderStatus.CANCELLED
-    ) {
-      for (const orderDetail of
-        order.orderDetails ?? []) {
-        const inventory =
-          await this.inventoryRepository.findByProductId(
-            orderDetail.product.id,
-          );
+    if (newStatus === OrderStatus.CANCELLED) {
+      for (const orderDetail of order.orderDetails ?? []) {
+        const inventory = await this.inventoryRepository.findByProductId(
+          orderDetail.product.id,
+        );
 
         if (!inventory) {
-          throw new NotFoundException(
-            '[INVENTORY] Sản phẩm không tồn tại',
-          );
+          throw new NotFoundException('[INVENTORY] Sản phẩm không tồn tại');
         }
 
-        const oldQuantity =
-          inventory.quantity ?? 0;
+        const oldQuantity = inventory.quantity ?? 0;
 
-        const newQuantity =
-          oldQuantity +
-          (orderDetail.quantity ?? 0);
+        const newQuantity = oldQuantity + (orderDetail.quantity ?? 0);
 
         inventory.quantity = newQuantity;
 
-        await this.inventoryRepository
-          .getRepository()
-          .save(inventory);
+        await this.inventoryRepository.getRepository().save(inventory);
 
-        const transaction =
-          new InventoryTransaction();
+        const transaction = new InventoryTransaction();
 
-        transaction.inventory =
-          inventory;
-        transaction.quantity =
-          orderDetail.quantity;
-        transaction.type =
-          TypeInventory.IMPORT;
-        transaction.note =
-          'Import product from cancel order by admin';
+        transaction.inventory = inventory;
+        transaction.quantity = orderDetail.quantity;
+        transaction.type = TypeInventory.IMPORT;
+        transaction.note = 'Import product from cancel order by admin';
 
         await this.inventoryTransactionRepository
           .getRepository()
@@ -735,20 +502,14 @@ export class OrderServiceImpl implements OrderService {
     if (order.payment) {
       switch (newStatus) {
         case OrderStatus.DELIVERED:
-          order.payment.status =
-            PaymentStatus.SUCCESS;
+          order.payment.status = PaymentStatus.SUCCESS;
           break;
 
         case OrderStatus.CANCELLED:
-          if (
-            order.payment.status ===
-            PaymentStatus.SUCCESS
-          ) {
-            order.payment.status =
-              PaymentStatus.REFUNDED;
+          if (order.payment.status === PaymentStatus.SUCCESS) {
+            order.payment.status = PaymentStatus.REFUNDED;
           } else {
-            order.payment.status =
-              PaymentStatus.FAILED;
+            order.payment.status = PaymentStatus.FAILED;
           }
           break;
 
@@ -759,47 +520,24 @@ export class OrderServiceImpl implements OrderService {
 
     order.status = newStatus;
 
-    const updatedOrder =
-      await this.orderRepository
-        .getRepository()
-        .save(order);
+    const updatedOrder = await this.orderRepository.getRepository().save(order);
 
-    return this.orderMapper.toDto(
-      updatedOrder,
-    );
+    return this.orderMapper.toDto(updatedOrder);
   }
 
-  async getAllOrders(
-    query: OrderQueryDto,
-  ): Promise<ResultPaginationDto> {
+  async getAllOrders(query: OrderQueryDto): Promise<ResultPaginationDto> {
     const page = query.page;
     const pageSize = query.pageSize;
     const filter = query.filter ?? [];
 
-    const queryBuilder =
-      this.orderRepository
-        .getRepository()
-        .createQueryBuilder('order')
-        .leftJoinAndSelect(
-          'order.user',
-          'user',
-        )
-        .leftJoinAndSelect(
-          'order.payment',
-          'payment',
-        )
-        .leftJoinAndSelect(
-          'order.orderDetails',
-          'orderDetail',
-        )
-        .leftJoinAndSelect(
-          'orderDetail.product',
-          'product',
-        )
-        .leftJoinAndSelect(
-          'product.productImages',
-          'productImage',
-        );
+    const queryBuilder = this.orderRepository
+      .getRepository()
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.payment', 'payment')
+      .leftJoinAndSelect('order.orderDetails', 'orderDetail')
+      .leftJoinAndSelect('orderDetail.product', 'product')
+      .leftJoinAndSelect('product.productImages', 'productImage');
 
     if (filter?.length) {
       for (const expression of filter) {
@@ -822,102 +560,69 @@ export class OrderServiceImpl implements OrderService {
           continue;
         }
 
-        const index =
-          expression.indexOf(separator);
+        const index = expression.indexOf(separator);
 
-        const key =
-          expression
-            .substring(0, index)
-            .trim();
+        const key = expression.substring(0, index).trim();
 
-        const value =
-          expression
-            .substring(
-              index + separator.length,
-            )
-            .trim();
+        const value = expression.substring(index + separator.length).trim();
 
         if (!key || !value) {
           continue;
         }
 
-        const allowedColumns: Record<
-          string,
-          string
-        > = {
+        const allowedColumns: Record<string, string> = {
           id: 'order.id',
           shippingName: 'order.shipping_name',
           shippingPhone: 'order.shipping_phone',
-          shippingAddressFull:
-            'order.shipping_address_full',
+          shippingAddressFull: 'order.shipping_address_full',
           totalAmount: 'order.total_amount',
           status: 'order.status',
           orderType: 'order.order_type',
           paymentId: 'order.payment_id',
           userId: 'order.user_id',
           createdDate: 'order.created_date',
-          lastModifiedDate:
-            'order.last_modified_date',
+          lastModifiedDate: 'order.last_modified_date',
           deleteFlag: 'order.delete_flag',
           activeFlag: 'order.active_flag',
         };
 
-        const column =
-          allowedColumns[key];
+        const column = allowedColumns[key];
 
         if (!column) {
           continue;
         }
 
-        const parameter =
-          `filter_${Math.random()
-            .toString(36)
-            .slice(2, 10)}`;
+        const parameter = `filter_${Math.random().toString(36).slice(2, 10)}`;
 
         switch (separator) {
           case ':':
-            queryBuilder.andWhere(
-              `${column} = :${parameter}`,
-              {
-                [parameter]: value,
-              },
-            );
+            queryBuilder.andWhere(`${column} = :${parameter}`, {
+              [parameter]: value,
+            });
             break;
 
           case '!':
-            queryBuilder.andWhere(
-              `${column} != :${parameter}`,
-              {
-                [parameter]: value,
-              },
-            );
+            queryBuilder.andWhere(`${column} != :${parameter}`, {
+              [parameter]: value,
+            });
             break;
 
           case '>=':
-            queryBuilder.andWhere(
-              `${column} >= :${parameter}`,
-              {
-                [parameter]: value,
-              },
-            );
+            queryBuilder.andWhere(`${column} >= :${parameter}`, {
+              [parameter]: value,
+            });
             break;
 
           case '<=':
-            queryBuilder.andWhere(
-              `${column} <= :${parameter}`,
-              {
-                [parameter]: value,
-              },
-            );
+            queryBuilder.andWhere(`${column} <= :${parameter}`, {
+              [parameter]: value,
+            });
             break;
 
           case '~':
-            queryBuilder.andWhere(
-              `${column} LIKE :${parameter}`,
-              {
-                [parameter]: `%${value}%`,
-              },
-            );
+            queryBuilder.andWhere(`${column} LIKE :${parameter}`, {
+              [parameter]: `%${value}%`,
+            });
             break;
         }
       }
@@ -928,8 +633,7 @@ export class OrderServiceImpl implements OrderService {
       .skip((page - 1) * pageSize)
       .take(pageSize);
 
-    const [orders, total] =
-      await queryBuilder.getManyAndCount();
+    const [orders, total] = await queryBuilder.getManyAndCount();
 
     return this.buildPaginationResponse(
       this.orderMapper.toDtoList(orders),
@@ -945,18 +649,13 @@ export class OrderServiceImpl implements OrderService {
     pageSize: number,
     total: number,
   ): ResultPaginationDto {
-    const result =
-      new ResultPaginationDto();
+    const result = new ResultPaginationDto();
 
-    const meta =
-      new Meta();
+    const meta = new Meta();
 
     meta.page = page;
     meta.pageSize = pageSize;
-    meta.pages =
-      pageSize > 0
-        ? Math.ceil(total / pageSize)
-        : 0;
+    meta.pages = pageSize > 0 ? Math.ceil(total / pageSize) : 0;
     meta.total = total;
 
     result.meta = meta;
