@@ -171,7 +171,6 @@ export class OrderServiceImpl implements OrderService {
 
     const payment = new Payment();
 
-    payment.order = order;
     payment.paymentMethod =
       req.paymentMethod;
     payment.amount = totalAmount;

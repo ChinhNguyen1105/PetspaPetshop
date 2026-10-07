@@ -158,20 +158,13 @@ export class PermissionsGuard implements CanActivate {
     request: Request,
     routePath: string,
   ): string {
-    const requestPath = request.path;
+    const normalizedRoutePath =
+      this.normalizeApiPath(routePath);
 
     if (
-      requestPath &&
-      requestPath.startsWith('/api/v1')
+      normalizedRoutePath.startsWith('/api/v1')
     ) {
-      return requestPath;
-    }
-
-    if (
-      requestPath &&
-      requestPath !== routePath
-    ) {
-      return this.normalizeApiPath(requestPath);
+      return normalizedRoutePath;
     }
 
     const baseUrl = request.baseUrl ?? '';

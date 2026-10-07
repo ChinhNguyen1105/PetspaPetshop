@@ -1,7 +1,6 @@
 ﻿import {
   Column,
   Entity,
-  JoinColumn,
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -21,7 +20,6 @@ export class Payment extends UserDateAuditing {
   id: number;
 
   @OneToOne(() => Order, (order) => order.payment)
-  @JoinColumn({ name: 'order_id' }) // Chỉ định rõ khóa ngoại liên kết tới bảng Order
   order: Order;
 
   @Column({
@@ -34,7 +32,7 @@ export class Payment extends UserDateAuditing {
 
   @Column({
     name: 'transaction_id',
-    type: 'varchar', // Bắt buộc khai báo kiểu dữ liệu cho chuỗi
+    type: 'varchar',
     length: 255,
     unique: true,
     nullable: true,

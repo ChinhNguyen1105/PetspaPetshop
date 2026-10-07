@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+// Config
+import vnpayConfig from './config/vnpay.config';
+
 // Guards
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from 'src/modules/auth/guards/permissions.guard';
@@ -38,6 +41,7 @@ import { ReviewsModule } from 'src/modules/reviews/reviews.module';
     // 1. Cấu hình biến môi trường toàn cục (.env)
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [vnpayConfig],
     }),
 
     // 2. Kết nối Database (MySQL)
