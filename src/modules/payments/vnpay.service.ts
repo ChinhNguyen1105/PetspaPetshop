@@ -24,6 +24,7 @@ import type { UserService } from 'src/modules/users/service/user.service';
 import { PaymentStatusDto } from 'src/modules/orders/dto/response/payment-status.dto';
 import { Inject } from '@nestjs/common';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
+
 @Injectable()
 export class VNPayService {
   constructor(
@@ -50,8 +51,11 @@ export class VNPayService {
     }
 
     const tmnCode = this.configService.get<string>('vnpay.tmnCode');
+
     const hashSecret = this.configService.get<string>('vnpay.hashSecret');
+
     const vnpayUrl = this.configService.get<string>('vnpay.url');
+
     const returnUrl = this.configService.get<string>('vnpay.returnUrl');
 
     if (!tmnCode || !hashSecret || !vnpayUrl || !returnUrl) {
@@ -175,13 +179,18 @@ export class VNPayService {
 
     return this.dataSource.transaction(async (manager) => {
       const orderRepository = manager.getRepository(Order);
+
       const bookingRepository = manager.getRepository(Booking);
+
       const inventoryRepository = manager.getRepository(Inventory);
+
       const inventoryTransactionRepository =
         manager.getRepository(InventoryTransaction);
 
       const order = await orderRepository.findOne({
-        where: { id: orderId },
+        where: {
+          id: orderId,
+        },
         relations: ['payment', 'orderDetails', 'orderDetails.product'],
       });
 
@@ -200,12 +209,16 @@ export class VNPayService {
       }
 
       const isSuccess = responseCode === '00';
+
       let stockShortage = false;
 
       if (isSuccess) {
         order.payment.status = PaymentStatus.SUCCESS;
+
         order.payment.transactionId = transactionId ?? null;
+
         order.payment.paymentMethod = PaymentMethod.VNPAY;
+
         order.status = OrderStatus.PROCESSING;
 
         if (order.orderType === OrderType.PRODUCT) {
@@ -227,7 +240,9 @@ export class VNPayService {
             const inventory = await inventoryRepository
               .createQueryBuilder('inventory')
               .leftJoinAndSelect('inventory.product', 'product')
-              .where('product.id = :productId', { productId })
+              .where('product.id = :productId', {
+                productId,
+              })
               .getOne();
 
             if (!inventory) {
@@ -260,6 +275,7 @@ export class VNPayService {
 
         if (stockShortage) {
           order.status = OrderStatus.CANCELLED;
+
           order.payment.status = PaymentStatus.REFUNDED;
         }
       } else {
@@ -268,17 +284,31 @@ export class VNPayService {
 
       await orderRepository.save(order);
 
+      /*
+       * Booking không được chuyển sang CONFIRMED
+       * chỉ vì thanh toán thành công.
+       *
+       * SUCCESS:
+       *   Payment  -> SUCCESS
+       *   Order    -> PROCESSING
+       *   Booking  -> giữ nguyên PENDING
+       *
+       * FAILED:
+       *   Payment  -> FAILED
+       *   Booking  -> CANCELLED
+       */
+
       if (order.orderType === OrderType.BOOKING) {
         const booking = await bookingRepository
           .createQueryBuilder('booking')
           .leftJoinAndSelect('booking.order', 'order')
-          .where('order.id = :orderId', { orderId })
+          .where('order.id = :orderId', {
+            orderId,
+          })
           .getOne();
 
-        if (booking) {
-          booking.status = isSuccess
-            ? BookingStatus.CONFIRMED
-            : BookingStatus.CANCELLED;
+        if (booking && !isSuccess) {
+          booking.status = BookingStatus.CANCELLED;
 
           await bookingRepository.save(booking);
         }
@@ -294,7 +324,9 @@ export class VNPayService {
 
   async getPaymentStatus(orderId: number): Promise<PaymentStatusDto> {
     const order = await this.dataSource.getRepository(Order).findOne({
-      where: { id: orderId },
+      where: {
+        id: orderId,
+      },
       relations: ['payment', 'user'],
     });
 
@@ -313,8 +345,11 @@ export class VNPayService {
     const dto = new PaymentStatusDto();
 
     dto.orderId = order.id;
+
     dto.orderStatus = order.status as OrderStatus;
+
     dto.totalAmount = Number(order.totalAmount ?? 0);
+
     dto.transactionId = order.payment?.transactionId ?? '';
 
     if (order.payment) {
@@ -330,10 +365,15 @@ export class VNPayService {
 
   private formatDate(date: Date): string {
     const year = date.getFullYear();
+
     const month = String(date.getMonth() + 1).padStart(2, '0');
+
     const day = String(date.getDate()).padStart(2, '0');
+
     const hour = String(date.getHours()).padStart(2, '0');
+
     const minute = String(date.getMinutes()).padStart(2, '0');
+
     const second = String(date.getSeconds()).padStart(2, '0');
 
     return `${year}${month}${day}${hour}${minute}${second}`;

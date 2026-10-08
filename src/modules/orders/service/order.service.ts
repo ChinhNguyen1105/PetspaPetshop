@@ -7,15 +7,12 @@ import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-stat
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
 
 import { OrderDto } from 'src/modules/orders/dto/response/order.dto';
+import { RevenueDto } from 'src/modules/orders/dto/response/revenue.dto';
 
 export interface OrderService {
-  createOrderFromCart(
-    req: ReqCreateOrderFromCartDto,
-  ): Promise<OrderDto>;
+  createOrderFromCart(req: ReqCreateOrderFromCartDto): Promise<OrderDto>;
 
-  createOrderFromBuyNow(
-    req: ReqCreateOrderBuyNowDto,
-  ): Promise<OrderDto>;
+  createOrderFromBuyNow(req: ReqCreateOrderBuyNowDto): Promise<OrderDto>;
 
   getMyOrders(
     status: ReqOrderStatusDto,
@@ -27,11 +24,9 @@ export interface OrderService {
 
   cancelOrder(orderId: number): Promise<OrderDto>;
 
-  updateOrderStatus(
-    req: ReqUpdateOrderStatusDto,
-  ): Promise<OrderDto>;
+  updateOrderStatus(req: ReqUpdateOrderStatusDto): Promise<OrderDto>;
 
-  getAllOrders(
-    query: OrderQueryDto,
-  ): Promise<ResultPaginationDto>;
+  getAllOrders(query: OrderQueryDto): Promise<ResultPaginationDto>;
+
+  getRevenue(): Promise<RevenueDto>;
 }

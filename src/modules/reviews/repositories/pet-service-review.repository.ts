@@ -1,4 +1,5 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -29,6 +30,7 @@ export class PetServiceReviewRepository {
     const query = this.repository
       .createQueryBuilder('review')
       .leftJoinAndSelect('review.petService', 'service')
+      .leftJoinAndSelect('review.user', 'user')
       .where('service.id = :serviceId', { serviceId });
 
     if (page !== undefined && pageSize !== undefined) {
@@ -44,7 +46,7 @@ export class PetServiceReviewRepository {
 
   findByPetServiceIdAndUserId(
     serviceId: number,
-    userId: number,
+    userId: string,
   ) {
     return this.repository
       .createQueryBuilder('review')
@@ -76,3 +78,4 @@ export class PetServiceReviewRepository {
     return this.repository;
   }
 }
+

@@ -1,4 +1,5 @@
-﻿import { Injectable, Logger, Inject } from '@nestjs/common';
+﻿
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
@@ -19,11 +20,16 @@ import type { PetServiceReviewService } from 'src/modules/reviews/service/pet-se
 import type { UserService } from 'src/modules/users/service/user.service';
 
 @Injectable()
-export class PetServiceReviewServiceImpl implements PetServiceReviewService {
-  private readonly logger = new Logger(PetServiceReviewServiceImpl.name);
+export class PetServiceReviewServiceImpl
+  implements PetServiceReviewService
+{
+  private readonly logger = new Logger(
+    PetServiceReviewServiceImpl.name,
+  );
 
   constructor(
     private readonly reviewRepository: PetServiceReviewRepository,
+
     private readonly dataSource: DataSource,
 
     @Inject(PROVIDER_TOKEN.USER_SERVICE)
@@ -47,7 +53,8 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
 
     const currentUser = await this.userService.getUserLogin();
 
-    const serviceRepository = this.dataSource.getRepository(PetService);
+    const serviceRepository =
+      this.dataSource.getRepository(PetService);
 
     const service = await serviceRepository.findOne({
       where: {
@@ -56,13 +63,15 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
     });
 
     if (!service) {
-      throw new NotFoundException('[SERVICE_REVIEW] Service not found');
+      throw new NotFoundException(
+        '[SERVICE_REVIEW] Service not found',
+      );
     }
 
     const existingReview =
       await this.reviewRepository.findByPetServiceIdAndUserId(
         req.serviceId,
-        Number(currentUser.id),
+        currentUser.id,
       );
 
     if (existingReview) {
@@ -74,8 +83,11 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
     const review = new PetServiceReview();
 
     review.petService = service;
+
     review.user = currentUser;
+
     review.rating = req.rating;
+
     review.comment = req.comment;
 
     const savedReview = await this.reviewRepository
@@ -90,32 +102,42 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
   }
 
   async deleteReview(reviewId: number): Promise<void> {
-    this.logger.log(`[SERVICE_REVIEW] Deleting review with ID: ${reviewId}`);
+    this.logger.log(
+      `[SERVICE_REVIEW] Deleting review with ID: ${reviewId}`,
+    );
 
-    const review = await this.reviewRepository.getRepository().findOne({
-      where: {
-        id: reviewId,
-      },
-      relations: {
-        user: true,
-      },
-    });
+    const review = await this.reviewRepository
+      .getRepository()
+      .findOne({
+        where: {
+          id: reviewId,
+        },
+        relations: {
+          user: true,
+        },
+      });
 
     if (!review) {
-      throw new NotFoundException('[SERVICE_REVIEW] Review not found');
+      throw new NotFoundException(
+        '[SERVICE_REVIEW] Review not found',
+      );
     }
 
     const currentUser = await this.userService.getUserLogin();
 
-    if (Number(review.user.id) !== Number(currentUser.id)) {
+    if (review.user.id !== currentUser.id) {
       throw new BadRequestException(
         '[SERVICE_REVIEW] You can only delete your own reviews',
       );
     }
 
-    await this.reviewRepository.getRepository().remove(review);
+    await this.reviewRepository
+      .getRepository()
+      .remove(review);
 
-    this.logger.log('[SERVICE_REVIEW] Review deleted successfully');
+    this.logger.log(
+      '[SERVICE_REVIEW] Review deleted successfully',
+    );
   }
 
   async getServiceReviews(
@@ -127,7 +149,8 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
       `[SERVICE_REVIEW] Getting reviews for service: ${serviceId}`,
     );
 
-    const serviceRepository = this.dataSource.getRepository(PetService);
+    const serviceRepository =
+      this.dataSource.getRepository(PetService);
 
     const service = await serviceRepository.findOne({
       where: {
@@ -136,14 +159,17 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
     });
 
     if (!service) {
-      throw new NotFoundException('[SERVICE_REVIEW] Service not found');
+      throw new NotFoundException(
+        '[SERVICE_REVIEW] Service not found',
+      );
     }
 
-    const [reviews, total] = await this.reviewRepository.findByPetServiceId(
-      serviceId,
-      page,
-      pageSize,
-    );
+    const [reviews, total] =
+      await this.reviewRepository.findByPetServiceId(
+        serviceId,
+        page,
+        pageSize,
+      );
 
     const dtos = this.reviewMapper.toDtos(reviews);
 
@@ -158,8 +184,13 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
     };
   }
 
-  async getAverageRating(serviceId: number): Promise<number> {
-    const result = await this.reviewRepository.getAverageRating(serviceId);
+  async getAverageRating(
+    serviceId: number,
+  ): Promise<number> {
+    const result =
+      await this.reviewRepository.getAverageRating(
+        serviceId,
+      );
 
     if (!result?.averageRating) {
       return 0;
@@ -168,7 +199,10 @@ export class PetServiceReviewServiceImpl implements PetServiceReviewService {
     return Number(result.averageRating);
   }
 
-  async getReviewCount(serviceId: number): Promise<number> {
+  async getReviewCount(
+    serviceId: number,
+  ): Promise<number> {
     return this.reviewRepository.getReviewCount(serviceId);
   }
 }
+

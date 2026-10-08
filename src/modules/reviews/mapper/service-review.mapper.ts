@@ -1,4 +1,5 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿
+import { Injectable } from '@nestjs/common';
 
 import { PetServiceReview } from 'src/modules/reviews/entities/pet-service-review.entity';
 import { ServiceReviewDto } from 'src/modules/reviews/dto/response/service-review.dto';
@@ -9,11 +10,20 @@ export class ServiceReviewMapper {
     const dto = new ServiceReviewDto();
 
     dto.id = review.id;
+
     dto.serviceId = review.petService?.id ?? null;
+
     dto.userId = review.user?.id ?? null;
+
     dto.userName = review.user?.name ?? null;
+
+    dto.avatarUrl = review.user?.avatarUrl ?? null;
+
     dto.rating = review.rating;
+
     dto.comment = review.comment;
+
+    dto.createdDate = review.createdDate;
 
     return dto;
   }
@@ -26,9 +36,12 @@ export class ServiceReviewMapper {
     const review = new PetServiceReview();
 
     review.id = dto.id;
+
     review.rating = dto.rating;
+
     review.comment = dto.comment;
 
     return review;
   }
 }
+

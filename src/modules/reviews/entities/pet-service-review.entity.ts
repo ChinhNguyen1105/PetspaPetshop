@@ -8,9 +8,10 @@
 
 import { User } from '../../users/entities/user.entity';
 import { PetService } from '../../catalogue/services/entities/pet-service.entity';
+import { FlagUserDateAuditing } from 'src/common/entities/flag-user-date-auditing.entity';
 
 @Entity('tbl_pet_service_reviews')
-export class PetServiceReview {
+export class PetServiceReview extends FlagUserDateAuditing{
   @PrimaryGeneratedColumn({
     name: 'id',
     type: 'bigint',

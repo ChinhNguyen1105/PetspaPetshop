@@ -76,7 +76,7 @@
     GET_ORDER_DETAIL: '/orders/:id',
     CANCEL_ORDER: '/orders/:id/cancel',
     GET_ORDER_STATUS_HISTORY: '/orders/:id/status-history',
-
+    GET_REVENUE: '/orders/revenue',
     GET_ALL_ORDERS: '/admin/orders',
     UPDATE_ORDER_STATUS: '/admin/orders/status',
   },
@@ -87,7 +87,7 @@
     CREATE_PET: '/pets',
     UPDATE_PET: '/pets',
     DELETE_PET: '/pets/:id',
-
+    GET_REVENUE: '/orders/revenue',
     GET_ALL_PETS: '/admin/pets',
     PATCH_DEACTIVATE_PET: '/admin/pets/:id/deactivate',
     PATCH_ACTIVATE_PET: '/admin/pets/:id/activate',

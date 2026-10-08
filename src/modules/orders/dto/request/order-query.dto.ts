@@ -1,5 +1,9 @@
 ﻿import { Transform } from 'class-transformer';
-import { IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
@@ -26,4 +30,15 @@ export class OrderQueryDto extends PaginationDto {
   })
   @IsString({ each: true })
   filter?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    return value === true || value === 'true';
+  })
+  @IsBoolean()
+  all?: boolean;
 }

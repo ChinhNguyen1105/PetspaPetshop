@@ -22,7 +22,9 @@ import { ReqCreateOrderBuyNowDto } from 'src/modules/orders/dto/request/req-crea
 import { OrderQueryDto } from 'src/modules/orders/dto/request/order-query.dto';
 import { ReqOrderStatusDto } from 'src/modules/orders/dto/request/req-order-status.dto';
 import { ReqUpdateOrderStatusDto } from 'src/modules/orders/dto/request/req-update-order-status.dto';
+
 import { OrderDto } from 'src/modules/orders/dto/response/order.dto';
+import { RevenueDto } from 'src/modules/orders/dto/response/revenue.dto';
 
 import { Order } from 'src/modules/orders/entities/order.entity';
 import { OrderDetail } from 'src/modules/orders/entities/order-detail.entity';
@@ -38,10 +40,7 @@ import { ProductRepository } from 'src/modules/catalogue/products/repositories/p
 
 import { ShippingAddressMapper } from 'src/modules/shipping/mapper/shipping-address.mapper';
 
-import { Cart } from 'src/modules/cart/entities/cart.entity';
-import { CartItem } from 'src/modules/cart/entities/cart-item.entity';
 import { Payment } from 'src/modules/payments/entities/payment.entity';
-import { Inventory } from 'src/modules/inventory/entities/inventory.entity';
 import { InventoryTransaction } from 'src/modules/inventory/entities/inventory-transaction.entity';
 
 import type { UserService } from 'src/modules/users/service/user.service';
@@ -64,7 +63,9 @@ export class OrderServiceImpl implements OrderService {
     private readonly productRepository: ProductRepository,
   ) {}
 
-  async createOrderFromCart(req: ReqCreateOrderFromCartDto): Promise<OrderDto> {
+  async createOrderFromCart(
+    req: ReqCreateOrderFromCartDto,
+  ): Promise<OrderDto> {
     const currentUser = await this.userService.getUserLogin();
 
     const cart = await this.cartRepository.findByUserId(currentUser.id);
@@ -160,7 +161,9 @@ export class OrderServiceImpl implements OrderService {
     return this.orderMapper.toDto(savedOrder);
   }
 
-  async createOrderFromBuyNow(req: ReqCreateOrderBuyNowDto): Promise<OrderDto> {
+  async createOrderFromBuyNow(
+    req: ReqCreateOrderBuyNowDto,
+  ): Promise<OrderDto> {
     const currentUser = await this.userService.getUserLogin();
 
     const product = await this.productRepository.getRepository().findOne({
@@ -422,7 +425,10 @@ export class OrderServiceImpl implements OrderService {
     return this.orderMapper.toDto(updatedOrder);
   }
 
-  validateStatusTransaction(current: OrderStatus, next: OrderStatus): void {
+  validateStatusTransaction(
+    current: OrderStatus,
+    next: OrderStatus,
+  ): void {
     const validTransactions: Record<OrderStatus, OrderStatus[]> = {
       [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
       [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
@@ -440,7 +446,9 @@ export class OrderServiceImpl implements OrderService {
     }
   }
 
-  async updateOrderStatus(req: ReqUpdateOrderStatusDto): Promise<OrderDto> {
+  async updateOrderStatus(
+    req: ReqUpdateOrderStatusDto,
+  ): Promise<OrderDto> {
     const normalized = req.status.toUpperCase().trim();
 
     if (!Object.values(OrderStatus).includes(normalized as OrderStatus)) {
@@ -592,7 +600,9 @@ export class OrderServiceImpl implements OrderService {
           continue;
         }
 
-        const parameter = `filter_${Math.random().toString(36).slice(2, 10)}`;
+        const parameter = `filter_${Math.random()
+          .toString(36)
+          .slice(2, 10)}`;
 
         switch (separator) {
           case ':':
@@ -641,6 +651,47 @@ export class OrderServiceImpl implements OrderService {
       pageSize,
       total,
     );
+  }
+
+  async getRevenue(): Promise<RevenueDto> {
+    const orders = await this.orderRepository
+      .getRepository()
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.payment', 'payment')
+      .getMany();
+
+    let shopRevenue = 0;
+    let spaRevenue = 0;
+    let paidOrders = 0;
+    let unpaidOrders = 0;
+
+    for (const order of orders) {
+      const paymentStatus = order.payment?.status;
+
+      if (paymentStatus === PaymentStatus.SUCCESS) {
+        paidOrders++;
+
+        const amount = Number(order.totalAmount) || 0;
+
+        if (order.orderType === OrderType.PRODUCT) {
+          shopRevenue += amount;
+        }
+
+        if (order.orderType === OrderType.BOOKING) {
+          spaRevenue += amount;
+        }
+      } else {
+        unpaidOrders++;
+      }
+    }
+
+    return {
+      totalRevenue: shopRevenue + spaRevenue,
+      shopRevenue,
+      spaRevenue,
+      paidOrders,
+      unpaidOrders,
+    };
   }
 
   private buildPaginationResponse(

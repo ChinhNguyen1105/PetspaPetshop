@@ -33,47 +33,37 @@ export class OrderController {
   ) {}
 
   @Get(UrlConstant.Order.GET_ALL_ORDERS)
-  async getAllOrders(
-    @Query() query: OrderQueryDto,
-  ) {
+  async getAllOrders(@Query() query: OrderQueryDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.getAllOrders(query),
     );
   }
 
-  @Post(UrlConstant.Order.CREATE_ORDER_FROM_CART)
-  async createOrderFromCart(
-    @Body() req: ReqCreateOrderFromCartDto,
-  ) {
-    const orderDto =
-      await this.orderService.createOrderFromCart(req);
-
+  @Get(UrlConstant.Order.GET_REVENUE)
+  async getRevenue() {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      orderDto,
+      await this.orderService.getRevenue(),
     );
+  }
+
+  @Post(UrlConstant.Order.CREATE_ORDER_FROM_CART)
+  async createOrderFromCart(@Body() req: ReqCreateOrderFromCartDto) {
+    const orderDto = await this.orderService.createOrderFromCart(req);
+
+    return VsResponseUtil.successWithStatus(HttpStatus.OK, orderDto);
   }
 
   @Post(UrlConstant.Order.CREATE_ORDER_FROM_BUY_NOW)
-  async createOrderFromBuyNow(
-    @Body() req: ReqCreateOrderBuyNowDto,
-  ) {
-    const orderDto =
-      await this.orderService.createOrderFromBuyNow(req);
+  async createOrderFromBuyNow(@Body() req: ReqCreateOrderBuyNowDto) {
+    const orderDto = await this.orderService.createOrderFromBuyNow(req);
 
-    return VsResponseUtil.successWithStatus(
-      HttpStatus.OK,
-      orderDto,
-    );
+    return VsResponseUtil.successWithStatus(HttpStatus.OK, orderDto);
   }
 
-  @Patch(
-    UrlConstant.Order.CANCEL_ORDER
-  )
-  async cancelOrder(
-    @Param('id') id: number,
-  ) {
+  @Patch(UrlConstant.Order.CANCEL_ORDER)
+  async cancelOrder(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.cancelOrder(id),
@@ -81,9 +71,7 @@ export class OrderController {
   }
 
   @Patch(UrlConstant.Order.UPDATE_ORDER_STATUS)
-  async updateOrderStatus(
-    @Body() req: ReqUpdateOrderStatusDto,
-  ) {
+  async updateOrderStatus(@Body() req: ReqUpdateOrderStatusDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.updateOrderStatus(req),
@@ -91,9 +79,7 @@ export class OrderController {
   }
 
   @Get(UrlConstant.Order.GET_MY_ORDERS)
-  async getMyOrders(
-    @Query() query: OrderMyOrdersQueryDto,
-  ) {
+  async getMyOrders(@Query() query: OrderMyOrdersQueryDto) {
     const orderStatus: ReqOrderStatusDto = {
       status: query.status ?? null,
     };
@@ -108,12 +94,8 @@ export class OrderController {
     );
   }
 
-  @Get(
-    UrlConstant.Order.GET_ORDER_DETAIL
-  )
-  async getOrderDetail(
-    @Param('id') id: number,
-  ) {
+  @Get(UrlConstant.Order.GET_ORDER_DETAIL)
+  async getOrderDetail(@Param('id') id: number) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.orderService.getOrderDetail(id),

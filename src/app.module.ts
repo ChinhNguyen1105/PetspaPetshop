@@ -1,10 +1,15 @@
 ﻿import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Config
 import vnpayConfig from './config/vnpay.config';
+import { AuditingConfig } from 'src/config/auditing.config';
+
+// Auditing
+import { AuditInterceptor } from 'src/common/auditing/audit.interceptor';
+import { AuditSubscriber } from 'src/common/auditing/audit-subscriber';
 
 // Guards
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -56,6 +61,9 @@ import { ReviewsModule } from 'src/modules/reviews/reviews.module';
       // Tự động quét Entity trong toàn bộ project
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
 
+      // TypeORM Subscriber tự động xử lý createdBy/lastModifiedBy
+      subscribers: [AuditSubscriber],
+
       autoLoadEntities: true,
 
       // Development hiện tại
@@ -96,10 +104,22 @@ import { ReviewsModule } from 'src/modules/reviews/reviews.module';
   ],
 
   providers: [
+    // Lấy UserPrincipal từ request.user
+    AuditingConfig,
+
+    // Đưa auditorId vào AsyncLocalStorage
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
+
+    // Authentication
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+
+    // Authorization
     {
       provide: APP_GUARD,
       useClass: PermissionsGuard,

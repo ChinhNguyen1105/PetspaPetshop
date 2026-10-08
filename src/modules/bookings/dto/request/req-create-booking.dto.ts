@@ -1,12 +1,17 @@
-﻿import {
+﻿
+import {
+  IsArray,
   IsDefined,
   IsNotEmpty,
+  IsNumber,
+  IsOptional,
 } from 'class-validator';
 
 export class ReqCreateBookingDto {
   @IsDefined({ message: 'User ID is required' })
   userId: string;
 
+  @IsArray({ message: 'Service list must be an array' })
   @IsNotEmpty({ message: 'Service list cannot be empty' })
   serviceIds: number[];
 
@@ -19,5 +24,8 @@ export class ReqCreateBookingDto {
   @IsDefined({ message: 'End time is required' })
   endTime: string;
 
+  @IsOptional()
+  @IsNumber({}, { message: 'Pet ID must be a number' })
   petId: number | null;
 }
+

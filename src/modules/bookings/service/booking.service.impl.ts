@@ -181,23 +181,11 @@ export class BookingServiceImpl implements BookingService {
             continue;
           }
 
-          const startInside =
-            req.startTime >= existing.startTime &&
-            req.startTime <= existing.endTime;
+          const hasConflict =
+            req.startTime < existing.endTime &&
+            req.endTime > existing.startTime;
 
-          const endInside =
-            req.endTime >= existing.startTime &&
-            req.endTime <= existing.endTime;
-
-          const fullyContains =
-            req.startTime < existing.startTime &&
-            req.endTime > existing.endTime;
-
-          if (
-            startInside ||
-            endInside ||
-            fullyContains
-          ) {
+          if (hasConflict) {
             throw new AppBadRequestException(
               `[BOOKING] Requested time ${req.startTime}-${req.endTime} conflicts with existing booking ${existing.startTime}-${existing.endTime}`,
             );
@@ -809,29 +797,11 @@ export class BookingServiceImpl implements BookingService {
         continue;
       }
 
-      const startInside =
-        booking.startTime >=
-          existing.startTime &&
-        booking.startTime <=
-          existing.endTime;
+      const hasConflict =
+        booking.startTime < existing.endTime &&
+        booking.endTime > existing.startTime;
 
-      const endInside =
-        booking.endTime >=
-          existing.startTime &&
-        booking.endTime <=
-          existing.endTime;
-
-      const fullyContains =
-        booking.startTime <
-          existing.startTime &&
-        booking.endTime >
-          existing.endTime;
-
-      if (
-        startInside ||
-        endInside ||
-        fullyContains
-      ) {
+      if (hasConflict) {
         throw new AppBadRequestException(
           `[BOOKING] Requested time ${booking.startTime}-${booking.endTime} conflicts with existing booking ${existing.startTime}-${existing.endTime}`,
         );
@@ -915,3 +885,4 @@ export class BookingServiceImpl implements BookingService {
     return response;
   }
 }
+
