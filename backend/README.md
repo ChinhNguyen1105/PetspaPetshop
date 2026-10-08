@@ -12,7 +12,7 @@ starting a feature.
 
 ## Frontend integration contract
 
-- Development base URL: `http://localhost:8080/api/v1`.
+- Development base URL: `http://localhost:3000/api/v1`.
 - Protected requests use `Authorization: Bearer <accessToken>`.
 - Success envelope: `{ status: "SUCCESS", message, data }`.
 - Paginated collections: `data.result` and `data.meta`.
@@ -49,68 +49,3 @@ permission matrix, booking capacity/cancellation rules, order transition graph,
 and VNPay configuration/refund policy. These are deliberately marked as open
 decisions in the documentation rather than guessed.
 
-
-
-
-
-
-src/
-│
-├── main.ts
-├── app.module.ts
-│
-├── common/
-│   ├── constants/
-│   ├── decorators/
-│   ├── dto/
-│   ├── entities/
-│   ├── exceptions/
-│   ├── filters/
-│   ├── guards/
-│   ├── interceptors/
-│   ├── pipes/
-│   ├── utils/
-│   └── validators/
-│
-├── config/
-│   ├── index.ts
-│   └── validation.ts
-│
-├── database/
-│   ├── data-source.ts
-│   ├── migrations/
-│   └── seeds/
-│
-└── modules/
-    │
-    ├── auth/
-    │
-    ├── users/
-    │
-    ├── roles/
-    │
-    ├── permissions/
-    │
-    ├── pets/
-    │
-    ├── catalogue/
-    │
-    ├── cart/
-    │
-    ├── orders/
-    │
-    ├── inventory/
-    │
-    ├── bookings/
-    │
-    ├── shipping/
-    │
-    ├── payments/
-    │
-    ├── reviews/
-    │
-    ├── files/
-    │
-    ├── menu/
-    │
-    └── recommendation/

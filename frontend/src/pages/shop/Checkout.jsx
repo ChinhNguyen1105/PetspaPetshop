@@ -1,0 +1,821 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  MapPin,
+  CreditCard,
+  ShoppingBag,
+  ArrowLeft,
+  Plus,
+  X,
+  Image,
+  AlertTriangle,
+  ShieldCheck,
+} from "lucide-react";
+import { Button } from "../../components/common/Button";
+import { Badge } from "../../components/ui/Badge";
+import AddressForm from "../../components/form/AddressForm";
+
+// TÍCH HỢP STORES
+import { useCartStore } from "../../store/cartStore";
+import { useOrderStore } from "../../store/orderStore";
+import { useAddressStore } from "../../store/addressStore";
+import { formatPrice } from "../../utils/formatPrice";
+import { useProductImageStore } from "../../store/productImageStore";
+
+import PaymentModal from "../../components/common/PaymentModal";
+
+// TÍCH HỢP COMPONENT APRIORI RECOMMENDATION
+import RecommendedProducts from "./RecommendProducts";
+
+/*
+|--------------------------------------------------------------------------
+| HELPER: FORMAT ĐỊA CHỈ
+|--------------------------------------------------------------------------
+| Backend hiện trả:
+| fullName
+| phone
+| addressDetail
+| ward
+| district
+| province
+|--------------------------------------------------------------------------
+*/
+
+const getAddressName = (address) => {
+  if (!address) return "";
+
+  return address.fullName || address.recipient_name || "";
+};
+
+const getAddressPhone = (address) => {
+  if (!address) return "";
+
+  return address.phone || address.phone_number || "";
+};
+
+const getAddressFullText = (address) => {
+  if (!address) return "";
+
+  // Nếu backend/frontend đã có fullAddress thì ưu tiên dùng
+  if (address.fullAddress) {
+    return address.fullAddress;
+  }
+
+  // Format theo response backend hiện tại
+  const parts = [
+    address.addressDetail || address.detail_address,
+    address.ward,
+    address.district,
+    address.province,
+  ].filter(Boolean);
+
+  return parts.join(", ");
+};
+
+/*
+|--------------------------------------------------------------------------
+| SUB-COMPONENT: CHECKOUT ITEM ROW
+|--------------------------------------------------------------------------
+*/
+
+const CheckoutItemRow = ({ item }) => {
+  const [imgUrl, setImgUrl] = useState("");
+  const [loadingImg, setLoadingImg] = useState(true);
+
+  const fetchImages = useProductImageStore((state) => state.fetchImages);
+
+  const fallbackImg =
+    "https://images.unsplash.com/photo-1548767797-d8c844163c4c?q=80&w=100";
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProductThumbnail = async () => {
+      if (item.productImage && item.productImage.startsWith("http")) {
+        if (isMounted) {
+          setImgUrl(item.productImage);
+          setLoadingImg(false);
+        }
+
+        return;
+      }
+
+      try {
+        if (item.productId) {
+          const res = await fetchImages(item.productId);
+
+          if (res?.data && isMounted) {
+            const mainImg =
+              res.data.find((img) => img.isThumbnail || img.isMain) ||
+              res.data[0];
+
+            setImgUrl(mainImg?.imageUrl || fallbackImg);
+          } else if (isMounted) {
+            setImgUrl(fallbackImg);
+          }
+        } else {
+          if (isMounted) {
+            setImgUrl(fallbackImg);
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Lỗi fetch ảnh sản phẩm ${item.productId} tại Checkout:`,
+          error,
+        );
+
+        if (isMounted) {
+          setImgUrl(fallbackImg);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingImg(false);
+        }
+      }
+    };
+
+    loadProductThumbnail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [item.productId, item.productImage, fetchImages]);
+
+  return (
+    <div className="flex py-3 items-center justify-between gap-2">
+      <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-50 flex-shrink-0 relative border border-gray-100">
+        {loadingImg ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+            <Image className="text-gray-300 animate-bounce" size={14} />
+          </div>
+        ) : (
+          <img
+            src={imgUrl || fallbackImg}
+            alt={item.productName}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.src = fallbackImg;
+            }}
+          />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0 text-left">
+        <h4 className="text-sm font-bold text-gray-800 truncate">
+          {item.productName}
+        </h4>
+
+        <p className="text-xs text-gray-500 font-medium">
+          Số lượng: {item.quantity}
+        </p>
+      </div>
+
+      <span className="text-sm font-black text-gray-700 flex-shrink-0">
+        {formatPrice(item.productPrice * item.quantity)}
+      </span>
+    </div>
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
+| MAIN COMPONENT: CHECKOUT
+|--------------------------------------------------------------------------
+*/
+
+const Checkout = () => {
+  const navigate = useNavigate();
+
+  // 1. Giỏ hàng Store
+  const { itemDtoList, totalAmount, fetchCart, clearCart } = useCartStore();
+
+  // 2. Đặt hàng Store
+  const { createOrder, submitting: isSubmitting } = useOrderStore();
+
+  // 3. Địa chỉ Store
+  const {
+    addresses,
+    isLoading: isLoadingAddress,
+    fetchAddresses,
+  } = useAddressStore();
+
+  // LOCAL STATE
+  const [selectedAddress, setSelectedAddress] = useState(null);
+
+  const [paymentMethod, setPaymentMethod] = useState("COD");
+
+  const [showAddressOverlay, setShowAddressOverlay] = useState(false);
+
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const [createdOrderData, setCreatedOrderData] = useState(null);
+
+  const [editingAddress, setEditingAddress] = useState(null);
+
+  const [showConfirmOverlay, setShowConfirmOverlay] = useState(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | LOAD DATA
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    fetchCart();
+    fetchAddresses();
+  }, [fetchCart, fetchAddresses]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | CHỌN ĐỊA CHỈ MẶC ĐỊNH
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (addresses && addresses.length > 0 && !selectedAddress) {
+      const defaultAddr =
+        addresses.find((item) => item.isDefault) || addresses[0];
+
+      setSelectedAddress(defaultAddr);
+    }
+  }, [addresses, selectedAddress]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | SAU KHI ADD / UPDATE ADDRESS
+  |--------------------------------------------------------------------------
+  */
+
+  const handleAddressSubmitSuccess = async (result) => {
+    await fetchAddresses();
+
+    /*
+     * AddressStore hiện trả:
+     *
+     * {
+     *   success: true,
+     *   data: address
+     * }
+     *
+     * nên lấy result.data.
+     */
+    const newAddress = result?.data || result;
+
+    if (newAddress) {
+      const newAddressId = String(newAddress.id);
+
+      if (!editingAddress) {
+        setSelectedAddress(newAddress);
+      } else if (
+        selectedAddress &&
+        String(selectedAddress.id) === newAddressId
+      ) {
+        setSelectedAddress(newAddress);
+      }
+    }
+
+    setEditingAddress(null);
+    setShowAddForm(false);
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | VERIFY ORDER
+  |--------------------------------------------------------------------------
+  */
+
+  const handleVerifyOrderClick = () => {
+    if (!selectedAddress) {
+      alert("Vui lòng chọn hoặc thêm địa chỉ nhận hàng!");
+
+      return;
+    }
+
+    setShowConfirmOverlay(true);
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | CREATE ORDER
+  |--------------------------------------------------------------------------
+  */
+
+  const handleExecuteOrder = async () => {
+    setShowConfirmOverlay(false);
+
+    const orderPayload = {
+      cartItemIds: itemDtoList.map((item) => item.id),
+      addressId: selectedAddress.id,
+      paymentMethod,
+    };
+
+    console.log("ORDER PAYLOAD:", orderPayload);
+
+    const res = await createOrder(orderPayload);
+
+    const orderData = res?.data || res;
+
+    if (res?.success || orderData) {
+      // =======================================================
+      // VNPAY
+      // Giữ nguyên flow hiện tại
+      // =======================================================
+
+      if (paymentMethod === "VNPAY") {
+        setCreatedOrderData(orderData);
+        setShowPaymentModal(true);
+        return;
+      }
+
+      // =======================================================
+      // COD
+      // Tạo đơn thành công → xóa giỏ hàng → order-success
+      // =======================================================
+
+      if (paymentMethod === "COD") {
+        clearCart();
+
+        navigate("/order-success", {
+          state: {
+            order: orderData,
+          },
+        });
+
+        return;
+      }
+    }
+
+    alert(res?.message || "Đã có lỗi xảy ra khi tạo đơn hàng.");
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | PRODUCT IDS FOR RECOMMENDATION
+  |--------------------------------------------------------------------------
+  */
+
+  const currentCartProductIds = itemDtoList
+    ? itemDtoList.map((item) => item.productId).filter(Boolean)
+    : [];
+
+  return (
+    <div className="container mx-auto px-12 py-8 max-w-6xl">
+      <button
+        onClick={() => navigate("/cart")}
+        className="flex items-center text-gray-600 hover:text-primary mb-6 transition-colors font-bold text-sm bg-transparent border-none outline-none cursor-pointer"
+      >
+        <ArrowLeft className="w-5 h-5 mr-2" />
+        Quay lại giỏ hàng
+      </button>
+
+      <h1 className="text-3xl font-black mb-8 text-gray-800 uppercase tracking-tight text-left">
+        Tiến hành thanh toán
+      </h1>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* =========================================================
+            LEFT + CENTER
+        ========================================================= */}
+
+        <div className="lg:col-span-2 space-y-6">
+          {/* =======================================================
+              ADDRESS
+          ======================================================= */}
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-left">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-black flex items-center text-gray-800 uppercase tracking-wide">
+                <MapPin className="w-5 h-5 text-primary mr-2" />
+                Thông tin nhận hàng
+              </h2>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddressOverlay(true)}
+                className="font-bold rounded-xl"
+              >
+                Thay đổi địa chỉ
+              </Button>
+            </div>
+
+            {isLoadingAddress ? (
+              <p className="text-gray-400 text-sm animate-pulse font-medium">
+                Đang tải thông tin địa chỉ...
+              </p>
+            ) : selectedAddress ? (
+              <div className="p-4 bg-slate-50/60 rounded-xl border border-dashed border-gray-200">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-bold text-gray-700">
+                    {getAddressName(selectedAddress)}
+                  </span>
+
+                  <span className="text-gray-400">|</span>
+
+                  <span className="text-gray-600 font-bold text-sm">
+                    {getAddressPhone(selectedAddress)}
+                  </span>
+
+                  {selectedAddress.isDefault && (
+                    <Badge
+                      variant="success"
+                      className="text-xs ml-2 font-bold rounded-md"
+                    >
+                      Mặc định
+                    </Badge>
+                  )}
+                </div>
+
+                <p className="text-gray-500 text-sm mt-1 font-medium leading-relaxed">
+                  {getAddressFullText(selectedAddress)}
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-gray-200">
+                <p className="text-gray-500 text-sm mb-3 font-medium">
+                  Bạn chưa có địa chỉ nhận hàng nào
+                </p>
+
+                <Button
+                  size="sm"
+                  className="font-bold rounded-xl"
+                  onClick={() => {
+                    setShowAddressOverlay(true);
+                    setShowAddForm(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Thêm địa chỉ mới
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* =======================================================
+              PAYMENT
+          ======================================================= */}
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-left">
+            <h2 className="text-xl font-black flex items-center text-gray-800 mb-4 uppercase tracking-wide">
+              <CreditCard className="w-5 h-5 text-primary mr-2" />
+              Phương thức thanh toán
+            </h2>
+
+            <div className="space-y-3">
+              <label
+                className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all ${
+                  paymentMethod === "COD"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  value="COD"
+                  checked={paymentMethod === "COD"}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-4 h-4 text-primary focus:ring-primary border-gray-300 cursor-pointer"
+                />
+
+                <div className="ml-4">
+                  <p className="font-bold text-gray-800">
+                    Thanh toán khi nhận hàng (COD)
+                  </p>
+
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Thanh toán bằng tiền mặt trực tiếp cho shipper khi nhận được
+                    hàng
+                  </p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all ${
+                  paymentMethod === "VNPAY"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  value="VNPAY"
+                  checked={paymentMethod === "VNPAY"}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-4 h-4 text-primary focus:ring-primary border-gray-300 cursor-pointer"
+                />
+
+                <div className="ml-4">
+                  <p className="font-bold text-gray-800">
+                    Thanh toán trực tuyến qua cổng VNPAY (QR / Banking)
+                  </p>
+
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Quét mã QR bằng ứng dụng ngân hàng để thanh toán tự động
+                    khớp đơn an toàn
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================
+            ORDER SUMMARY
+        ========================================================= */}
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24 text-left">
+          <h2 className="text-xl font-black flex items-center text-gray-800 mb-4 uppercase tracking-wider border-b border-gray-50 pb-3">
+            <ShoppingBag className="w-5 h-5 text-primary mr-2" />
+            Tóm tắt đơn hàng
+          </h2>
+
+          <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto mb-4 pr-1 scrollbar-thin">
+            {itemDtoList.map((item) => (
+              <CheckoutItemRow key={item.id} item={item} />
+            ))}
+          </div>
+
+          <div className="border-t border-gray-100 pt-4 space-y-2 mb-6">
+            <div className="flex justify-between text-sm text-gray-500 font-bold">
+              <span>Tạm tính</span>
+
+              <span className="text-gray-700">{formatPrice(totalAmount)}</span>
+            </div>
+
+            <div className="flex justify-between text-sm text-gray-500 font-bold">
+              <span>Phí vận chuyển</span>
+
+              <span className="text-emerald-600 font-bold">Miễn phí</span>
+            </div>
+
+            <div className="flex justify-between items-center text-base font-bold text-gray-800 border-t border-gray-100 pt-3 mt-1">
+              <span className="text-sm text-gray-600 font-bold">Tổng cộng</span>
+
+              <span className="text-2xl text-orange-500 font-black">
+                {formatPrice(totalAmount)}
+              </span>
+            </div>
+          </div>
+
+          <Button
+            className="w-full py-4 text-sm font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-500/10"
+            onClick={handleVerifyOrderClick}
+            disabled={isSubmitting || itemDtoList.length === 0}
+          >
+            {isSubmitting ? "Đang xử lý đơn hàng..." : "Xác nhận đặt đơn"}
+          </Button>
+        </div>
+      </div>
+
+      {/* ===========================================================
+          RECOMMENDATION
+      =========================================================== */}
+
+      <RecommendedProducts currentCartIds={currentCartProductIds} />
+
+      {/* ===========================================================
+          CONFIRM ORDER OVERLAY
+      =========================================================== */}
+
+      {showConfirmOverlay && selectedAddress && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl relative border border-gray-100 animate-in fade-in zoom-in-95 duration-200 text-left">
+            <div className="flex items-center gap-2 text-amber-500 font-black border-b border-gray-100 pb-3 mb-4">
+              <AlertTriangle size={20} />
+
+              <span className="uppercase text-sm tracking-wider text-gray-800">
+                Xác nhận thông tin mua hàng
+              </span>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <p className="text-xs text-gray-400 font-medium">
+                Vui lòng rà soát chính xác địa chỉ và phương thức thanh toán
+                trước khi hệ thống tạo hóa đơn giao hàng.
+              </p>
+
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-gray-150 space-y-1">
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Địa chỉ giao hàng:
+                </div>
+
+                <div className="font-bold text-gray-800 text-sm">
+                  {getAddressName(selectedAddress)} —{" "}
+                  {getAddressPhone(selectedAddress)}
+                </div>
+
+                <div className="text-xs text-gray-500 leading-relaxed font-medium mt-0.5">
+                  {getAddressFullText(selectedAddress)}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 p-3 rounded-xl border border-gray-150">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Hình thức:
+                  </div>
+
+                  <div className="text-xs font-black text-gray-700 mt-1">
+                    {paymentMethod === "COD"
+                      ? "Thanh toán COD"
+                      : "Cổng trực tuyến VNPAY"}
+                  </div>
+                </div>
+
+                <div className="bg-orange-50/60 p-3 rounded-xl border border-orange-100">
+                  <div className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">
+                    Tổng số tiền:
+                  </div>
+
+                  <div className="text-base font-black text-orange-600 mt-0.5">
+                    {formatPrice(totalAmount)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmOverlay(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs rounded-xl transition-colors cursor-pointer border-none"
+              >
+                Thay đổi lại
+              </button>
+
+              <button
+                onClick={handleExecuteOrder}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer border-none shadow-md shadow-blue-500/10 flex items-center justify-center gap-1"
+              >
+                <ShieldCheck size={14} />
+                Tôi xác nhận đặt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===========================================================
+          ADDRESS OVERLAY
+      =========================================================== */}
+
+      {showAddressOverlay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+          <div className="no-scrollbar bg-white rounded-3xl w-full max-w-xl p-6 shadow-xl relative max-h-[85vh] overflow-y-auto m-4 animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => {
+                setShowAddressOverlay(false);
+                setShowAddForm(false);
+                setEditingAddress(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors border-none bg-transparent cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {!showAddForm ? (
+              <>
+                <h3 className="text-lg font-black text-gray-800 mb-4 uppercase tracking-tight text-left">
+                  Danh sách địa chỉ của bạn
+                </h3>
+
+                <div className="space-y-3 mb-6">
+                  {addresses.map((addr) => (
+                    <div
+                      key={addr.id}
+                      className={`p-4 rounded-xl border text-left relative flex justify-between items-center transition-all ${
+                        String(selectedAddress?.id) === String(addr.id)
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div
+                        className="cursor-pointer flex-1 pr-12"
+                        onClick={() => {
+                          setSelectedAddress(addr);
+                          setShowAddressOverlay(false);
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-gray-800">
+                            {getAddressName(addr)}
+                          </span>
+
+                          <span className="text-gray-400">|</span>
+
+                          <span className="text-gray-500 text-xs font-bold">
+                            {getAddressPhone(addr)}
+                          </span>
+
+                          {addr.isDefault && (
+                            <Badge
+                              variant="success"
+                              className="text-xs font-bold rounded-md"
+                            >
+                              Mặc định
+                            </Badge>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                          {getAddressFullText(addr)}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          setEditingAddress(addr);
+
+                          setShowAddForm(true);
+                        }}
+                        className="text-xs font-black text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition-colors flex-shrink-0 cursor-pointer border-none"
+                      >
+                        Sửa
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full border-dashed flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm"
+                  onClick={() => {
+                    setEditingAddress(null);
+                    setShowAddForm(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Thêm địa chỉ nhận hàng mới
+                </Button>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-black text-gray-800 mb-1 text-left uppercase tracking-tight">
+                  {editingAddress ? "Chỉnh sửa địa chỉ" : "Thêm địa chỉ mới"}
+                </h3>
+
+                <p className="text-xs text-gray-400 mb-4 font-medium text-left">
+                  Vui lòng điền thông tin biểu mẫu chính xác bên dưới để giao
+                  hàng thuận tiện hơn.
+                </p>
+
+                <div className="border border-gray-100 p-4 rounded-2xl bg-slate-50/50">
+                  <AddressForm
+                    initialData={editingAddress}
+                    onSuccess={handleAddressSubmitSuccess}
+                    onCancel={() => {
+                      setShowAddForm(false);
+                      setEditingAddress(null);
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===========================================================
+          VNPAY PAYMENT MODAL
+      =========================================================== */}
+
+      {showPaymentModal && createdOrderData && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            clearCart();
+
+            navigate("/order-success", {
+              state: {
+                order: createdOrderData,
+              },
+            });
+          }}
+          orderData={createdOrderData}
+          onPaymentSuccess={() => {
+            setShowPaymentModal(false);
+            clearCart();
+
+            navigate("/order-success", {
+              state: {
+                order: {
+                  ...createdOrderData,
+                  isPaid: true,
+                },
+              },
+            });
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Checkout;
