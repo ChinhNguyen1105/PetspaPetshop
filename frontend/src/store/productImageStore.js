@@ -13,37 +13,26 @@ export const useProductImageStore = create((set, get) => ({
   */
   fetchImages: async (productId) => {
     try {
-      set({
-        loading: true,
-        error: null,
-      });
+      set({ loading: true, error: null });
 
       const res =
-        await ProductImageService.getProductImages(
-          productId
-        );
+        await ProductImageService.getProductImages(productId);
 
       const imageList =
-        res?.data || [];
-
-      console.log(
-        "response img",
-        imageList
-      );
+        res?.body?.data ??
+        res?.data?.data ??
+        [];
 
       set((state) => ({
         imagesByProductId: {
           ...state.imagesByProductId,
-          [productId]: imageList,
+          [String(productId)]: imageList,
         },
       }));
 
       return imageList;
     } catch (err) {
-      console.error(
-        "Fetch images error:",
-        err
-      );
+      console.error("Fetch images error:", err);
 
       set({
         error:
@@ -54,9 +43,7 @@ export const useProductImageStore = create((set, get) => ({
 
       throw err;
     } finally {
-      set({
-        loading: false,
-      });
+      set({ loading: false });
     }
   },
 
@@ -65,146 +52,174 @@ export const useProductImageStore = create((set, get) => ({
   | GET IMAGES OF PRODUCT
   |--------------------------------------------------------------------------
   */
-  getImagesByProductId: (productId) => get().imagesByProductId[productId] || [],
+  getImagesByProductId: (productId) =>
+    get().imagesByProductId[String(productId)] || [],
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPLOAD IMAGES
-    |--------------------------------------------------------------------------
-    */
-    uploadImages: async (
-      productId,
-      files
-    ) => {
-      try {
-        set({
-          loading: true,
-          error: null,
-        });
+  /*
+  |--------------------------------------------------------------------------
+  | GET MAIN IMAGE
+  |--------------------------------------------------------------------------
+  */
+  getMainImage: (productId) => {
+    const images =
+      get().imagesByProductId[String(productId)] || [];
 
-        const res =
-          await ProductImageService.addImages(
-            productId,
-            files
-          );
+    return (
+      images.find(
+        (img) => img.isThumbnail || img.isMain
+      ) ||
+      images[0] ||
+      null
+    );
+  },
 
-        // refresh lại ảnh
-        await get().fetchImages(
-          productId
-        );
+  /*
+  |--------------------------------------------------------------------------
+  | UPLOAD IMAGES
+  |--------------------------------------------------------------------------
+  */
+  uploadImages: async (productId, files) => {
+    try {
+      set({ loading: true, error: null });
 
-        return res;
-      } catch (err) {
-        console.error(
-          "Upload image error:",
-          err
-        );
+      const res =
+        await ProductImageService.addImages(productId, files);
 
-        set({
-          error:
-            err?.response?.data
-              ?.message ||
-            err?.message ||
-            "Upload images failed",
-        });
+      await get().fetchImages(productId);
 
-        throw err;
-      } finally {
-        set({
-          loading: false,
-        });
-      }
-    },
+      return res;
+    } catch (err) {
+      console.error("Upload image error:", err);
 
-    /*
-    |--------------------------------------------------------------------------
-    | DELETE IMAGE
-    |--------------------------------------------------------------------------
-    */
- /*
-    |--------------------------------------------------------------------------
-    | DELETE IMAGE
-    |--------------------------------------------------------------------------
-    */
-    deleteImage: async (imageId) => {
-      try {
-        const res = await ProductImageService.deleteImage(imageId);
-
-        // Cập nhật đồng nhất với cấu trúc Map imagesByProductId
-        set((state) => {
-          const updatedMap = { ...state.imagesByProductId };
-          
-          // Duyệt qua từng productId trong Map để lọc bỏ ảnh vừa xóa
-          Object.keys(updatedMap).forEach((productId) => {
-            if (Array.isArray(updatedMap[productId])) {
-              updatedMap[productId] = updatedMap[productId].filter(
-                (img) => img.id !== imageId
-              );
-            }
-          });
-
-          return { imagesByProductId: updatedMap };
-        });
-
-        return res;
-      } catch (err) {
-        console.error("Delete image error:", err);
-        throw err;
-      }
-    },
-
-    /*
-    |--------------------------------------------------------------------------
-    | SET THUMBNAIL
-    |--------------------------------------------------------------------------
-    */
-    setMainImage: async (productId, imageId) => {
-      try {
-        const res = await ProductImageService.setMainImage(productId, imageId);
-
-        // Cập nhật đồng nhất với cấu trúc Map imagesByProductId theo đúng productId truyền vào
-        set((state) => {
-          const updatedMap = { ...state.imagesByProductId };
-          const productTargetId = String(productId); // Đảm bảo trùng kiểu Key (String) của Object
-
-          if (Array.isArray(updatedMap[productTargetId])) {
-            updatedMap[productTargetId] = updatedMap[productTargetId].map((img) => ({
-              ...img,
-              isMain: img.id === imageId,
-              isThumbnail: img.id === imageId, // Đồng bộ cả 2 cờ hiển thị tránh sót logic
-            }));
-          }
-
-          return { imagesByProductId: updatedMap };
-        });
-
-        return res;
-      } catch (err) {
-        console.error("Set thumbnail error:", err);
-        throw err;
-      }
-    },
-    /*
-    |--------------------------------------------------------------------------
-    | HELPERS
-    |--------------------------------------------------------------------------
-    */
-    getMainImage: () => {
-      const images =
-        get().images;
-
-      return (
-        images.find(
-          (img) =>
-            img.isThumbnail ||
-            img.isMain
-        ) || null
-      );
-    },
-
-    clearImages: () =>
       set({
-        images: [],
-        error: null,
-      }),
-  }));
+        error:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Upload images failed",
+      });
+
+      throw err;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | DELETE IMAGE
+  |--------------------------------------------------------------------------
+  */
+  deleteImage: async (imageId) => {
+    try {
+      const res =
+        await ProductImageService.deleteImage(imageId);
+
+      set((state) => {
+        const updatedMap = {};
+
+        Object.entries(state.imagesByProductId).forEach(
+          ([productId, images]) => {
+            updatedMap[productId] = images.filter(
+              (img) => String(img.id) !== String(imageId)
+            );
+          }
+        );
+
+        return {
+          imagesByProductId: updatedMap,
+        };
+      });
+
+      return res;
+    } catch (err) {
+      console.error("Delete image error:", err);
+      throw err;
+    }
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | SET THUMBNAIL / MAIN IMAGE
+  |--------------------------------------------------------------------------
+  */
+  setMainImage: async (productId, imageId) => {
+    try {
+      const res =
+        await ProductImageService.setMainImage(
+          productId,
+          imageId
+        );
+
+      set((state) => {
+        const key = String(productId);
+        const images = state.imagesByProductId[key];
+
+        if (!Array.isArray(images)) {
+          return {};
+        }
+
+        return {
+          imagesByProductId: {
+            ...state.imagesByProductId,
+            [key]: images.map((img) => ({
+              ...img,
+              isMain:
+                String(img.id) === String(imageId),
+              isThumbnail:
+                String(img.id) === String(imageId),
+            })),
+          },
+        };
+      });
+
+      return res;
+    } catch (err) {
+      console.error("Set thumbnail error:", err);
+      throw err;
+    }
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | DOWNLOAD IMAGE AS BLOB
+  |--------------------------------------------------------------------------
+  */
+  downloadImage: async (imageUrl) => {
+    if (!imageUrl) {
+      throw new Error("Không có đường dẫn ảnh sản phẩm.");
+    }
+
+    try {
+      const blob =
+        await ProductImageService.downloadImage(imageUrl);
+
+      if (!(blob instanceof Blob) || blob.size === 0) {
+        throw new Error("Dữ liệu ảnh sản phẩm không hợp lệ.");
+      }
+
+      return blob;
+    } catch (err) {
+      console.error("Lỗi tải ảnh sản phẩm:", err);
+
+      set({
+        error:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Không thể tải ảnh sản phẩm.",
+      });
+
+      throw err;
+    }
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | CLEAR IMAGES
+  |--------------------------------------------------------------------------
+  */
+  clearImages: () =>
+    set({
+      imagesByProductId: {},
+      error: null,
+    }),
+}));

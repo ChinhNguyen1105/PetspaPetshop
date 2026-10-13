@@ -11,6 +11,7 @@ import {
   Clock,
   DollarSign,
   AlertCircle,
+  Star, // Thêm import Star
 } from "lucide-react";
 import Loading from "../../../components/common/Loading";
 import { formatPrice } from "../../../utils/formatPrice";
@@ -24,9 +25,6 @@ import { useServiceStore } from "../../../store/serviceStore";
 import { useCategoryStore } from "../../../store/categoryStore";
 import ServiceFormAdmin from "../../../components/form/ServiceFormAdmin";
 
-// ==========================================
-// MAIN MANAGEMENT COMPONENT
-// ==========================================
 const ServiceManagement = () => {
   const services = useServiceStore((state) => state.services) || [];
   const meta = useServiceStore((state) => state.meta);
@@ -173,7 +171,7 @@ const ServiceManagement = () => {
         const res = await createService(formOutputData);
 
         if (res?.success !== false) {
-          showToast("Thêm gói dịch vụ mới thành công! 🎉", "success");
+          showToast("Thêm gói dịch vụ mới thành công!", "success");
           setSearchTerm("");
           setSelectedCategory(0);
           setCurrentPage(1);
@@ -193,7 +191,7 @@ const ServiceManagement = () => {
           }));
 
           showToast(
-            `Đã lưu thay đổi cho gói dịch vụ #${selectedService.id} thành công! 💾`,
+            `Đã lưu thay đổi cho gói dịch vụ #${selectedService.id} thành công!`,
             "success",
           );
 
@@ -245,7 +243,7 @@ const ServiceManagement = () => {
 
       if (res?.success !== false) {
         showToast(
-          "Đã gỡ bỏ gói dịch vụ thành công khỏi hệ thống! 🗑️",
+          "Đã gỡ bỏ gói dịch vụ thành công khỏi hệ thống!",
           "success",
         );
 
@@ -301,6 +299,12 @@ const ServiceManagement = () => {
       </div>
     );
   }
+
+  // Helper function lấy URL Thumbnail cho View Modal
+  const viewThumbnailUrl =
+    selectedService?.serviceImages?.find((img) => img.isThumbnail)?.imageUrl ||
+    selectedService?.serviceImages?.[0]?.imageUrl ||
+    "https://placehold.co/400x400?text=No+Image";
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -383,87 +387,104 @@ const ServiceManagement = () => {
                   </td>
                 </tr>
               ) : (
-                services.map((service) => (
-                  <tr
-                    key={service.id}
-                    className="hover:bg-gray-50/50 transition-colors group"
-                  >
-                    <td className="p-4 font-mono font-bold text-gray-400">
-                      #{service.id}
-                    </td>
+                services.map((service) => {
+                  // Lấy Thumbnail cho danh sách
+                  const thumbnailUrl =
+                    service.serviceImages?.find((img) => img.isThumbnail)
+                      ?.imageUrl ||
+                    service.serviceImages?.[0]?.imageUrl ||
+                    "https://placehold.co/100x100?text=No+Image";
 
-                    <td className="p-4 max-w-sm">
-                      <div className="font-bold text-gray-800 text-sm group-hover:text-orange-500 transition-colors">
-                        {service.name}
-                      </div>
+                  return (
+                    <tr
+                      key={service.id}
+                      className="hover:bg-gray-50/50 transition-colors group"
+                    >
+                      <td className="p-4 font-mono font-bold text-gray-400">
+                        #{service.id}
+                      </td>
 
-                      <div
-                        className="text-xs text-gray-400 truncate mt-0.5"
-                        title={service.description}
-                      >
-                        {service.description || "Chưa cập nhật mô tả ngắn."}
-                      </div>
+                      <td className="p-4 max-w-sm">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={thumbnailUrl}
+                            alt={service.name}
+                            className="w-12 h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                          />
+                          <div>
+                            <div className="font-bold text-gray-800 text-sm group-hover:text-orange-500 transition-colors">
+                              {service.name}
+                            </div>
+                            <div
+                              className="text-xs text-gray-400 truncate mt-0.5"
+                              title={service.description}
+                            >
+                              {service.description ||
+                                "Chưa cập nhật mô tả ngắn."}
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-1">
+                              Ngày tạo: {formatDate(service.createdDate)}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
 
-                      <div className="text-[10px] text-gray-400 mt-1">
-                        Ngày tạo: {formatDate(service.createdDate)}
-                      </div>
-                    </td>
+                      <td className="p-4">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
+                          <Layers size={12} />
+                          {service.categoryName || "Mặc định"}
+                        </span>
+                      </td>
 
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
-                        <Layers size={12} />
-                        {service.categoryName || "Mặc định"}
-                      </span>
-                    </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-1 text-xs font-medium text-gray-600">
+                          <Clock size={14} className="text-gray-400" />
+                          {service.durationMin} phút
+                        </div>
+                      </td>
 
-                    <td className="p-4">
-                      <div className="flex items-center gap-1 text-xs font-medium text-gray-600">
-                        <Clock size={14} className="text-gray-400" />
-                        {service.durationMin} phút
-                      </div>
-                    </td>
+                      <td className="p-4">
+                        <div className="font-black text-gray-900 text-sm flex items-center">
+                          <DollarSign
+                            size={14}
+                            className="text-gray-400 shrink-0"
+                          />
+                          {formatPrice(service.basePrice)}
+                        </div>
+                      </td>
 
-                    <td className="p-4">
-                      <div className="font-black text-gray-900 text-sm flex items-center">
-                        <DollarSign
-                          size={14}
-                          className="text-gray-400 shrink-0"
-                        />
-                        {formatPrice(service.basePrice)}
-                      </div>
-                    </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenViewModal(service)}
+                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl border border-transparent transition-all"
+                            title="Xem chi tiết"
+                          >
+                            <Eye size={16} />
+                          </button>
 
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleOpenViewModal(service)}
-                          className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl border border-transparent transition-all"
-                          title="Xem chi tiết"
-                        >
-                          <Eye size={16} />
-                        </button>
+                          <button
+                            onClick={() => handleOpenEditModal(service)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl border border-transparent hover:border-blue-200 transition-all"
+                            title="Sửa thông tin"
+                          >
+                            <Edit2 size={16} />
+                          </button>
 
-                        <button
-                          onClick={() => handleOpenEditModal(service)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl border border-transparent hover:border-blue-200 transition-all"
-                          title="Sửa thông tin"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-
-                        <button
-                          onClick={() =>
-                            handleConfirmDelete(service.id, service.name)
-                          }
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 transition-all"
-                          title="Xóa dịch vụ"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <button
+                            onClick={() =>
+                              handleConfirmDelete(service.id, service.name)
+                            }
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 transition-all"
+                            title="Xóa dịch vụ"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -494,25 +515,35 @@ const ServiceManagement = () => {
       >
         {modalType === "VIEW" ? (
           <div className="space-y-4 text-sm text-gray-700">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <span className="block font-semibold text-gray-500 text-xs uppercase">
+            {/* Header: Ảnh Thumbnail & Tên, Đánh giá */}
+            <div className="flex gap-4 items-start border-b border-gray-100 pb-4 mb-4">
+              <img
+                src={viewThumbnailUrl}
+                alt={selectedService?.name}
+                className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl object-cover border border-gray-200 shadow-sm flex-shrink-0"
+              />
+              <div className="flex-1">
+                <span className="block font-semibold text-gray-500 text-xs uppercase mb-1">
                   Tên dịch vụ
                 </span>
-
-                <span className="text-base font-bold text-gray-900">
+                <span className="text-xl sm:text-2xl font-bold text-gray-900 block mb-3">
                   {selectedService?.name}
                 </span>
-              </div>
 
-              <div>
-                <span className="block font-semibold text-gray-500 text-xs uppercase">
-                  Danh mục
-                </span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="inline-block px-2.5 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg border border-blue-100">
+                    {selectedService?.categoryName || "Mặc định"}
+                  </span>
 
-                <span className="inline-block mt-1 px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-bold rounded">
-                  {selectedService?.categoryName || "Mặc định"}
-                </span>
+                  {/* Badge Đánh giá */}
+                  <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg text-xs font-bold border border-amber-100">
+                    <Star size={14} fill="currentColor" />
+                    <span>{selectedService?.averageRating || 0}</span>
+                    <span className="text-amber-500 font-medium">
+                      ({selectedService?.totalReviews || 0} đánh giá)
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -520,18 +551,16 @@ const ServiceManagement = () => {
               <span className="block font-semibold text-gray-500 text-xs uppercase">
                 Mô tả dịch vụ
               </span>
-
               <p className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-1 whitespace-pre-line text-gray-600">
                 {selectedService?.description || "Không có mô tả."}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 border-t pt-3">
+            <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-3">
               <div>
                 <span className="block font-semibold text-gray-500 text-xs uppercase">
                   Giá gốc niêm yết
                 </span>
-
                 <span className="text-lg font-black text-gray-900">
                   {formatPrice(selectedService?.basePrice)}
                 </span>
@@ -541,7 +570,6 @@ const ServiceManagement = () => {
                 <span className="block font-semibold text-gray-500 text-xs uppercase">
                   Thời lượng dự kiến
                 </span>
-
                 <span className="text-base font-semibold text-gray-800">
                   {selectedService?.durationMin} phút
                 </span>

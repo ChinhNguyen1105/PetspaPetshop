@@ -20,10 +20,10 @@ export const usePetServiceImageStore =
           await PetServiceImageService.getServiceImages(
             serviceId
           );
-
+        
         set({
           images:
-            res?.data || [],
+            res?.body?.data || [],
         });
 
         return res;

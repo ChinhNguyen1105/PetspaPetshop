@@ -27,5 +27,5 @@ export const ROLE_OPTIONS = [
   { value: 'ALL', label: 'Tất cả vai trò' },
   { value: 'ADMIN', label: 'Quản trị viên' },
   { value: 'STAFF', label: 'Nhân viên' },
-  { value: 'CUSTOMER', label: 'Khách hàng' } // Hoặc 'USER' tùy thuộc vào database của bạn
+  { value: 'USER', label: 'Khách hàng' } // Hoặc 'USER' tùy thuộc vào database của bạn
 ];

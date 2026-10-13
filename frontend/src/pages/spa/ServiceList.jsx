@@ -10,21 +10,17 @@ import ServiceCard from "../../components/ui/ServiceCard";
 import Pagination from "../../components/common/Pagination";
 
 const ServiceList = () => {
-  const [filterCategoryId, setFilterCategoryId] = useState(null);
-
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const [currentPage, setCurrentPage] = useState(1);
-
   const PAGE_SIZE = 10;
+
+  const [filterCategoryId, setFilterCategoryId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const {
     services,
     meta,
     loading: loadingServices,
     fetchServices,
-    searchServices,
-    fetchServicesByCategory,
   } = useServiceStore();
 
   const {
@@ -33,14 +29,12 @@ const ServiceList = () => {
     fetchCategories,
   } = useCategoryStore();
 
-  // ───────────────── FETCH CATEGORIES ─────────────────
-
+  // FETCH CATEGORIES
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
 
-  // ───────────────── FETCH SERVICES ─────────────────
-
+  // FETCH SERVICES USING QUERY FILTER
   useEffect(() => {
     const loadServices = async () => {
       const params = {
@@ -48,83 +42,62 @@ const ServiceList = () => {
         pageSize: PAGE_SIZE,
       };
 
-      // Có category
-      if (filterCategoryId !== null) {
-        await fetchServicesByCategory(filterCategoryId, params);
+      const filters = [];
 
-        return;
+      // Filter theo danh mục
+      if (filterCategoryId !== null && Number(filterCategoryId) !== 0) {
+        filters.push(`category.id:${Number(filterCategoryId)}`);
       }
 
-      // Có keyword
+      // Filter theo từ khóa
       if (searchTerm.trim()) {
-        await searchServices(searchTerm.trim(), params);
-
-        return;
+        filters.push(`name~*${searchTerm.trim()}*`);
       }
 
-      // Tất cả services
+      // Gộp điều kiện vào query filter
+      if (filters.length > 0) {
+        params.filter = filters.join(",");
+      }
+
+      console.log("Service query params:", params);
+
       await fetchServices(params);
     };
 
     loadServices();
-  }, [
-    currentPage,
-    filterCategoryId,
-    searchTerm,
-    fetchServices,
-    fetchServicesByCategory,
-    searchServices,
-  ]);
+  }, [currentPage, filterCategoryId, searchTerm, fetchServices]);
 
-  // ───────────────── FILTER CATEGORIES ─────────────────
-
+  // FILTER SERVICE CATEGORIES
   const filteredCategories = useMemo(() => {
     return Array.isArray(categories)
-      ? categories.filter((cat) => cat && cat.categoryType === "SERVICE")
+      ? categories.filter(
+          (category) => category && category.categoryType === "SERVICE",
+        )
       : [];
   }, [categories]);
 
-  // ───────────────── SELECTED CATEGORY ─────────────────
-
-  const selectedCategory = useMemo(() => {
-    if (filterCategoryId === null) {
-      return null;
-    }
-
-    return filteredCategories.find(
-      (cat) => Number(cat.id) === Number(filterCategoryId),
-    );
-  }, [filteredCategories, filterCategoryId]);
-
-  // ───────────────── CURRENT SERVICES ─────────────────
-
+  // CURRENT SERVICES
   const currentServices = useMemo(() => {
     return Array.isArray(services) ? services.filter(Boolean) : [];
   }, [services]);
 
-  // ───────────────── PAGINATION ─────────────────
-
+  // PAGINATION
   const totalPages = Number(meta?.pages) || 0;
+  const displayedPage = Number(meta?.page) || currentPage;
 
-  // ───────────────── CATEGORY CHANGE ─────────────────
-
+  // CATEGORY CHANGE
   const handleCategoryChange = (id) => {
-    setCurrentPage(1);
-
     setFilterCategoryId(id === null ? null : Number(id));
-  };
-
-  // ───────────────── SEARCH CHANGE ─────────────────
-
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-
-    setSearchTerm(value);
     setCurrentPage(1);
   };
 
-  // ───────────────── PAGE CHANGE ─────────────────
+  // SEARCH CHANGE
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
 
+  // PAGE CHANGE
   const handlePageChange = (page) => {
     if (page < 1 || (totalPages > 0 && page > totalPages)) {
       return;
@@ -138,8 +111,7 @@ const ServiceList = () => {
     });
   };
 
-  // ───────────────── LOADING ─────────────────
-
+  // LOADING
   const isFirstLoad =
     loadingCategories || (loadingServices && currentServices.length === 0);
 
@@ -154,8 +126,7 @@ const ServiceList = () => {
   return (
     <div className="min-h-screen bg-gray-50/50 pt-10 pb-20 text-left">
       <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
-        {/* ───────────────── HEADER ───────────────── */}
-
+        {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div>
             <h1 className="text-4xl font-black text-pet-blue mb-2">
@@ -167,10 +138,10 @@ const ServiceList = () => {
             </p>
           </div>
 
-          {/* ───────────────── CATEGORY FILTER ───────────────── */}
-
+          {/* CATEGORY FILTER */}
           <div className="flex flex-wrap gap-3 items-center">
             <button
+              type="button"
               onClick={() => handleCategoryChange(null)}
               className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer border outline-none ${
                 filterCategoryId === null
@@ -181,10 +152,9 @@ const ServiceList = () => {
               Tất Cả
             </button>
 
-            {filteredCategories.map((cat) => {
-              const categoryName = cat.name;
-
-              const currentId = Number(cat.id);
+            {filteredCategories.map((category) => {
+              const categoryName = category.name;
+              const categoryId = Number(category.id);
 
               if (!categoryName) {
                 return null;
@@ -192,10 +162,11 @@ const ServiceList = () => {
 
               return (
                 <button
-                  key={currentId}
-                  onClick={() => handleCategoryChange(currentId)}
+                  key={categoryId}
+                  type="button"
+                  onClick={() => handleCategoryChange(categoryId)}
                   className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer border outline-none ${
-                    Number(filterCategoryId) === currentId
+                    Number(filterCategoryId) === categoryId
                       ? "bg-pet-blue text-white border-pet-blue shadow-lg shadow-blue-500/10"
                       : "bg-white text-gray-500 hover:bg-gray-100 border-gray-200"
                   }`}
@@ -207,8 +178,7 @@ const ServiceList = () => {
           </div>
         </div>
 
-        {/* ───────────────── TOOLBAR ───────────────── */}
-
+        {/* TOOLBAR */}
         <div className="bg-white p-4 rounded-2xl border border-gray-100 mb-8 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-sm">
           <div className="relative w-full sm:w-96">
             <Search
@@ -225,14 +195,16 @@ const ServiceList = () => {
             />
           </div>
 
-          <button className="flex items-center gap-2 text-gray-600 font-black text-xs uppercase tracking-wider hover:text-pet-blue transition-colors cursor-pointer bg-transparent border-none outline-none">
+          <button
+            type="button"
+            className="flex items-center gap-2 text-gray-600 font-black text-xs uppercase tracking-wider hover:text-pet-blue transition-colors cursor-pointer bg-transparent border-none outline-none"
+          >
             <SlidersHorizontal size={16} />
             Sắp xếp theo: Phổ biến nhất
           </button>
         </div>
 
-        {/* ───────────────── RESULT INFO ───────────────── */}
-
+        {/* RESULT INFO */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-gray-500 font-medium">
             {meta?.total
@@ -243,61 +215,55 @@ const ServiceList = () => {
           {totalPages > 0 && (
             <p className="text-sm text-gray-400">
               Trang{" "}
-              <span className="font-bold text-gray-600">
-                {meta?.page || currentPage}
-              </span>{" "}
-              / {totalPages}
+              <span className="font-bold text-gray-600">{displayedPage}</span> /{" "}
+              {totalPages}
             </p>
           )}
         </div>
 
-        {/* ───────────────── LOADING WHEN CHANGING PAGE ───────────────── */}
-
-        {loadingServices ? (
-          <div className="py-20 flex justify-center">
-            <Loading />
-          </div>
-        ) : currentServices.length > 0 ? (
-          <>
-            {/* ───────────────── SERVICE GRID ───────────────── */}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
-              {currentServices.map((service) => (
-                <ServiceCard key={service.id} service={service} />
-              ))}
+        {/* SERVICE GRID */}
+        <div className="relative">
+          {loadingServices ? (
+            <div className="py-20 flex justify-center">
+              <Loading />
             </div>
-
-            {/* ───────────────── PAGINATION ───────────────── */}
-
-            {totalPages > 1 && (
-              <div className="mt-12 flex justify-center">
-                <Pagination
-                  currentPage={meta?.page || currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
+          ) : currentServices.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+                {currentServices.map((service) => (
+                  <ServiceCard key={service.id} service={service} />
+                ))}
               </div>
-            )}
-          </>
-        ) : (
-          /* ───────────────── EMPTY ───────────────── */
 
-          <div className="text-center py-24 bg-white rounded-[32px] border border-gray-100 shadow-sm max-w-xl mx-auto flex flex-col items-center justify-center p-6">
-            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 mb-4">
-              <Layers size={22} />
+              {/* PAGINATION */}
+              {totalPages > 1 && (
+                <div className="mt-12 flex justify-center">
+                  <Pagination
+                    currentPage={displayedPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            /* EMPTY STATE */
+            <div className="text-center py-24 bg-white rounded-[32px] border border-gray-100 shadow-sm max-w-xl mx-auto flex flex-col items-center justify-center p-6">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                <Layers size={22} />
+              </div>
+
+              <h3 className="text-gray-700 font-black text-base mb-1">
+                Không tìm thấy kết quả
+              </h3>
+
+              <p className="text-gray-400 font-medium text-sm">
+                Không tìm thấy dịch vụ nào phù hợp với danh mục hoặc từ khóa "
+                {searchTerm}".
+              </p>
             </div>
-
-            <h3 className="text-gray-700 font-black text-base mb-1">
-              Không tìm thấy kết quả
-            </h3>
-
-            <p className="text-gray-400 font-medium text-sm">
-              Không tìm thấy dịch vụ nào phù hợp với danh mục hoặc từ khóa "
-              {searchTerm}
-              ".
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,370 +1,507 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Camera, UploadCloud, X, Eye, EyeOff } from "lucide-react";
 import { useRoleStore } from "../../store/roleStore";
-import { useUserStore } from "../../store/userStore";
+import UserAvatar from "../../pages/admin/users/UserAvatar";
 
-const UserFormAdmin = ({ initialData, onSubmit, onClose, onUploadAvatar }) => {
-  const { fetchUserById } = useUserStore();
-  const isEditMode = !!initialData?.id;
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
-  // Lấy dữ liệu và hành động từ useRoleStore
-  const { roles, fetchRoles, loading: loadingRoles } = useRoleStore();
+const initialFormState = {
+  name: "",
+  email: "",
+  avatar: "",
+  roleId: "",
+  gender: "",
+  dateOfBirth: "",
+  password: "",
+  rawFile: null,
+};
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    avatar: "", // Sẽ lưu URL ảnh (được map từ avatarUrl hoặc avatar)
-    roleId: "",
-    gender: "",
-    dateOfBirth: "",
-    password: "",
-  });
+const UserFormAdmin = ({
+  initialData,
+  onSubmit,
+  onUploadAvatar,
+  onCancel,
+  isSubmitting = false,
+}) => {
+  const { roles, fetchRoles } = useRoleStore();
 
+  const [formData, setFormData] = useState(initialFormState);
   const [errors, setErrors] = useState({});
+  const [previewUrl, setPreviewUrl] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // 1. Gọi API lấy danh sách roles khi component mount
+  const isEditMode = Boolean(initialData?.id);
+  const isBusy = isSubmitting || submitting;
+
+  const availableRoles = useMemo(
+    () => (Array.isArray(roles) ? roles : []),
+    [roles],
+  );
+
   useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
+    let active = true;
 
-  // 2. Đồng bộ dữ liệu khi mở form sửa và ưu tiên lấy avatarUrl từ hàm fetchUserById
-  useEffect(() => {
-    if (initialData) {
-      let formattedDate = "";
-      if (initialData.dateOfBirth && initialData.dateOfBirth !== "undefined") {
-        formattedDate = initialData.dateOfBirth.split("T")[0];
-      }
+    const loadRoles = async () => {
+      setLoadingRoles(true);
 
-      let currentRoleId = initialData.roleId || "";
-
-      if (!currentRoleId && initialData.role) {
-        if (typeof initialData.role === "object") {
-          currentRoleId = initialData.role.id;
-        } else if (roles.length > 0) {
-          const matchedRole = roles.find((r) => r.name === initialData.role);
-          if (matchedRole) currentRoleId = matchedRole.id;
+      try {
+        await fetchRoles();
+      } catch (error) {
+        console.error("Không thể tải danh sách vai trò:", error);
+      } finally {
+        if (active) {
+          setLoadingRoles(false);
         }
       }
+    };
+
+    loadRoles();
+
+    return () => {
+      active = false;
+    };
+  }, [fetchRoles]);
+
+  useEffect(() => {
+    if (!initialData) {
+      const customerRole = availableRoles.find(
+        (role) => role.name?.toUpperCase() === "CUSTOMER",
+      );
 
       setFormData({
-        name: initialData.name || "",
-        email: initialData.email || "",
-        // Ưu tiên avatarUrl từ store lấy về, fallback về avatar cũ
-        avatar: initialData.avatarUrl || initialData.avatar || "",
-        roleId: currentRoleId,
-        gender:
-          initialData.gender && initialData.gender !== "undefined"
-            ? initialData.gender
-            : "",
-        dateOfBirth: formattedDate,
-        password: "",
+        ...initialFormState,
+        roleId: customerRole ? String(customerRole.id) : "",
       });
-    }
-  }, [initialData, roles]);
 
-  // Tự động chọn vai trò đầu tiên nếu thêm mới
+      setErrors({});
+      return;
+    }
+
+    const roleId =
+      initialData.role?.id ??
+      initialData.roleId ??
+      availableRoles.find(
+        (role) =>
+          role.name?.toUpperCase() === initialData.roleName?.toUpperCase(),
+      )?.id ??
+      "";
+
+    setFormData({
+      name: initialData.name ?? "",
+      email: initialData.email ?? "",
+      avatar: initialData.avatarUrl ?? initialData.avatar ?? "",
+      roleId: roleId === "" ? "" : String(roleId),
+      gender: initialData.gender ?? "",
+      dateOfBirth: initialData.dateOfBirth
+        ? String(initialData.dateOfBirth).split("T")[0]
+        : "",
+      password: "",
+      rawFile: null,
+    });
+
+    setPreviewUrl("");
+    setErrors({});
+  }, [
+    initialData?.id,
+    initialData?.name,
+    initialData?.email,
+    initialData?.avatarUrl,
+    initialData?.avatar,
+    initialData?.role?.id,
+    initialData?.roleId,
+    initialData?.roleName,
+    initialData?.gender,
+    initialData?.dateOfBirth,
+    availableRoles,
+  ]);
+
   useEffect(() => {
-    if (!isEditMode && roles.length > 0 && !formData.roleId) {
-      const defaultRole = roles.find((r) => r.name === "CUSTOMER") || roles[0];
-      setFormData((prev) => ({ ...prev, roleId: defaultRole.id }));
+    if (!formData.rawFile) {
+      setPreviewUrl("");
+      return undefined;
     }
-  }, [roles, isEditMode, formData.roleId]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    const objectUrl = URL.createObjectURL(formData.rawFile);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [formData.rawFile]);
+
+  const updateField = (field, value) => {
+    setFormData((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+
+    setErrors((previous) => ({
+      ...previous,
+      [field]: "",
+      form: "",
+    }));
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+
+    // Cho phép chọn lại cùng một file sau khi bỏ chọn.
+    event.target.value = "";
+
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setErrors((prev) => ({
-        ...prev,
-        avatar: "Vui lòng chọn file định dạng ảnh hợp lệ!",
+      setErrors((previous) => ({
+        ...previous,
+        avatar: "Vui lòng chọn tệp hình ảnh.",
       }));
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setErrors((prev) => ({
-        ...prev,
-        avatar: "Kích thước ảnh không vượt quá 2MB",
+    if (file.size > MAX_FILE_SIZE) {
+      setErrors((previous) => ({
+        ...previous,
+        avatar: "Ảnh đại diện không được vượt quá 2 MB.",
       }));
       return;
     }
 
-    if (isEditMode && onUploadAvatar) {
-      try {
-        setIsUploading(true);
-        setErrors((prev) => ({ ...prev, avatar: "" }));
+    setFormData((previous) => ({
+      ...previous,
+      rawFile: file,
+    }));
 
-        const response = await onUploadAvatar(initialData.id, file);
-
-        if (response?.status === "SUCCESS") {
-          const refreshedUser = await fetchUserById(initialData.id);
-
-          setFormData((prev) => ({
-            ...prev,
-            avatar: refreshedUser.data.avatarUrl,
-          }));
-        } else {
-          setErrors((prev) => ({
-            ...prev,
-            avatar: response?.message || "Upload ảnh thất bại.",
-          }));
-        }
-        console.log("UPLOAD RESPONSE:", response);
-        console.log("TYPE:", typeof response.data);
-      } catch (err) {
-        console.error("Lỗi upload avatar trực tiếp từ form:", err);
-        setErrors((prev) => ({
-          ...prev,
-          avatar: "Gặp lỗi hệ thống khi tải ảnh.",
-        }));
-      } finally {
-        setIsUploading(false);
-      }
-    } else {
-      const previewUrl = URL.createObjectURL(file);
-      setFormData((prev) => ({ ...prev, avatar: previewUrl, rawFile: file }));
-      if (errors.avatar) setErrors((prev) => ({ ...prev, avatar: "" }));
-    }
+    setErrors((previous) => ({
+      ...previous,
+      avatar: "",
+      form: "",
+    }));
   };
 
   const handleRemoveAvatar = () => {
-    setFormData((prev) => ({ ...prev, avatar: "", rawFile: undefined }));
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setFormData((previous) => ({
+      ...previous,
+      avatar: "",
+      rawFile: null,
+    }));
+
+    setErrors((previous) => ({
+      ...previous,
+      avatar: "",
+    }));
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = "Họ và tên không được để trống";
-    if (!formData.roleId) newErrors.roleId = "Vui lòng chọn vai trò";
+    const nextErrors = {};
 
-    if (!isEditMode) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!formData.email.trim()) {
-        newErrors.email = "Email không được để trống";
-      } else if (!emailRegex.test(formData.email)) {
-        newErrors.email = "Định dạng email không hợp lệ";
-      }
-
-      if (!formData.password) {
-        newErrors.password = "Mật khẩu bắt buộc nhập đối với tài khoản mới";
-      } else if (formData.password.length < 6) {
-        newErrors.password = "Mật khẩu phải chứa ít nhất 6 ký tự";
-      }
-    } else {
-      if (formData.password && formData.password.length < 6) {
-        newErrors.password = "Mật khẩu mới phải chứa ít nhất 6 ký tự";
-      }
+    if (!formData.name.trim()) {
+      nextErrors.name = "Vui lòng nhập họ và tên.";
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!formData.email.trim()) {
+      nextErrors.email = "Vui lòng nhập email.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      nextErrors.email = "Email không đúng định dạng.";
+    }
+
+    if (!isEditMode && !formData.password.trim()) {
+      nextErrors.password = "Vui lòng nhập mật khẩu.";
+    }
+
+    if (!isEditMode && formData.password.length < 6) {
+      nextErrors.password = "Mật khẩu phải có ít nhất 6 ký tự.";
+    }
+
+    if (formData.password && formData.password.length < 6) {
+      nextErrors.password = "Mật khẩu phải có ít nhất 6 ký tự.";
+    }
+
+    if (!formData.roleId) {
+      nextErrors.roleId = "Vui lòng chọn vai trò.";
+    }
+
+    if (
+      formData.dateOfBirth &&
+      Number.isNaN(Date.parse(formData.dateOfBirth))
+    ) {
+      nextErrors.dateOfBirth = "Ngày sinh không hợp lệ.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (isBusy) return;
     if (!validateForm()) return;
 
-    let finalPayload = {
-      name: formData.name,
-      dateOfBirth: formData.dateOfBirth
-        ? formData.dateOfBirth.split("T")[0]
-        : undefined,
-      gender: formData.gender || undefined,
-      avatar: formData.avatar || undefined,
-      role: {
-        id: Number(formData.roleId),
-      },
-    };
-
-    if (isEditMode) {
-      finalPayload.id = initialData.id;
-      finalPayload.email = formData.email;
-
-      if (formData.password) {
-        finalPayload.password = formData.password;
-      } else {
-        finalPayload.password = undefined;
-      }
-    } else {
-      finalPayload.email = formData.email;
-      finalPayload.password = formData.password;
-      if (formData.rawFile) {
-        finalPayload.rawFile = formData.rawFile;
-      }
-    }
-
-    finalPayload = Object.fromEntries(
-      Object.entries(finalPayload).filter(([_, value]) => value !== undefined),
-    );
+    setSubmitting(true);
+    setErrors({});
 
     try {
-      await onSubmit(finalPayload);
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        role: {
+          id: Number(formData.roleId),
+        },
+        gender: formData.gender || null,
+        dateOfBirth: formData.dateOfBirth || null,
+        rawFile: formData.rawFile || undefined,
+      };
+
+      if (isEditMode) {
+        payload.id = initialData.id;
+
+        // Không gửi mật khẩu rỗng khi chỉnh sửa.
+        if (formData.password.trim()) {
+          payload.password = formData.password;
+        }
+      } else {
+        payload.password = formData.password;
+      }
+
+      const result = await onSubmit(payload);
+
+      if (result === false) {
+        setErrors({
+          form: "Không thể lưu thông tin. Vui lòng kiểm tra lại.",
+        });
+        return;
+      }
+
+      // Nếu component cha chưa xử lý upload, thực hiện tại đây.
+      // Component cha nên trả về { success: true, avatarUploaded: true }
+      // khi đã hoàn tất cả cập nhật thông tin và upload ảnh.
+      const avatarAlreadyUploaded = result?.avatarUploaded === true;
+
+      if (
+        isEditMode &&
+        formData.rawFile &&
+        typeof onUploadAvatar === "function" &&
+        !avatarAlreadyUploaded
+      ) {
+        const uploadResult = await onUploadAvatar(
+          initialData.id,
+          formData.rawFile,
+        );
+
+        if (
+          uploadResult === false ||
+          uploadResult?.status === "ERROR" ||
+          uploadResult?.success === false
+        ) {
+          setErrors({
+            form: "Thông tin đã được lưu nhưng tải ảnh thất bại. Vui lòng thử lại.",
+          });
+          return;
+        }
+      }
+
+      setFormData((previous) => ({
+        ...previous,
+        password: "",
+        rawFile: null,
+      }));
     } catch (error) {
-      console.error("Lỗi khi xử lý form:", error);
+      console.error("Lỗi khi lưu người dùng:", error);
+
+      setErrors({
+        form:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Có lỗi xảy ra khi lưu thông tin người dùng.",
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const inputClassName =
+    "w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100";
+
+  const renderError = (field) =>
+    errors[field] ? (
+      <p className="mt-1 text-sm text-red-600">{errors[field]}</p>
+    ) : null;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 p-2">
-      {/* ẢNH ĐẠI DIỆN */}
-      <div className="flex flex-col items-center justify-center p-4 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-        <label className="text-sm font-bold text-gray-700 mb-3 w-full text-left">
-          Ảnh đại diện
-        </label>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {errors.form && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {errors.form}
+        </div>
+      )}
 
-        <div className="relative group">
-          <div
-            className={`w-28 h-28 rounded-full overflow-hidden border-2 border-orange-100 bg-white flex items-center justify-center shadow-inner transition-transform group-hover:scale-105 duration-200 ${isUploading ? "opacity-60" : ""}`}
+      <div className="flex flex-col items-center gap-3">
+        <div className="relative h-28 w-28 overflow-hidden rounded-full border border-gray-200 bg-gray-100">
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Ảnh đại diện xem trước"
+              className="h-full w-full object-cover"
+            />
+          ) : formData.avatar ? (
+            <UserAvatar
+              user={{
+                id: initialData?.id,
+                avatarUrl: formData.avatar,
+              }}
+              className="h-full w-full"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-gray-400">
+              <Camera size={36} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <label
+            className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 ${
+              isBusy ? "pointer-events-none opacity-50" : ""
+            }`}
           >
-            {formData.avatar ? (
-              <img
-                src={formData.avatar}
-                alt="Avatar preview"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="text-gray-300 flex flex-col items-center gap-1">
-                <UploadCloud size={28} />
-                <span className="text-[10px] font-medium text-gray-400">
-                  Chưa có ảnh
-                </span>
-              </div>
-            )}
+            <UploadCloud size={16} />
+            Chọn ảnh
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={isBusy}
+            />
+          </label>
 
-            {isUploading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white text-xs font-bold rounded-full">
-                Đang tải...
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            disabled={isUploading}
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full shadow-md hover:bg-orange-600 transition-colors disabled:opacity-50"
-            title="Tải ảnh lên"
-          >
-            <Camera size={16} />
-          </button>
-
-          {formData.avatar && !isUploading && (
+          {(previewUrl || formData.avatar) && (
             <button
               type="button"
               onClick={handleRemoveAvatar}
-              className="absolute -top-1 -right-1 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600 transition-all active:scale-90"
-              title="Xóa ảnh hiện tại"
+              disabled={isBusy}
+              className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
             >
-              <X size={12} />
+              <X size={16} />
+              Bỏ ảnh
             </button>
           )}
         </div>
 
-        <button
-          type="button"
-          disabled={isUploading}
-          onClick={() => fileInputRef.current?.click()}
-          className="mt-3 text-xs font-bold text-orange-500 hover:text-orange-600 underline disabled:text-gray-400"
-        >
-          {formData.avatar ? "Thay đổi ảnh khác" : "Chọn tệp từ máy tính"}
-        </button>
+        <p className="text-xs text-gray-500">
+          Chỉ hỗ trợ tệp hình ảnh, dung lượng tối đa 2 MB.
+        </p>
 
+        {formData.rawFile && (
+          <p className="max-w-full break-all text-xs text-gray-600">
+            Ảnh đã chọn: {formData.rawFile.name}
+          </p>
+        )}
+
+        {renderError("avatar")}
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Họ và tên <span className="text-red-500">*</span>
+        </label>
         <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept="image/*"
-          className="hidden"
+          type="text"
+          value={formData.name}
+          onChange={(event) => updateField("name", event.target.value)}
+          className={inputClassName}
+          placeholder="Nhập họ và tên"
+          disabled={isBusy}
         />
-        {errors.avatar && (
-          <p className="text-xs text-red-500 font-medium mt-1">
-            {errors.avatar}
+        {renderError("name")}
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Email <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="email"
+          value={formData.email}
+          onChange={(event) => updateField("email", event.target.value)}
+          className={inputClassName}
+          placeholder="example@email.com"
+          disabled={isBusy || isEditMode}
+        />
+        {renderError("email")}
+        {isEditMode && (
+          <p className="mt-1 text-xs text-gray-500">
+            Email không thể chỉnh sửa tại đây.
           </p>
         )}
       </div>
 
-      {/* THÔNG TIN CHI TIẾT Ô NHẬP */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Họ và tên */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold text-gray-700">Họ và tên *</label>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Mật khẩu {isEditMode ? "(để trống nếu không đổi)" : "*"}
+        </label>
+        <div className="relative">
           <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            placeholder="Nhập họ và tên thành viên"
-            className={`w-full px-4 py-2.5 bg-white border ${errors.name ? "border-red-500" : "border-gray-200"} rounded-xl text-sm focus:outline-none focus:border-orange-500`}
+            type={showPassword ? "text" : "password"}
+            value={formData.password}
+            onChange={(event) => updateField("password", event.target.value)}
+            className={`${inputClassName} pr-11`}
+            placeholder={
+              isEditMode ? "Nhập mật khẩu mới nếu cần" : "Nhập mật khẩu"
+            }
+            autoComplete="new-password"
+            disabled={isBusy}
           />
-          {errors.name && (
-            <p className="text-xs text-red-500 font-medium">{errors.name}</p>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowPassword((previous) => !previous)}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700"
+            aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            disabled={isBusy}
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         </div>
+        {renderError("password")}
+      </div>
 
-        {/* Địa chỉ Email */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold text-gray-700">
-            Địa chỉ Email *
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            disabled={isEditMode}
-            placeholder="example@petspa.vn"
-            className={`w-full px-4 py-2.5 bg-white border ${errors.email ? "border-red-500" : "border-gray-200"} rounded-xl text-sm focus:outline-none focus:border-orange-500 ${isEditMode ? "bg-gray-100 text-gray-400 cursor-not-allowed" : ""}`}
-          />
-          {errors.email && (
-            <p className="text-xs text-red-500 font-medium">{errors.email}</p>
-          )}
-        </div>
-
-        {/* Vai trò Hệ thống */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold text-gray-700">
-            Vai trò thành viên *
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            Vai trò <span className="text-red-500">*</span>
           </label>
           <select
-            name="roleId"
             value={formData.roleId}
-            onChange={handleChange}
-            className={`w-full px-4 py-2.5 bg-white border ${errors.roleId ? "border-red-500" : "border-gray-200"} rounded-xl text-sm focus:outline-none focus:border-orange-500 text-gray-700 font-semibold`}
+            onChange={(event) => updateField("roleId", event.target.value)}
+            className={inputClassName}
+            disabled={isBusy || loadingRoles}
           >
-            <option value="" disabled>
-              -- Chọn vai trò --
+            <option value="">
+              {loadingRoles ? "Đang tải vai trò..." : "Chọn vai trò"}
             </option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.description || role.name}
+            {availableRoles.map((role) => (
+              <option key={role.id} value={String(role.id)}>
+                {role.name}
               </option>
             ))}
           </select>
-          {errors.roleId && (
-            <p className="text-xs text-red-500 font-medium">{errors.roleId}</p>
-          )}
+          {renderError("roleId")}
         </div>
 
-        {/* Giới tính */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold text-gray-700">Giới tính</label>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            Giới tính
+          </label>
           <select
-            name="gender"
             value={formData.gender}
-            onChange={handleChange}
-            className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500 text-gray-700"
+            onChange={(event) => updateField("gender", event.target.value)}
+            className={inputClassName}
+            disabled={isBusy}
           >
             <option value="">Chọn giới tính</option>
             <option value="MALE">Nam</option>
@@ -372,68 +509,44 @@ const UserFormAdmin = ({ initialData, onSubmit, onClose, onUploadAvatar }) => {
             <option value="OTHER">Khác</option>
           </select>
         </div>
-
-        {/* Ngày sinh */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold text-gray-700">Ngày sinh</label>
-          <input
-            type="date"
-            name="dateOfBirth"
-            value={formData.dateOfBirth}
-            onChange={handleChange}
-            className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500 text-gray-700"
-          />
-        </div>
-
-        {/* Mật khẩu */}
-        <div className="space-y-1.5 relative">
-          <label className="text-sm font-bold text-gray-700">
-            {isEditMode
-              ? "Mật khẩu mới (Bỏ trống nếu không đổi)"
-              : "Mật khẩu tài khoản *"}
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder={
-                isEditMode ? "••••••••" : "Nhập mật khẩu ít nhất 6 ký tự"
-              }
-              className={`w-full px-4 py-2.5 bg-white border ${errors.password ? "border-red-500" : "border-gray-200"} rounded-xl text-sm focus:outline-none focus:border-orange-500 pr-10`}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {errors.password && (
-            <p className="text-xs text-red-500 font-medium">
-              {errors.password}
-            </p>
-          )}
-        </div>
       </div>
 
-      {/* FOOTER BUTTONS */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-200 transition-colors"
-        >
-          Hủy bỏ
-        </button>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          Ngày sinh
+        </label>
+        <input
+          type="date"
+          value={formData.dateOfBirth}
+          onChange={(event) => updateField("dateOfBirth", event.target.value)}
+          className={inputClassName}
+          disabled={isBusy}
+        />
+        {renderError("dateOfBirth")}
+      </div>
+
+      <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:justify-end">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isBusy}
+            className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Hủy
+          </button>
+        )}
+
         <button
           type="submit"
-          disabled={isUploading}
-          className="px-5 py-2.5 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 shadow-md transition-colors disabled:opacity-50"
+          disabled={isBusy || loadingRoles}
+          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isEditMode ? "Lưu thay đổi" : "Tạo tài khoản"}
+          {isBusy
+            ? "Đang lưu..."
+            : isEditMode
+              ? "Cập nhật người dùng"
+              : "Tạo người dùng"}
         </button>
       </div>
     </form>

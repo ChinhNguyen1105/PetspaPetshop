@@ -46,19 +46,16 @@ const deleteImage = async (
   return resp.data;
 };
 
-const setMainImage = async (
-  imageId
-) => {
-  const resp =
-    await api.patch(
-      URL_CONSTANT.PetServiceImages.SET_MAIN_IMAGE,
-      null,
-      {
-        params: {
-          imageId,
-        },
-      }
-    );
+const setMainImage = async (imageId) => {
+  const resp = await api.patch(
+    URL_CONSTANT.PetServiceImages.SET_MAIN_IMAGE,
+    {},
+    {
+      params: {
+        imageId,
+      },
+    }
+  );
 
   return resp.data;
 };

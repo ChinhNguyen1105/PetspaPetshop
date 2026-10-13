@@ -1,6 +1,5 @@
 import api from "./api";
 import { URL_CONSTANT } from "../constants/urlConstant";
-
 /*
 |--------------------------------------------------------------------------
 | GET PRODUCT IMAGES
@@ -8,22 +7,46 @@ import { URL_CONSTANT } from "../constants/urlConstant";
 */
 const getProductImages = async (productId) => {
   const resp = await api.get(
-    URL_CONSTANT.ProductImages.GET_IMAGES.replace("{productId}", productId)
+    URL_CONSTANT.ProductImages.GET_IMAGES.replace(
+      "{productId}",
+      productId
+    )
   );
 
-  const baseUrl = `${import.meta.env.VITE_API_URL}/upload/products`;
-
-  const mapped = (resp.data?.data || []).map((img) => ({
-    ...img,
-    imageUrl: img.imageUrl
-      ? `${baseUrl}/${img.imageUrl}`
-      : "",
-  }));
+  // Giữ imageUrl là tên file để sử dụng với API download.
+  const imageList = resp.data?.body?.data
+    ?? resp.data?.data
+    ?? [];
 
   return {
     ...resp.data,
-    data: mapped,
+    body: {
+      ...resp.data?.body,
+      data: imageList,
+    },
   };
+};
+
+/*
+|--------------------------------------------------------------------------
+| DOWNLOAD PRODUCT IMAGE
+|--------------------------------------------------------------------------
+*/
+const downloadImage = async (imageUrl) => {
+  console.log("ĐANG GỌI DOWNLOAD:", imageUrl);
+
+  const fileName = imageUrl.split("/").pop().split("?")[0];
+
+  const response = await api.get("/files/download", {
+    params: {
+      fileName,
+      folder: "products",
+      inline: true,
+    },
+    responseType: "blob",
+  });
+
+  return response.data;
 };
 
 /*
@@ -31,33 +54,32 @@ const getProductImages = async (productId) => {
 | ADD IMAGES
 |--------------------------------------------------------------------------
 */
-const addImages = async (
-  productId,
-  files
-) => {
-  console.log("payload: ", { productId, files });
+const addImages = async (productId, files) => {
+  console.log("productId:", productId);
+  console.log("files:", files);
+  console.log("isArray:", Array.isArray(files));
+
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new Error("Danh sách ảnh không hợp lệ");
+  }
+
   const formData = new FormData();
 
-  formData.append(
-    "productId",
-    productId
-  );
-
   files.forEach((file) => {
-    formData.append(
-      "files",
-      file
-    );
+    console.log("Appending file:", file.name, file.size);
+    formData.append("files", file);
   });
+
+  // Kiểm tra nội dung FormData
+  for (const [key, value] of formData.entries()) {
+    console.log("FormData:", key, value);
+  }
 
   const resp = await api.post(
     URL_CONSTANT.ProductImages.ADD_IMAGES,
     formData,
     {
-      headers: {
-        "Content-Type":
-          "multipart/form-data",
-      },
+      params: { productId: Number(productId) },
     }
   );
 
@@ -109,4 +131,5 @@ export default {
   addImages,
   deleteImage,
   setMainImage,
+  downloadImage
 };

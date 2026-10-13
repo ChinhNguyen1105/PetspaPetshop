@@ -2,29 +2,36 @@ import React, { useState, useEffect, useRef } from "react";
 import { useProductStore } from "../../store/productStore";
 import { useCategoryStore } from "../../store/categoryStore";
 import { useProductImageStore } from "../../store/productImageStore";
+import ProductImage from "../../pages/admin/products/ProductImage";
+
+const MAX_IMAGES = 6;
 
 const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
-  const isEdit = !!initialData;
+  const isEdit = Boolean(initialData?.id);
   const productId = initialData?.id;
 
-  const { loading: loadingProduct } = useProductStore();
-  const { categories, fetchCategories } = useCategoryStore();
+  // Product store
+  const loadingProduct = useProductStore((state) => state.loading);
 
-  // Kết nối các phương thức quản lý ảnh từ useProductImageStore
-  const {
-    imagesByProductId,
-    loading: loadingImages,
-    fetchImages,
-    uploadImages,
-    deleteImage,
-    setMainImage,
-    clearImages,
-  } = useProductImageStore();
+  // Category store
+  const categories = useCategoryStore((state) => state.categories) || [];
+  const fetchCategories = useCategoryStore((state) => state.fetchCategories);
 
-  // SỬA ĐỔI TẠI ĐÂY: Trích xuất chính xác mảng ảnh dựa vào productId từ Object Map
-  const productImages = productId ? imagesByProductId?.[productId] || [] : [];
+  // Product image store
+  const imagesByProductId = useProductImageStore(
+    (state) => state.imagesByProductId,
+  );
+  const loadingImages = useProductImageStore((state) => state.loading);
+  const fetchImages = useProductImageStore((state) => state.fetchImages);
+  const uploadImages = useProductImageStore((state) => state.uploadImages);
+  const deleteImage = useProductImageStore((state) => state.deleteImage);
+  const setMainImage = useProductImageStore((state) => state.setMainImage);
+  const clearImages = useProductImageStore((state) => state.clearImages);
 
-  // State quản lý dữ liệu form bám sát theo Class ReqCreateProduct DTO
+  const productImages = productId
+    ? imagesByProductId?.[String(productId)] || []
+    : [];
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -33,24 +40,22 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
     quantity: "",
   });
 
-  // Dùng ref để clear input file dễ dàng sau khi upload thành công
+  const [uploadingImages, setUploadingImages] = useState(false);
   const fileInputRef = useRef(null);
 
-  // ĐỒNG BỘ MỚI: Chỉ kích hoạt fetch các danh mục có loại là PRODUCT
+  // Fetch categories
   useEffect(() => {
-    if (fetchCategories) {
-      fetchCategories({ type: "PRODUCT" });
-    }
+    fetchCategories?.({ type: "PRODUCT" });
   }, [fetchCategories]);
 
-  // Đổ dữ liệu ban đầu hoặc Fetch ảnh từ server về nếu là Mode Edit
+  // Populate form when opening or switching product
   useEffect(() => {
     if (initialData) {
       setFormData({
         name: initialData.name || "",
         description: initialData.description || "",
         price: initialData.price ?? "",
-        categoryId: initialData.categoryId || initialData.category?.id || "",
+        categoryId: initialData.categoryId ?? initialData.category?.id ?? "",
         quantity:
           initialData.quantity ??
           initialData.stockQuantity ??
@@ -58,8 +63,10 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
           "",
       });
 
-      if (initialData.id) {
-        fetchImages(initialData.id);
+      if (initialData.id != null) {
+        fetchImages(String(initialData.id)).catch((error) => {
+          console.error("Không tải được danh sách ảnh:", error);
+        });
       }
     } else {
       setFormData({
@@ -69,89 +76,131 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
         categoryId: "",
         quantity: "",
       });
-      if (clearImages) clearImages();
+
+      clearImages?.();
     }
   }, [initialData, fetchImages, clearImages]);
 
-  // Xử lý upload tập tin hình ảnh (Hỗ trợ chọn nhiều ảnh cùng lúc)
-  const handleFileChange = async (e) => {
-    const fileList = e.target.files;
-    if (!fileList || fileList.length === 0 || !productId) return;
+  // Upload selected images
+  const handleFileChange = async (event) => {
+    const files = Array.from(event.target.files || []);
 
-    // Ép kiểu FileList thành một Array thực thụ để pass qua Service/Store không bị lỗi .forEach
-    const filesArray = Array.from(fileList);
+    if (!files.length) return;
 
-    // Kiểm tra giới hạn số lượng ảnh (Tối đa 6) sử dụng optional chaining phòng xa
-    if ((productImages?.length || 0) + filesArray.length > 6) {
+    // Product images require a persisted product ID.
+    if (!productId) {
+      alert("Vui lòng tạo sản phẩm trước khi tải ảnh lên.");
+      event.target.value = "";
+      return;
+    }
+
+    if (productImages.length + files.length > MAX_IMAGES) {
       alert(
-        `Hệ thống chỉ hỗ trợ tối đa 6 ảnh minh họa. Hiện tại bạn đã có ${productImages?.length || 0} ảnh.`,
+        `Tối đa ${MAX_IMAGES} ảnh. Hiện tại sản phẩm có ${productImages.length} ảnh.`,
       );
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      event.target.value = "";
+      return;
+    }
+
+    const invalidFile = files.find((file) => !file.type.startsWith("image/"));
+
+    if (invalidFile) {
+      alert(`Tệp "${invalidFile.name}" không phải là hình ảnh.`);
+      event.target.value = "";
       return;
     }
 
     try {
-      // Truyền mảng chuẩn (Array) thay vì FileList gốc
-      await uploadImages(productId, filesArray);
-    } catch (err) {
+      setUploadingImages(true);
+
+      await uploadImages(String(productId), files);
+      await fetchImages(String(productId));
+
+      alert("Tải ảnh lên thành công.");
+    } catch (error) {
+      console.error("Upload images error:", error);
       alert(
-        "Tải tập tin hình ảnh lên thất bại, vui lòng kiểm tra lại định dạng tệp.",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Tải ảnh thất bại. Vui lòng kiểm tra API upload.",
       );
     } finally {
-      // Reset input để có thể chọn lại chính tệp đó nếu muốn
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploadingImages(false);
+      event.target.value = "";
     }
   };
 
+  // Delete image
   const handleRemoveGalleryImage = async (imageId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa hình ảnh này không?"))
+    if (!window.confirm("Bạn có chắc chắn muốn xóa hình ảnh này không?")) {
       return;
-    try {
-      console.log("Đang gọi xóa ảnh ID:", imageId);
-      await deleteImage(imageId);
+    }
 
-      // Nếu chạy xuống đây tức là thành công
-      alert("Xóa ảnh thành công!");
-      if (productId) fetchImages(productId);
-    } catch (err) {
-      // 🔍 Xem log này ở F12 Console để biết lỗi gì
-      console.error("Lỗi xóa ảnh chi tiết:", err);
-      alert(`Xóa ảnh thất bại! Chi tiết: ${err.message || err}`);
+    try {
+      await deleteImage(imageId);
+      await fetchImages(String(productId));
+      alert("Xóa ảnh thành công.");
+    } catch (error) {
+      console.error("Delete image error:", error);
+      alert(
+        error?.response?.data?.message || error?.message || "Xóa ảnh thất bại.",
+      );
     }
   };
 
+  // Set main image
   const handleSetMainImage = async (imageId) => {
     if (!productId) return;
-    try {
-      console.log(
-        "Đang gọi set main cho ảnh ID:",
-        imageId,
-        "thuộc product:",
-        productId,
-      );
-      await setMainImage(productId, imageId);
 
-      alert("Thay đổi ảnh đại diện chính thành công!");
-      if (productId) fetchImages(productId);
-    } catch (err) {
-      // 🔍 Xem log này ở F12 Console để biết lỗi gì
-      console.error("Lỗi set main chi tiết:", err);
-      alert(`Thay đổi ảnh thất bại! Chi tiết: ${err.message || err}`);
+    try {
+      await setMainImage(String(productId), imageId);
+      await fetchImages(String(productId));
+    } catch (error) {
+      console.error("Set main image error:", error);
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể đặt ảnh đại diện.",
+      );
     }
   };
 
-  // Validate và submit payload chuẩn DTO
+  // Validate and submit
   const handleSubmitForm = () => {
-    if (!formData.name.trim()) return alert("Tên sản phẩm không được để trống");
-    if (!formData.description.trim())
-      return alert("Mô tả sản phẩm không được để trống");
-    if (formData.price === "" || Number(formData.price) < 0)
-      return alert("Giá sản phẩm không hợp lệ");
-    if (!formData.categoryId) return alert("Vui lòng chọn danh mục");
-    if (formData.quantity === "" || Number(formData.quantity) < 0)
-      return alert("Số lượng nhập kho không hợp lệ");
+    if (!formData.name.trim()) {
+      alert("Tên sản phẩm không được để trống.");
+      return;
+    }
 
-    const submitPayload = {
+    if (!formData.description.trim()) {
+      alert("Mô tả sản phẩm không được để trống.");
+      return;
+    }
+
+    if (
+      formData.price === "" ||
+      !Number.isFinite(Number(formData.price)) ||
+      Number(formData.price) < 0
+    ) {
+      alert("Giá sản phẩm không hợp lệ.");
+      return;
+    }
+
+    if (!formData.categoryId) {
+      alert("Vui lòng chọn danh mục.");
+      return;
+    }
+
+    if (
+      formData.quantity === "" ||
+      !Number.isFinite(Number(formData.quantity)) ||
+      Number(formData.quantity) < 0
+    ) {
+      alert("Số lượng nhập kho không hợp lệ.");
+      return;
+    }
+
+    const payload = {
       name: formData.name.trim(),
       description: formData.description.trim(),
       price: Number(formData.price),
@@ -159,115 +208,132 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
       quantity: Number(formData.quantity),
     };
 
-    if (isEdit && productId) {
-      submitPayload.id = Number(productId);
+    if (isEdit) {
+      payload.id = Number(productId);
     }
-    console.log("submit payload: ", submitPayload);
-    onSubmit(submitPayload);
+
+    onSubmit(payload);
   };
 
-  console.log("productImg: ", productImages);
-
   return (
-    <div className="space-y-6 relative">
-      {/* Loading Overlay khi hệ thống đang xử lý sản phẩm */}
+    <div className="relative space-y-6">
       {loadingProduct && (
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] flex flex-col items-center justify-center z-50">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/70 backdrop-blur-[2px]">
+          <div className="mb-2 h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
           <span className="text-sm font-medium text-gray-600">
             Đang xử lý dữ liệu sản phẩm...
           </span>
         </div>
       )}
 
-      {/* ── Group 1: Tên & Danh mục sản phẩm ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Product name and category */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Tên sản phẩm *
           </label>
           <input
             type="text"
             value={formData.name}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, name: e.target.value }))
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                name: event.target.value,
+              }))
             }
             placeholder="Nhập tên sản phẩm..."
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Danh mục sản phẩm *
           </label>
           <select
             value={formData.categoryId}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, categoryId: e.target.value }))
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                categoryId: event.target.value,
+              }))
             }
             className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500"
           >
             <option value="">-- Chọn danh mục --</option>
-            {categories &&
-              categories
-                .filter(
-                  (cat) =>
-                    cat.categoryType === "PRODUCT" ||
-                    cat.type === "PRODUCT" ||
-                    !cat.categoryType,
-                )
-                .map((cat) => (
-                  <option key={cat.value || cat.id} value={cat.value || cat.id}>
-                    {cat.label || cat.name}
+            {categories
+              .filter(
+                (category) =>
+                  category.categoryType === "PRODUCT" ||
+                  category.type === "PRODUCT" ||
+                  !category.categoryType,
+              )
+              .map((category) => {
+                const id = category.value ?? category.id;
+
+                return (
+                  <option key={id} value={id}>
+                    {category.label ?? category.name}
                   </option>
-                ))}
+                );
+              })}
           </select>
         </div>
       </div>
 
-      {/* ── Group 2: Mô tả sản phẩm ── */}
+      {/* Description */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
           Mô tả sản phẩm *
         </label>
         <textarea
-          rows="3"
+          rows={3}
           value={formData.description}
-          onChange={(e) =>
-            setFormData((p) => ({ ...p, description: e.target.value }))
+          onChange={(event) =>
+            setFormData((prev) => ({
+              ...prev,
+              description: event.target.value,
+            }))
           }
           placeholder="Mô tả chi tiết các đặc tính, công dụng sản phẩm..."
-          className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+          className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
-      {/* ── Group 3: Giá bán & Số lượng ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Price and quantity */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Giá sản phẩm (đ) *
           </label>
           <input
             type="number"
             min="0"
             value={formData.price}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, price: e.target.value }))
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                price: event.target.value,
+              }))
             }
             placeholder="Nhập giá bán..."
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium text-gray-800"
+            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm font-medium text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
             Số lượng nhập kho ban đầu *
           </label>
           <input
             type="number"
             min="0"
             value={formData.quantity}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, quantity: e.target.value }))
+            onChange={(event) =>
+              setFormData((prev) => ({
+                ...prev,
+                quantity: event.target.value,
+              }))
             }
             placeholder="Nhập số lượng tồn..."
             className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -275,68 +341,65 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
         </div>
       </div>
 
-      {/* ── Group 4: Quản lý Album Ảnh bằng File Upload (Chỉ hiển thị khi EDIT) ── */}
+      {/* Image gallery */}
       {isEdit && (
-        <div className="space-y-4 border-t border-gray-100 pt-4 relative">
-          {loadingImages && (
-            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10">
-              <span className="text-xs font-semibold text-gray-500 animate-pulse">
-                Đang đồng bộ tập tin ảnh...
+        <div className="relative space-y-4 border-t border-gray-100 pt-4">
+          {(loadingImages || uploadingImages) && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
+              <span className="animate-pulse text-xs font-semibold text-gray-500">
+                {uploadingImages
+                  ? "Đang tải ảnh lên..."
+                  : "Đang đồng bộ ảnh..."}
               </span>
             </div>
           )}
 
-          <label className="block text-sm font-semibold text-gray-800">
-            Quản lý Album Ảnh sản phẩm
-          </label>
-
           <div>
-            <p className="text-xs text-gray-500 mb-2">
-              Danh sách hình ảnh chi tiết từ hệ thống (
-              {productImages?.length || 0}/6)
-            </p>
-            <p className="text-[11px] text-gray-400 mb-3">
-              * Mẹo: Click trực tiếp vào một ảnh để cấu hình đặt làm ảnh hiển
-              thị chính (Thumbnail).
+            <label className="block text-sm font-semibold text-gray-800">
+              Quản lý album ảnh sản phẩm
+            </label>
+            <p className="mb-3 mt-1 text-xs text-gray-500">
+              {productImages.length}/{MAX_IMAGES} ảnh. Nhấn vào ảnh để đặt làm
+              ảnh đại diện.
             </p>
 
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
-              {(productImages || []).map((img) => {
-                const isMain = img.isThumbnail || img.isMain;
-                const currentImgUrl = img.imageUrl || img.url;
+            <div className="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {productImages.map((img) => {
+                const isMain = Boolean(img.isThumbnail || img.isMain);
+
                 return (
                   <div
                     key={img.id}
-                    className={`relative group aspect-square rounded-xl border overflow-hidden cursor-pointer ${
+                    className={`group relative aspect-square cursor-pointer overflow-hidden rounded-xl border ${
                       isMain
                         ? "border-orange-500 ring-2 ring-orange-400/30"
                         : "border-gray-200"
                     }`}
                   >
-                    <img
-                      src={currentImgUrl}
-                      alt={`gallery-${img.id}`}
-                      className="w-full h-full object-cover bg-gray-50"
+                    <button
+                      type="button"
                       onClick={() => handleSetMainImage(img.id)}
-                      title="Click để đặt làm ảnh hiển thị chính"
-                      onError={(e) => {
-                        e.target.src = "https://placehold.co/300x300";
-                      }}
-                    />
+                      title="Đặt làm ảnh đại diện"
+                      className="h-full w-full"
+                    >
+                      <ProductImage
+                        image={img}
+                        alt={`Ảnh sản phẩm ${img.id}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
 
                     {isMain && (
-                      <span className="absolute bottom-1 left-1 bg-orange-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold shadow">
+                      <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-orange-500 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
                         Chính
                       </span>
                     )}
 
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveGalleryImage(img.id);
-                      }}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow hover:bg-red-600"
+                      onClick={() => handleRemoveGalleryImage(img.id)}
+                      title="Xóa ảnh"
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white opacity-0 shadow transition-opacity hover:bg-red-600 group-hover:opacity-100"
                     >
                       ×
                     </button>
@@ -344,53 +407,39 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
                 );
               })}
 
-              {(productImages?.length || 0) < 6 && (
-                <div
+              {productImages.length < MAX_IMAGES && (
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/40 transition-colors text-gray-400 hover:text-blue-500"
+                  className="flex aspect-square flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 text-gray-400 transition-colors hover:border-blue-400 hover:bg-blue-50/40 hover:text-blue-500"
                 >
                   <span className="text-2xl leading-none">+</span>
-                  <span className="text-[10px] mt-1">Tải ảnh lên</span>
-                </div>
+                  <span className="mt-1 text-[10px]">Tải ảnh lên</span>
+                </button>
               )}
             </div>
 
-            {/* Input file ẩn phục vụ việc click chọn tệp */}
-            <div className="hidden">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-                multiple
-              />
-            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileChange}
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
+              className="hidden"
+            />
 
-            {(productImages?.length || 0) < 6 && (
+            {productImages.length < MAX_IMAGES && (
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-slate-900 transition-colors flex items-center gap-1.5 shadow-sm"
+                  disabled={uploadingImages}
+                  className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-slate-900 disabled:opacity-50"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                    className="w-4 h-4"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 12 12M12 3v13.5"
-                    />
-                  </svg>
                   Chọn tệp từ thiết bị
                 </button>
                 <span className="text-xs text-gray-400">
-                  Hỗ trợ các định dạng .png, .jpg, .jpeg, .webp
+                  PNG, JPG, JPEG, WEBP
                 </span>
               </div>
             )}
@@ -398,19 +447,21 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
         </div>
       )}
 
-      {/* ── Group 5: Hộp điều hướng Actions Footer ── */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50"
+          className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           Hủy bỏ
         </button>
+
         <button
           type="button"
           onClick={handleSubmitForm}
-          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          disabled={loadingProduct || uploadingImages}
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isEdit ? "Cập nhật sản phẩm" : "Tạo sản phẩm mới"}
         </button>

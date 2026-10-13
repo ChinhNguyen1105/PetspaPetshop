@@ -3,9 +3,7 @@ import { APP_CONFIG } from "./config";
 import { URL_CONSTANT } from "../constants/urlConstant";
 
 const delay = (ms) =>
-  new Promise((resolve) =>
-    setTimeout(resolve, ms)
-  );
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 let useApi = APP_CONFIG.USE_REAL_API;
 
@@ -14,33 +12,39 @@ const setApi = (flag) => {
 };
 
 const shouldUseApi = (options = {}) =>
-  options.api !== undefined
-    ? !!options.api
-    : useApi;
+  options.api !== undefined ? !!options.api : useApi;
 
 /*
 |--------------------------------------------------------------------------
 | MAPPER
 |--------------------------------------------------------------------------
 */
-const mapRoleRequest = (
-  request
-) => ({
-  id: request.id,
+const mapRoleRequest = (request) => ({
+  id:
+    request.id !== undefined && request.id !== null
+      ? Number(request.id)
+      : undefined,
 
   name: request.name,
 
-  description:
-    request.description,
+  description: request.description ?? null,
 
-  permissions:
-    request.permissions?.map(
-      (permission) => ({
-        id:
-          permission.id ??
-          permission,
-      })
-    ) || [],
+  activeFlag:
+    typeof request.activeFlag === "boolean"
+      ? request.activeFlag
+      : request.activeFlag === "true"
+        ? true
+        : request.activeFlag === "false"
+          ? false
+          : undefined,
+
+  permissions: Array.isArray(request.permissions)
+    ? request.permissions.map((permission) => ({
+        id: Number(
+          permission?.id ?? permission
+        ),
+      }))
+    : [],
 });
 
 /*
@@ -48,12 +52,8 @@ const mapRoleRequest = (
 | CREATE
 |--------------------------------------------------------------------------
 */
-const createRole = async (
-  request,
-  options = {}
-) => {
-  const payload =
-    mapRoleRequest(request);
+const createRole = async (request, options = {}) => {
+  const payload = mapRoleRequest(request);
 
   delete payload.id;
 
@@ -79,12 +79,27 @@ const createRole = async (
 | UPDATE
 |--------------------------------------------------------------------------
 */
-const updateRole = async (
-  request,
-  options = {}
-) => {
-  const payload =
-    mapRoleRequest(request);
+const updateRole = async (request, options = {}) => {
+  const payload = mapRoleRequest(request);
+
+  if (payload.id === undefined || !Number.isInteger(payload.id) || payload.id <= 0) {
+    throw new Error("ID Role phải là số nguyên dương.");
+  }
+
+  if (typeof payload.activeFlag !== "boolean") {
+    throw new Error(
+      "Role phải có activeFlag kiểu boolean trước khi cập nhật."
+    );
+  }
+
+  if (payload.permissions.some(
+    (permission) =>
+      !Number.isInteger(permission.id) || permission.id <= 0
+  )) {
+    throw new Error(
+      "ID của từng permission phải là số nguyên dương."
+    );
+  }
 
   if (shouldUseApi(options)) {
     const resp = await api.put(
@@ -105,40 +120,26 @@ const updateRole = async (
 | GET ALL
 |--------------------------------------------------------------------------
 */
-const getRoles = async (
-  params = {},
-  options = {}
-) => {
+const getRoles = async (params = {}, options = {}) => {
   if (shouldUseApi(options)) {
     const resp = await api.get(
       URL_CONSTANT.Role.GET_ALL_ROLES,
-      {
-        params,
-      }
-    );
-
-    console.log(
-      "all role = ",
-      resp
+      { params }
     );
 
     const response = resp.data;
 
     return {
-      meta:
-        response?.body?.data?.meta ?? {
-          page: 1,
-          pageSize: 10,
-          pages: 0,
-          total: 0,
-        },
+      meta: response?.body?.data?.meta ?? {
+        page: 1,
+        pageSize: 10,
+        pages: 0,
+        total: 0,
+      },
 
-      result:
-        Array.isArray(
-          response?.body?.data?.result
-        )
-          ? response.body.data.result
-          : [],
+      result: Array.isArray(response?.body?.data?.result)
+        ? response.body.data.result
+        : [],
     };
   }
 
@@ -160,15 +161,12 @@ const getRoles = async (
 | DETAIL
 |--------------------------------------------------------------------------
 */
-const getRoleById = async (
-  id,
-  options = {}
-) => {
+const getRoleById = async (id, options = {}) => {
   if (shouldUseApi(options)) {
     const resp = await api.get(
       URL_CONSTANT.Role.GET_ROLE_BY_ID.replace(
         "{id}",
-        id
+        String(id)
       )
     );
 
@@ -178,7 +176,7 @@ const getRoleById = async (
   await delay(500);
 
   return {
-    id,
+    id: Number(id),
     name: "",
     description: "",
     activeFlag: true,
@@ -191,15 +189,12 @@ const getRoleById = async (
 | DELETE
 |--------------------------------------------------------------------------
 */
-const deleteRole = async (
-  id,
-  options = {}
-) => {
+const deleteRole = async (id, options = {}) => {
   if (shouldUseApi(options)) {
     const resp = await api.delete(
       URL_CONSTANT.Role.DELETE_ROLE.replace(
         "{id}",
-        id
+        String(id)
       )
     );
 
@@ -210,20 +205,16 @@ const deleteRole = async (
 
   return {
     status: true,
-    message:
-      "Delete role successfully",
+    message: "Delete role successfully",
   };
 };
 
 const RoleService = {
   setApi,
-
   createRole,
   updateRole,
-
   getRoles,
   getRoleById,
-
   deleteRole,
 };
 

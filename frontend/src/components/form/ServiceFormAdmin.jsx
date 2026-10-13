@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  Image,
+  Image as ImageIcon, // Đổi tên để tránh trùng với Component Image HTML nếu có
   Trash2,
   Check,
   Plus,
@@ -16,7 +16,6 @@ import { useCartStore } from "../../store/cartStore";
 
 const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
   const isEdit = !!initialData;
-console.log("initialData", initialData);
 
   // ─── STORES ──────────────────────────────────────────────────────────────────
   const { submitting } = useServiceStore();
@@ -26,12 +25,12 @@ console.log("initialData", initialData);
     images: serviceImages,
     loading: loadingImages,
     fetchImages,
-    addImage, // Giữ nguyên hàm addImage nhận Url từ store của bạn
+    addImage,
     deleteImage,
     setMainImage,
     clearImages,
   } = usePetServiceImageStore();
-
+  console.log("service images:", serviceImages);
   const { showToast } = useCartStore();
 
   // ─── LOCAL STATE ─────────────────────────────────────────────────────────────
@@ -54,12 +53,9 @@ console.log("initialData", initialData);
   }, [fetchCategories]);
 
   // ─── EFFECT: ĐIỀN DỮ LIỆU BAN ĐẦU HOẶC RESET ─────────────────────────────────
-  // ─── EFFECT: ĐIỀN DỮ LIỆU BAN ĐẦU HOẶC RESET ─────────────────────────────────
   useEffect(() => {
     if (initialData) {
       const serviceId = initialData.id;
-
-      // Tìm ID danh mục an toàn từ dữ liệu ban đầu
       const rawCategoryId =
         initialData.categoryId || initialData.category?.id || "";
 
@@ -69,7 +65,6 @@ console.log("initialData", initialData);
         basePrice: initialData.basePrice ?? initialData.original_price ?? "",
         durationMin:
           initialData.durationMin ?? initialData.duration_minutes ?? "30",
-        // SỬA TẠI ĐÂY: Ép kiểu sang String để đồng bộ hoàn toàn với value của thẻ <select>
         categoryId: rawCategoryId ? rawCategoryId.toString() : "",
       });
 
@@ -121,11 +116,10 @@ console.log("initialData", initialData);
       submitPayload.id = Number(initialData.id);
     }
 
-    // Đẩy payload sạch lên view cha tự điều phối xử lý API
     onSubmit(submitPayload);
   };
 
-  // ─── HANDLERS QUẢN LÝ ẢNH BẰNG URL REAL-TIME ──────────────────────────────────
+  // ─── HANDLERS QUẢN LÝ ẢNH ──────────────────────────────────
   const handleAddImageUrl = async (e) => {
     e.preventDefault();
     if (!newImageUrl.trim()) return;
@@ -143,7 +137,7 @@ console.log("initialData", initialData);
         const isFirstImg = serviceImages.length === 0;
         await addImage(initialData.id, newImageUrl.trim(), isFirstImg);
         setNewImageUrl("");
-        showToast("Thêm hình ảnh vào album thành công! 📸", "success");
+        showToast("Thêm hình ảnh vào album thành công!", "success");
       } else {
         showToast(
           "Vui lòng tạo dịch vụ trước khi thêm ảnh vào album chi tiết.",
@@ -176,15 +170,24 @@ console.log("initialData", initialData);
   const handleSetMainImage = async (imageId) => {
     try {
       await setMainImage(imageId);
-      showToast("Thay đổi ảnh hiển thị đại diện thành công! 🖼️", "success");
+      showToast("Thay đổi ảnh hiển thị đại diện thành công!", "success");
     } catch (err) {
       showToast("Thiết lập ảnh đại diện thất bại!", "error");
     }
   };
 
+  // Lấy Thumbnail hiện tại (ưu tiên Store realtime, nếu store rỗng lúc load thì lấy từ initialData)
+  const currentThumbnailObj = serviceImages?.find(
+    (img) => img.isThumbnail || img.isMain,
+  );
+  const formThumbnailUrl =
+    currentThumbnailObj?.imageUrl ||
+    currentThumbnailObj?.url ||
+    initialData?.serviceImages?.find((img) => img.isThumbnail)?.imageUrl ||
+    "https://placehold.co/150x150?text=No+Image";
+
   return (
     <div className="space-y-6 relative">
-      {/* Khung loading bao phủ khi form đang submit */}
       {submitting && (
         <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] flex flex-col items-center justify-center z-50 rounded-xl">
           <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-2" />
@@ -201,51 +204,67 @@ console.log("initialData", initialData);
         </div>
       )}
 
-      {/* Layout chia 2 phần tương tự form Product: Thông tin và Album (nếu sửa) */}
       <div className="grid grid-cols-1 gap-6">
         {/* ── Khối 1: Thông tin dịch vụ cơ bản ── */}
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tên dịch vụ spa *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                placeholder="Ví dụ: Combo Tắm Sấy & Vệ Sinh Tai"
-                className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Danh mục dịch vụ *
-              </label>
-              <select
-                value={formData.categoryId}
-                onChange={(e) =>
-                  handleInputChange("categoryId", e.target.value)
-                }
-                className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 bg-white"
-              >
-                <option value="">-- Chọn danh mục dịch vụ --</option>
-                {categories &&
-                  categories
-                    .filter(
-                      (cat) =>
-                        cat.categoryType === "SERVICE" ||
-                        cat.type === "SERVICE" ||
-                        !cat.categoryType ||
-                        cat.id?.toString() === formData.categoryId, // SỬA TẠI ĐÂY: Luôn giữ lại danh mục đang chọn khi sửa
-                    )
-                    .map((cat) => (
-                      // Ép cat.id sang string ở value để đồng nhất dữ liệu
-                      <option key={cat.id} value={cat.id?.toString()}>
-                        {cat.name}
-                      </option>
-                    ))}
-              </select>
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Hiển thị Thumbnail trong Form Sửa */}
+            {isEdit && (
+              <div className="flex-shrink-0 hidden md:block">
+                <label className="block text-sm font-medium text-gray-700 mb-1 text-center">
+                  Thumbnail
+                </label>
+                <div className="w-[102px] h-[102px] rounded-lg border border-gray-300 overflow-hidden bg-gray-50">
+                  <img
+                    src={formThumbnailUrl}
+                    alt="Thumbnail Preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tên dịch vụ spa *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  placeholder="Ví dụ: Combo Tắm Sấy & Vệ Sinh Tai"
+                  className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Danh mục dịch vụ *
+                </label>
+                <select
+                  value={formData.categoryId}
+                  onChange={(e) =>
+                    handleInputChange("categoryId", e.target.value)
+                  }
+                  className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 bg-white"
+                >
+                  <option value="">-- Chọn danh mục dịch vụ --</option>
+                  {categories &&
+                    categories
+                      .filter(
+                        (cat) =>
+                          cat.categoryType === "SERVICE" ||
+                          cat.type === "SERVICE" ||
+                          !cat.categoryType ||
+                          cat.id?.toString() === formData.categoryId,
+                      )
+                      .map((cat) => (
+                        <option key={cat.id} value={cat.id?.toString()}>
+                          {cat.name}
+                        </option>
+                      ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -308,7 +327,7 @@ console.log("initialData", initialData);
             )}
 
             <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
-              <Image size={16} className="text-blue-500" />
+              <ImageIcon size={16} className="text-blue-500" />
               <span>Quản lý Album ảnh gói dịch vụ</span>
             </div>
 
@@ -397,7 +416,7 @@ console.log("initialData", initialData);
       </div>
 
       {/* ── Khối 3: Các nút bấm điều hướng Footer ── */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
         <button
           type="button"
           onClick={onClose}
