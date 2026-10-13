@@ -22,6 +22,7 @@ import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
 
 import { UserCreateDto } from 'src/modules/users/dto/request/user-create.dto';
+import { UserQueryDto } from 'src/modules/users/dto/request/user-query.dto';
 import { UserUpdateDto } from 'src/modules/users/dto/request/user-update.dto';
 import { ReqUserUpdateProfileDto } from 'src/modules/users/dto/request/req-user-update-profile.dto';
 
@@ -102,17 +103,11 @@ export class UserController {
 
   @Get(UrlConstant.User.GET_USERS)
   async getAllUser(
-    @Query('filter') filter: string[] = [],
-    @Query('page') page = '1',
-    @Query('pageSize') pageSize = '10',
+    @Query() query: UserQueryDto,
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.userService.getAllUser(
-        filter,
-        Number(page),
-        Number(pageSize),
-      ),
+      await this.userService.getAllUser(query),
     );
   }
 

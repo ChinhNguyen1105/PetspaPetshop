@@ -121,7 +121,6 @@ export class FileServiceImpl implements FileService {
     const result = new ResUploadFileResultDto();
 
     result.resUploadFileDtoList = resUploadFileDtoList;
-
     result.resUploadFileFailedList = resUploadFileFailedList;
 
     return result;
@@ -165,6 +164,10 @@ export class FileServiceImpl implements FileService {
     file: Express.Multer.File,
     folder: string,
   ): Promise<ResUploadFileDto> {
+    if (!file) {
+      throw new UploadFileException('Không có file được tải lên');
+    }
+
     await this.createDirectory(folder);
 
     const originalFileName = this.cleanFileName(file.originalname);
@@ -266,7 +269,17 @@ export class FileServiceImpl implements FileService {
   ): Promise<void> {
     const targetLocation = this.resolveFilePath(finalName, folder);
 
-    await fs.copyFile(file.path, targetLocation);
+    if (file.path) {
+      await fs.copyFile(file.path, targetLocation);
+      return;
+    }
+
+    if (file.buffer && file.buffer.length > 0) {
+      await fs.writeFile(targetLocation, file.buffer);
+      return;
+    }
+
+    throw new Error('Không tìm thấy dữ liệu file để lưu');
   }
 
   private resolveFilePath(fileName: string, folder: string): string {

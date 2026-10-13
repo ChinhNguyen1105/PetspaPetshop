@@ -1,15 +1,11 @@
-﻿import {
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+﻿import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 import { GenderEnum } from 'src/common/constants/gender.enum';
 import { UserDateAuditingDto } from 'src/common/dto/common/user-date-auditing.dto';
 import { EnumValue } from 'src/common/validators/enum-value.decorator';
 import { Role } from 'src/modules/roles/entities/role.entity';
 
-export class UserUpdateDto extends UserDateAuditingDto {
+export class UserUpdateDto {
   @IsNotEmpty({
     message: 'User ID is required',
   })

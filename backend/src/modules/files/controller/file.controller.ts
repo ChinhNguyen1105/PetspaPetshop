@@ -1,4 +1,11 @@
-﻿import { Controller, Get, Header, Inject, Query, Res } from '@nestjs/common';
+﻿import {
+  Controller,
+  Get,
+  Header,
+  Inject,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
@@ -17,29 +24,46 @@ export class FileController {
   async downloadFile(
     @Query('fileName') fileName: string,
     @Query('folder') folder: string,
+    @Query('inline') inline: string,
     @Res() response: Response,
-  ) {
-    const resource = await this.fileService.getResource(fileName, folder);
+  ): Promise<void> {
+    if (!fileName || !folder) {
+      response.status(400).json({
+        statusCode: 400,
+        message: 'fileName và folder là bắt buộc',
+      });
+      return;
+    }
 
-    const contentType = this.getContentType(fileName);
+    try {
+      const resource = await this.fileService.getResource(fileName, folder);
+      const contentType = this.getContentType(fileName);
+      const shouldDisplayInline =
+        inline === 'true' && contentType.startsWith('image/');
 
-    response.setHeader('Content-Type', contentType);
+      response.setHeader('Content-Type', contentType);
+      response.setHeader(
+        'X-Content-Type-Options',
+        'nosniff',
+      );
+      response.setHeader(
+        'Content-Disposition',
+        `${shouldDisplayInline ? 'inline' : 'attachment'}; filename="${this.getSafeHeaderFileName(fileName)}"`,
+      );
 
-    response.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${fileName}"`,
-    );
-
-    response.send(resource);
+      response.send(resource);
+    } catch {
+      response.status(404).json({
+        statusCode: 404,
+        message: 'Không tìm thấy file',
+      });
+    }
   }
 
   private getContentType(fileName: string): string {
     const extension = fileName.split('.').pop()?.toLowerCase();
 
     switch (extension) {
-      case 'pdf':
-        return 'application/pdf';
-
       case 'jpg':
       case 'jpeg':
         return 'image/jpeg';
@@ -53,6 +77,9 @@ export class FileController {
       case 'gif':
         return 'image/gif';
 
+      case 'pdf':
+        return 'application/pdf';
+
       case 'doc':
         return 'application/msword';
 
@@ -62,5 +89,9 @@ export class FileController {
       default:
         return 'application/octet-stream';
     }
+  }
+
+  private getSafeHeaderFileName(fileName: string): string {
+    return fileName.replace(/["\\\r\n]/g, '_');
   }
 }

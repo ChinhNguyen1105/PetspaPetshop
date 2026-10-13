@@ -2,6 +2,7 @@
 import { ReqUserUpdateProfileDto } from 'src/modules/users/dto/request/req-user-update-profile.dto';
 import { UserCreateDto } from 'src/modules/users/dto/request/user-create.dto';
 import { UserUpdateDto } from 'src/modules/users/dto/request/user-update.dto';
+import { UserQueryDto } from 'src/modules/users/dto/request/user-query.dto';
 import { CommonResponseDto } from 'src/common/dto/common/common-response.dto';
 import { UserDto } from 'src/modules/users/dto/response/user.dto';
 import { User } from 'src/modules/users/entities/user.entity';
@@ -15,11 +16,7 @@ export interface UserService {
 
   deleteUser(id: string): Promise<CommonResponseDto>;
 
-  getAllUser(
-    filter: string[],
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto>;
+  getAllUser(query: UserQueryDto): Promise<ResultPaginationDto>;
 
   changeUserStatus(id: string): Promise<CommonResponseDto>;
 
