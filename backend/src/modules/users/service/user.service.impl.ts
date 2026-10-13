@@ -163,16 +163,20 @@ export class UserServiceImpl implements UserService {
 
     const queryBuilder = this.userRepository
       .getRepository()
-      .createQueryBuilder('user');
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'roleEntity');
 
     specificationBuilder.apply(queryBuilder, 'user');
 
     queryBuilder
-      .andWhere('user.deleteFlag = :deleteFlag', { deleteFlag: false })
+      .andWhere('user.deleteFlag = :deleteFlag', {
+        deleteFlag: false,
+      })
       .skip((page - 1) * pageSize)
       .take(pageSize);
 
     const [users, total] = await queryBuilder.getManyAndCount();
+
     const result = this.userMapper.toUserDtos(users);
 
     return {

@@ -32,8 +32,10 @@ export class ProductImageRepository {
     return this.repository
       .createQueryBuilder()
       .update(ProductImage)
-      .set({ isThumbnail: false })
-      .where('productId = :productId', { productId })
+      .set({
+        isThumbnail: false,
+      })
+      .where('product_id = :productId', { productId })
       .execute();
   }
 

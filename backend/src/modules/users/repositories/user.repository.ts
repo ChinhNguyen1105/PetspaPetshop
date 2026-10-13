@@ -1,5 +1,4 @@
-﻿
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -17,15 +16,20 @@ export class UserRepository {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .where('user.email = :email', { email })
-      .andWhere('user.deleteFlag = false')
+      .andWhere('user.deleteFlag = :deleteFlag', {
+        deleteFlag: false,
+      })
       .getOne();
   }
 
   findByIdAndDeleteFlagFalse(id: string) {
     return this.repository
       .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
       .where('user.id = :id', { id })
-      .andWhere('user.deleteFlag = false')
+      .andWhere('user.deleteFlag = :deleteFlag', {
+        deleteFlag: false,
+      })
       .getOne();
   }
 
@@ -33,7 +37,9 @@ export class UserRepository {
     return this.repository
       .createQueryBuilder('user')
       .where('user.email = :email', { email })
-      .andWhere('user.deleteFlag = false')
+      .andWhere('user.deleteFlag = :deleteFlag', {
+        deleteFlag: false,
+      })
       .getExists();
   }
 
@@ -43,7 +49,9 @@ export class UserRepository {
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('role.permissions', 'permissions')
       .where('user.id = :id', { id })
-      .andWhere('user.deleteFlag = false')
+      .andWhere('user.deleteFlag = :deleteFlag', {
+        deleteFlag: false,
+      })
       .getOne();
   }
 

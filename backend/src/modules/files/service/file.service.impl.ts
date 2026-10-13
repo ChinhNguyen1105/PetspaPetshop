@@ -80,6 +80,16 @@ export class FileServiceImpl implements FileService {
     files: Express.Multer.File[],
     folder: string,
   ): Promise<ResUploadFileResultDto> {
+    if (!Array.isArray(files)) {
+      throw new UploadFileException(
+        'Danh sách file không hợp lệ. Kiểm tra dữ liệu từ controller.',
+      );
+    }
+
+    if (files.length === 0) {
+      throw new UploadFileException('Vui lòng tải lên ít nhất một file.');
+    }
+
     await this.createDirectory(folder);
 
     const resUploadFileDtoList: ResUploadFileDto[] = [];
@@ -103,7 +113,6 @@ export class FileServiceImpl implements FileService {
         await this.saveFileToStorage(file, folder, finalName);
 
         const dto = new ResUploadFileDto();
-
         dto.fileName = finalName;
         dto.uploadedAt = new Date();
 
@@ -111,21 +120,18 @@ export class FileServiceImpl implements FileService {
       } catch (error) {
         throw new Error(
           `Không thể lưu file ${originalFileName}. Vui lòng thử lại!`,
-          {
-            cause: error,
-          },
+          { cause: error },
         );
       }
     }
 
     const result = new ResUploadFileResultDto();
-
     result.resUploadFileDtoList = resUploadFileDtoList;
     result.resUploadFileFailedList = resUploadFileFailedList;
 
     return result;
   }
-
+  
   async getFileLength(fileName: string, folder: string): Promise<number> {
     const filePath = this.resolveFilePath(fileName, folder);
 
