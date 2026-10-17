@@ -101,71 +101,20 @@ function App() {
       <main className="flex-grow pt-20">
         <Routes>
           {/* ========================================================= */}
-          {/* USER & PUBLIC ROUTES */}
+          {/* PUBLIC ROUTES - KHÔNG CẦN ĐĂNG NHẬP */}
           {/* ========================================================= */}
 
-          <Route
-            path="/"
-            element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <HomePage />
-              </RoleRoute>
-            }
-          />
+          <Route path="/" element={<HomePage />} />
 
-          <Route
-            path="/about"
-            element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <AboutUs />
-              </RoleRoute>
-            }
-          />
+          <Route path="/about" element={<AboutUs />} />
 
-          <Route
-            path="/spa"
-            element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <ServiceList />
-              </RoleRoute>
-            }
-          />
+          <Route path="/shop" element={<ProductList />} />
 
-          <Route
-            path="/spa/service/:id"
-            element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <ServiceDetail />
-              </RoleRoute>
-            }
-          />
+          <Route path="/shop/product/:id" element={<ProductDetail />} />
 
-          <Route
-            path="/shop"
-            element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <ProductList />
-              </RoleRoute>
-            }
-          />
+          <Route path="/spa" element={<ServiceList />} />
 
-          <Route
-            path="/shop/product/:id"
-            element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <ProductDetail />
-              </RoleRoute>
-            }
-          />
-
-          <Route
-            path="/shop/cart"
-            element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <Cart />
-              </RoleRoute>
-            }
-          />
+          <Route path="/spa/service/:id" element={<ServiceDetail />} />
 
           {/* ========================================================= */}
           {/* AUTH ROUTES */}
@@ -192,6 +141,15 @@ function App() {
           {/* ========================================================= */}
           {/* PROTECTED CUSTOMER ROUTES */}
           {/* ========================================================= */}
+
+          <Route
+            path="/shop/cart"
+            element={
+              <RoleRoute allowedRoles={customerRoles}>
+                <Cart />
+              </RoleRoute>
+            }
+          />
 
           <Route
             path="/shop/checkout"
@@ -349,45 +307,21 @@ function App() {
           >
             <Route path="dashboard" element={<Dashboard />} />
 
-            <Route
-              path="products/list"
-              element={<ProductManagement />}
-            />
+            <Route path="products/list" element={<ProductManagement />} />
 
-            <Route
-              path="categories"
-              element={<CategoryManagement />}
-            />
+            <Route path="categories" element={<CategoryManagement />} />
 
-            <Route
-              path="services/list"
-              element={<ServiceManagement />}
-            />
+            <Route path="services/list" element={<ServiceManagement />} />
 
-            <Route
-              path="bookings"
-              element={<BookingManagement />}
-            />
+            <Route path="bookings" element={<BookingManagement />} />
 
-            <Route
-              path="orders"
-              element={<OrderManagement />}
-            />
+            <Route path="orders" element={<OrderManagement />} />
 
-            <Route
-              path="users"
-              element={<UserManagement />}
-            />
+            <Route path="users" element={<UserManagement />} />
 
-            <Route
-              path="reports"
-              element={<RevenueReport />}
-            />
+            <Route path="reports" element={<RevenueReport />} />
 
-            <Route
-              path="roles"
-              element={<RoleManagement />}
-            />
+            <Route path="roles" element={<RoleManagement />} />
 
             <Route
               path="inventory/list"
@@ -399,20 +333,14 @@ function App() {
               element={<InventoryTransManagement />}
             />
 
-            <Route
-              path="permission"
-              element={<PermissionManagement />}
-            />
+            <Route path="permission" element={<PermissionManagement />} />
           </Route>
 
           {/* ========================================================= */}
           {/* FALLBACK */}
           {/* ========================================================= */}
 
-          <Route
-            path="*"
-            element={<Navigate to="/" replace />}
-          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 

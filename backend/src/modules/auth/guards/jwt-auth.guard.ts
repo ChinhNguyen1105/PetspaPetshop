@@ -24,6 +24,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     { path: '/api/v1/service-images/service', method: 'GET', prefix: true },
 
     { path: '/api/v1/payment/vnpay/return', method: 'ALL' },
+    { path: '/api/v1/files/download', method: 'GET' },
   ];
 
   canActivate(context: ExecutionContext) {

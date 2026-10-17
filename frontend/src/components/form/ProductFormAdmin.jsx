@@ -87,7 +87,6 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
 
     if (!files.length) return;
 
-    // Product images require a persisted product ID.
     if (!productId) {
       alert("Vui lòng tạo sản phẩm trước khi tải ảnh lên.");
       event.target.value = "";
@@ -186,18 +185,25 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
       return;
     }
 
-    if (!formData.categoryId) {
-      alert("Vui lòng chọn danh mục.");
+    if (
+      formData.categoryId === "" ||
+      !Number.isFinite(Number(formData.categoryId))
+    ) {
+      alert("Vui lòng chọn danh mục hợp lệ.");
       return;
     }
 
-    if (
-      formData.quantity === "" ||
-      !Number.isFinite(Number(formData.quantity)) ||
-      Number(formData.quantity) < 0
-    ) {
-      alert("Số lượng nhập kho không hợp lệ.");
-      return;
+    // Only validate quantity when creating a new product.
+    // Editing product details must not change stock quantity.
+    if (!isEdit) {
+      if (
+        formData.quantity === "" ||
+        !Number.isFinite(Number(formData.quantity)) ||
+        Number(formData.quantity) < 0
+      ) {
+        alert("Số lượng nhập kho không hợp lệ.");
+        return;
+      }
     }
 
     const payload = {
@@ -205,11 +211,15 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
       description: formData.description.trim(),
       price: Number(formData.price),
       categoryId: Number(formData.categoryId),
-      quantity: Number(formData.quantity),
     };
 
     if (isEdit) {
+      // Update product information only.
+      // Intentionally do not include quantity.
       payload.id = Number(productId);
+    } else {
+      // Initial stock quantity is only supplied during creation.
+      payload.quantity = Number(formData.quantity);
     }
 
     onSubmit(payload);
@@ -323,21 +333,34 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            Số lượng nhập kho ban đầu *
+            {isEdit
+              ? "Số lượng tồn kho hiện tại (chỉ xem)"
+              : "Số lượng nhập kho ban đầu *"}
           </label>
           <input
             type="number"
             min="0"
             value={formData.quantity}
+            disabled={isEdit}
             onChange={(event) =>
               setFormData((prev) => ({
                 ...prev,
                 quantity: event.target.value,
               }))
             }
-            placeholder="Nhập số lượng tồn..."
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            placeholder={
+              isEdit ? "Quản lý tại chức năng kho" : "Nhập số lượng tồn..."
+            }
+            className={`w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 ${
+              isEdit ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""
+            }`}
           />
+          {isEdit && (
+            <p className="mt-1 text-xs text-gray-500">
+              Số lượng tồn kho không thay đổi khi cập nhật thông tin sản phẩm.
+              Hãy dùng chức năng quản lý kho để nhập hoặc xuất hàng.
+            </p>
+          )}
         </div>
       </div>
 

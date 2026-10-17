@@ -36,10 +36,7 @@ export class PetServiceImpl implements PetService {
     private readonly userService: UserService,
   ) {}
 
-  private async checkExistPet(
-    userId: string,
-    petName: string,
-  ): Promise<void> {
+  private async checkExistPet(userId: string, petName: string): Promise<void> {
     const exists =
       await this.petRepository.existsByUserIdAndNameAndDeleteFlagFalse(
         userId,
@@ -211,9 +208,7 @@ export class PetServiceImpl implements PetService {
 
     specificationBuilder.apply(queryBuilder, 'pet');
 
-    queryBuilder
-      .skip((page - 1) * pageSize)
-      .take(pageSize);
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
 
     const [pets, total] = await queryBuilder.getManyAndCount();
 
@@ -236,7 +231,19 @@ export class PetServiceImpl implements PetService {
   ): Promise<Pet> {
     const pet = await this.getPetById(petId);
 
-    if (pet.user?.id !== currentUserId) {
+    const currentUser = await this.userService.getUserLogin();
+    const roleName = currentUser.role?.name?.trim().toUpperCase();
+
+    // Admin và nhân viên được xem thú cưng theo quyền nghiệp vụ.
+    // Khách hàng chỉ được thao tác thú cưng của chính mình.
+    const isStaff = ['ROLE_ADMIN', 'ROLE_STAFF'].includes(roleName ?? '');
+console.log('[DEBUG PET ACCESS]', {
+  petId: pet.id,
+  petOwnerId: pet.user?.id,
+  currentUserId,
+  hasPetUser: !!pet.user,
+});
+    if (!isStaff && pet.user?.id !== currentUserId) {
       throw new ForbiddenException(
         '[PET] Bạn không có quyền thao tác thú cưng này',
       );
@@ -251,21 +258,15 @@ export class PetServiceImpl implements PetService {
     if (!pet) {
       this.logger.warn(`[NOT_FOUND] Không tìm thấy thú cưng ID: ${petId}`);
 
-      throw new NotFoundException(
-        `[PET] Không tìm thấy thú cưng ID: ${petId}`,
-      );
+      throw new NotFoundException(`[PET] Không tìm thấy thú cưng ID: ${petId}`);
     }
 
     if (pet.deleteFlag === true) {
-      throw new NotFoundException(
-        `[PET] Thú cưng ID: ${petId} đã bị xóa`,
-      );
+      throw new NotFoundException(`[PET] Thú cưng ID: ${petId} đã bị xóa`);
     }
 
     if (pet.activeFlag === false) {
-      throw new BadRequestException(
-        `[PET] Thú cưng ID: ${petId} đã bị khóa`,
-      );
+      throw new BadRequestException(`[PET] Thú cưng ID: ${petId} đã bị khóa`);
     }
 
     return pet;

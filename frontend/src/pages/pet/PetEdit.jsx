@@ -46,20 +46,23 @@ const PetEdit = () => {
 
   // 3. ĐỒNG BỘ DỮ LIỆU TỪ STORE VÀO FORM STATE
   useEffect(() => {
-    if (currentPet && String(currentPet.id) === String(id)) {
-      setFormData({
-        id: currentPet.id || "",
-        name: currentPet.name || "",
-        specie: currentPet.specie || "", // Nếu backend trả về object, map lại thành string: currentPet.specie?.name hoặc giữ nguyên tùy cấu trúc data cũ
-        gender: currentPet.gender || "",
-        birthday: currentPet.birthday || "", // Đảm bảo định dạng yyyy-MM-dd để input[type=date] nhận diện được
-        weight: currentPet.weight || "",
-        healthStatus: currentPet.healthStatus || "",
-      });
-    } else if (!loading && !currentPet) {
-      setLocalError("Không tìm thấy thông tin thú cưng.");
-    }
-  }, [currentPet, id, loading]);
+    if (!currentPet) return;
+
+    setFormData({
+      id: currentPet.id ?? "",
+      name: currentPet.name ?? "",
+      specie:
+        currentPet.specie ?? currentPet.species?.name?.toUpperCase() ?? "DOG",
+      gender: currentPet.gender?.toUpperCase() ?? "MALE",
+      birthday: currentPet.birthday
+        ? String(currentPet.birthday).slice(0, 10)
+        : "",
+      weight: currentPet.weight ?? currentPet.weight_kg ?? "",
+      healthStatus: currentPet.healthStatus ?? currentPet.medical_note ?? "",
+    });
+
+    setLocalError(null);
+  }, [currentPet]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

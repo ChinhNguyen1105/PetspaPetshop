@@ -2,6 +2,7 @@
   IsDefined,
   IsNotEmpty,
   IsString,
+  IsOptional
 } from 'class-validator';
 
 export class ReqUpdateProductDto {
@@ -22,6 +23,7 @@ export class ReqUpdateProductDto {
   @IsDefined({ message: 'Category ID is required' })
   categoryId: number;
 
+  @IsOptional()
   @IsDefined({ message: 'Quantity is required' })
   quantity: number;
 }

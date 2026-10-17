@@ -1,0 +1,239 @@
+.pet-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 610px;
+  overflow: hidden;
+  padding: 76px max(24px, calc((100% - 1200px) / 2)) 88px;
+  color: #17324d;
+  background: #071326;
+}
+
+/* Nội dung nằm trên ma trận ảnh */
+.pet-hero__content {
+  position: relative;
+  z-index: 5;
+  width: min(100%, 650px);
+  margin: 0;
+}
+
+.pet-hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 24px;
+  color: #f97316;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.pet-hero__title {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(42px, 5.4vw, 72px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+  text-shadow: 0 3px 30px rgba(0, 0, 0, 0.22);
+}
+
+.pet-hero__title span {
+  color: #f97316;
+}
+
+.pet-hero__description {
+  max-width: 490px;
+  margin: 24px 0 0;
+  color: #e2e8f0;
+  font-size: 15px;
+  line-height: 1.9;
+  text-shadow: 0 2px 15px rgba(0, 0, 0, 0.5);
+}
+
+.pet-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.pet-hero__button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.pet-hero__button:hover {
+  transform: translateY(-2px);
+}
+
+/* Nút chính */
+.pet-hero__button--primary {
+  color: #ffffff;
+  background: #f97316;
+  border-color: #f97316;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+
+.pet-hero__button--primary:hover {
+  color: #ffffff;
+  background: #ea580c;
+  border-color: #ea580c;
+}
+
+/* Nút phụ */
+.pet-hero__button--secondary {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(5, 15, 35, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.pet-hero__button--secondary:hover {
+  color: #f97316;
+  border-color: #f97316;
+  background: rgba(5, 15, 35, 0.72);
+}
+
+.pet-hero__note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 42px;
+  color: #e2e8f0;
+  font-size: 12px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+
+.pet-hero__note-line {
+  width: 30px;
+  height: 1px;
+  flex-shrink: 0;
+  background: #f97316;
+}
+
+.pet-hero__bottom-label {
+  position: absolute;
+  z-index: 5;
+  right: max(24px, calc((100% - 1200px) / 2));
+  bottom: 22px;
+  left: max(24px, calc((100% - 1200px) / 2));
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: rgba(226, 235, 246, 0.75);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  pointer-events: none;
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .pet-hero {
+    min-height: 590px;
+    padding: 64px 32px 82px;
+  }
+
+  .pet-hero__content {
+    width: min(100%, 620px);
+  }
+
+  .pet-hero__title {
+    font-size: clamp(42px, 7vw, 62px);
+  }
+
+  .pet-hero__description {
+    max-width: 500px;
+  }
+
+  .pet-hero__bottom-label {
+    right: 32px;
+    left: 32px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .pet-hero {
+    min-height: 590px;
+    align-items: center;
+    padding: 48px 22px 74px;
+  }
+
+  .pet-hero__content {
+    width: 100%;
+  }
+
+  .pet-hero__eyebrow {
+    margin-bottom: 20px;
+    font-size: 10px;
+  }
+
+  .pet-hero__title {
+    font-size: clamp(37px, 10vw, 46px);
+  }
+
+  .pet-hero__description {
+    margin-top: 20px;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .pet-hero__actions {
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 26px;
+  }
+
+  .pet-hero__button {
+    min-height: 46px;
+    padding: 0 13px;
+    font-size: 12px;
+  }
+
+  .pet-hero__note {
+    margin-top: 28px;
+    font-size: 11px;
+  }
+
+  .pet-hero__bottom-label {
+    right: 22px;
+    bottom: 18px;
+    left: 22px;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  .pet-hero__bottom-label span:last-child {
+    text-align: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-hero__button {
+    transition: none;
+  }
+
+  .pet-hero__button:hover {
+    transform: none;
+  }
+}

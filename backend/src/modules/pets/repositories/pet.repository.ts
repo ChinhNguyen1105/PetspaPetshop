@@ -31,15 +31,13 @@ export class PetRepository {
   findByIdAndDeleteFlagFalse(id: number) {
     return this.repository
       .createQueryBuilder('pet')
+      .leftJoinAndSelect('pet.user', 'user')
       .where('pet.id = :id', { id })
       .andWhere('pet.deleteFlag = false')
       .getOne();
   }
 
-  existsByUserIdAndNameAndDeleteFlagFalse(
-    userId: string,
-    petName: string,
-  ) {
+  existsByUserIdAndNameAndDeleteFlagFalse(userId: string, petName: string) {
     return this.repository
       .createQueryBuilder('pet')
       .leftJoin('pet.user', 'user')

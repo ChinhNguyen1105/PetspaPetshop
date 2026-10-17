@@ -64,9 +64,7 @@ export class FileServiceImpl implements FileService {
     const targetPath = path.resolve(this.baseUri, folder);
 
     try {
-      await fs.mkdir(targetPath, {
-        recursive: true,
-      });
+      await fs.mkdir(targetPath, { recursive: true });
     } catch (error) {
       throw new Error(
         `Lỗi khởi tạo thư mục lưu trữ: ${
@@ -98,12 +96,29 @@ export class FileServiceImpl implements FileService {
     for (const file of files) {
       const originalFileName = this.cleanFileName(file.originalname);
 
-      const validationError = this.validateAllFile(file, originalFileName);
+      console.log('[UPLOAD FILE]', {
+        folder,
+        originalname: file.originalname,
+        cleanedName: originalFileName,
+        size: file.size,
+        mimetype: file.mimetype,
+      });
+
+      const validationError =
+        folder === 'products'
+          ? this.validFileImage(file, originalFileName)
+          : this.validateAllFile(file, originalFileName);
 
       if (validationError !== null) {
         resUploadFileFailedList.push(
           `${originalFileName} -> ${validationError}`,
         );
+
+        console.warn('[UPLOAD FILE REJECTED]', {
+          fileName: originalFileName,
+          reason: validationError,
+        });
+
         continue;
       }
 
@@ -129,20 +144,20 @@ export class FileServiceImpl implements FileService {
     result.resUploadFileDtoList = resUploadFileDtoList;
     result.resUploadFileFailedList = resUploadFileFailedList;
 
+    console.log('[UPLOAD FILE RESULT]', {
+      successCount: resUploadFileDtoList.length,
+      failedFiles: resUploadFileFailedList,
+    });
+
     return result;
   }
-  
+
   async getFileLength(fileName: string, folder: string): Promise<number> {
     const filePath = this.resolveFilePath(fileName, folder);
 
     try {
       const stat = await fs.stat(filePath);
-
-      if (!stat.isFile()) {
-        return 0;
-      }
-
-      return stat.size;
+      return stat.isFile() ? stat.size : 0;
     } catch {
       return 0;
     }
@@ -159,7 +174,6 @@ export class FileServiceImpl implements FileService {
       }
 
       await fs.access(filePath);
-
       return await fs.readFile(filePath);
     } catch {
       throw new Error(`Không tìm thấy file: ${fileName}`);
@@ -177,7 +191,6 @@ export class FileServiceImpl implements FileService {
     await this.createDirectory(folder);
 
     const originalFileName = this.cleanFileName(file.originalname);
-
     const validationError = this.validFileImage(file, originalFileName);
 
     if (validationError !== null) {
@@ -189,7 +202,6 @@ export class FileServiceImpl implements FileService {
     await this.saveFileToStorage(file, folder, finalName);
 
     const dto = new ResUploadFileDto();
-
     dto.fileName = finalName;
     dto.uploadedAt = new Date();
 

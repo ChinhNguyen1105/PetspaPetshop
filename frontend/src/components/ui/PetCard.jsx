@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import {
-  Edit2,
   Eye,
   Scale,
   Calendar,
@@ -13,9 +12,9 @@ import {
 import { Badge } from "./Badge";
 
 const PetCard = ({ pet }) => {
-  // HÀM HELPER: Tính tuổi dựa trên ngày sinh (birthday)
   const calculateAge = (birthday) => {
     if (!birthday) return "Chưa rõ tuổi";
+
     const birthDate = new Date(birthday);
     const today = new Date();
 
@@ -34,15 +33,16 @@ const PetCard = ({ pet }) => {
         (today.getFullYear() - birthDate.getFullYear()) * 12 +
         today.getMonth() -
         birthDate.getMonth();
+
       return months <= 0 ? "Mới sinh" : `${months} tháng`;
     }
 
     return `${age} tuổi`;
   };
 
-  // HÀM HELPER: Lấy Cấu hình Icon chính thống & Màu sắc theo loài (specie)
   const getSpecieConfig = (specie) => {
     const type = specie?.toLowerCase();
+
     if (type === "dog") {
       return {
         label: "Chó",
@@ -50,6 +50,7 @@ const PetCard = ({ pet }) => {
         IconComponent: Dog,
       };
     }
+
     if (type === "cat") {
       return {
         label: "Mèo",
@@ -57,6 +58,7 @@ const PetCard = ({ pet }) => {
         IconComponent: Cat,
       };
     }
+
     return {
       label: specie || "Thú cưng",
       bgColor: "bg-purple-50 text-purple-600 border-purple-100",
@@ -64,7 +66,6 @@ const PetCard = ({ pet }) => {
     };
   };
 
-  // Chuẩn hóa dữ liệu giới tính dựa trên Enum (MALE, FEMALE, UNKNOWN)
   const isMale = pet.gender?.toUpperCase() === "MALE";
   const isFemale = pet.gender?.toUpperCase() === "FEMALE";
 
@@ -73,7 +74,7 @@ const PetCard = ({ pet }) => {
   return (
     <div className="group bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-xl hover:border-pet-blue/20 transition-all duration-300 text-left flex flex-col justify-between min-h-[220px]">
       <div>
-        {/* Hàng đầu: Icon loài (Chính thống Lucide) & Badge giới tính */}
+        {/* Icon loài và giới tính */}
         <div className="flex justify-between items-center mb-4">
           <div
             className={`flex items-center gap-1.5 px-3 py-1 rounded-2xl border text-xs font-bold ${bgColor}`}
@@ -90,14 +91,13 @@ const PetCard = ({ pet }) => {
           </Badge>
         </div>
 
-        {/* Tên Pet */}
+        {/* Tên thú cưng */}
         <h3 className="text-xl font-black text-gray-900 group-hover:text-pet-blue transition-colors mb-4 truncate">
           {pet.name}
         </h3>
 
-        {/* Khu vực thông tin chi tiết (Grid) */}
+        {/* Thông tin chi tiết */}
         <div className="grid grid-cols-2 gap-3 mb-5">
-          {/* Tuổi */}
           <div className="flex items-center gap-2 text-gray-500">
             <Calendar size={16} className="text-gray-400 shrink-0" />
             <span className="text-xs font-semibold truncate">
@@ -105,7 +105,6 @@ const PetCard = ({ pet }) => {
             </span>
           </div>
 
-          {/* Cân nặng */}
           <div className="flex items-center gap-2 text-gray-500">
             <Scale size={16} className="text-gray-400 shrink-0" />
             <span className="text-xs font-semibold truncate">
@@ -113,7 +112,6 @@ const PetCard = ({ pet }) => {
             </span>
           </div>
 
-          {/* Tình trạng sức khỏe */}
           <div className="flex items-center gap-2 text-gray-500 col-span-2 border-t border-gray-50 pt-2 mt-0.5">
             <Activity size={16} className="text-gray-400 shrink-0" />
             <span className="text-xs font-medium text-gray-400 truncate">
@@ -123,17 +121,11 @@ const PetCard = ({ pet }) => {
         </div>
       </div>
 
-      {/* Nút hành động */}
+      {/* Nút xem/sửa */}
       <div className="flex gap-2 pt-2 border-t border-gray-50">
         <Link to={`/profile/pets/detail/${pet.id}`} className="flex-1">
           <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-pet-blue hover:text-white transition-all text-xs font-bold cursor-pointer border-none">
-            <Eye size={14} /> Xem
-          </button>
-        </Link>
-
-        <Link to={`/profile/pets/edit/${pet.id}`} className="flex-1">
-          <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-pet-orange hover:text-white transition-all text-xs font-bold cursor-pointer border-none">
-            <Edit2 size={14} /> Sửa
+            <Eye size={14} /> Xem/Sửa
           </button>
         </Link>
       </div>

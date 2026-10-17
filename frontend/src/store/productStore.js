@@ -371,136 +371,97 @@ export const useProductStore = create(
     |--------------------------------------------------------------------------
     */
 
-    updateProduct: async (
-      id,
-      data
-    ) => {
-      const numericId =
-        Number(id);
+    updateProduct: async (id, data) => {
+  const numericId = Number(id);
 
-      try {
-        set({
-          loading: true,
-        });
+  try {
+    set({ loading: true });
 
-        const request = {
-          id: numericId,
+    const request = {
+      name: data.name,
+      description: data.description,
+      price: Number(data.price),
+      categoryId: Number(
+        data.categoryId ?? data.category
+      ),
+    };
 
-          name: data.name,
+    // Chỉ gửi quantity nếu form thực sự cung cấp giá trị.
+    if (
+      data.quantity !== undefined &&
+      data.quantity !== null &&
+      data.quantity !== ""
+    ) {
+      request.quantity = Number(data.quantity);
+    }
 
-          description:
-            data.description,
+    console.log("UPDATE PRODUCT REQUEST:", {
+      id: numericId,
+      ...request,
+    });
 
-          price: Number(
-            data.price
-          ),
+    const res = await ProductService.updateProduct(
+      numericId,
+      request
+    );
 
-          categoryId: Number(
-            data.categoryId ??
-              data.category
-          ),
+    console.log("UPDATE PRODUCT SERVICE RESULT:", res);
 
-          quantity: Number(
-            data.stockQuantity ??
-              data.stock_quantity ??
-              0
-          ),
-        };
+    if (res?.success && res?.data) {
+      const updatedProduct = {
+        ...res.data,
+        id:
+          res.data.id !== undefined
+            ? Number(res.data.id)
+            : numericId,
+        price:
+          res.data.price !== undefined
+            ? Number(res.data.price)
+            : Number(data.price),
+        categoryId:
+          res.data.categoryId !== undefined
+            ? Number(res.data.categoryId)
+            : Number(data.categoryId ?? data.category),
+      };
 
-        console.log(
-          "UPDATE PRODUCT REQUEST:",
-          request
-        );
+      set((state) => ({
+        products: state.products.map((product) =>
+          Number(product.id) === numericId
+            ? {
+                ...product,
+                ...updatedProduct,
+              }
+            : product
+        ),
 
-        const res =
-          await ProductService.updateProduct(
-            numericId,
-            request
-          );
+        currentProduct:
+          Number(state.currentProduct?.id) === numericId
+            ? {
+                ...state.currentProduct,
+                ...updatedProduct,
+              }
+            : state.currentProduct,
+      }));
+    }
 
-        console.log(
-          "UPDATE PRODUCT SERVICE RESULT:",
-          res
-        );
+    return res;
+  } catch (err) {
+    console.error(
+      `Lỗi khi cập nhật sản phẩm ID ${id}:`,
+      err
+    );
 
-        if (
-          res?.success &&
-          res?.data
-        ) {
-          const updatedProduct =
-            {
-              ...res.data,
-
-              id:
-                res.data.id !==
-                undefined
-                  ? Number(
-                      res.data.id
-                    )
-                  : numericId,
-
-              price:
-                res.data.price !==
-                undefined
-                  ? Number(
-                      res.data.price
-                    )
-                  : res.data.price,
-
-              categoryId:
-                res.data.categoryId !==
-                undefined
-                  ? Number(
-                      res.data.categoryId
-                    )
-                  : res.data.categoryId,
-            };
-
-          set((state) => ({
-            products:
-              state.products.map(
-                (product) =>
-                  Number(
-                    product.id
-                  ) === numericId
-                    ? {
-                        ...product,
-                        ...updatedProduct,
-                      }
-                    : product
-              ),
-
-            currentProduct:
-              Number(
-                state.currentProduct?.id
-              ) === numericId
-                ? {
-                    ...state.currentProduct,
-                    ...updatedProduct,
-                  }
-                : state.currentProduct,
-          }));
-        }
-
-        return res;
-      } catch (err) {
-        console.error(
-          `Lỗi khi cập nhật sản phẩm ID ${id}:`,
-          err
-        );
-
-        return {
-          success: false,
-          message:
-            "Lỗi hệ thống không thể cập nhật sản phẩm.",
-          data: null,
-        };
-      } finally {
-        set({
-          loading: false,
-        });
-      }
-    },
+    return {
+      success: false,
+      message:
+        err?.response?.data?.message ??
+        "Lỗi hệ thống không thể cập nhật sản phẩm.",
+      data: null,
+    };
+  } finally {
+    set({ loading: false });
+  }
+},
 
     /*
     |--------------------------------------------------------------------------

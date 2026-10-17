@@ -398,13 +398,26 @@ const updateProduct = async (
   productData,
   options = {}
 ) => {
+  const numericId = Number(id);
+
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    return {
+      success: false,
+      message: "ID sản phẩm không hợp lệ.",
+      data: null,
+    };
+  }
+
   if (shouldUseApi(options)) {
+    // Không gửi quantity nếu productData không có trường này.
+    const request = {
+      ...productData,
+      id: numericId,
+    };
+
     const resp = await api.put(
       URL_CONSTANT.Product.UPDATE_PRODUCT,
-      {
-        id: Number(id),
-        ...productData,
-      }
+      request
     );
 
     console.log(
@@ -419,24 +432,19 @@ const updateProduct = async (
 
   return {
     success: true,
-
-    message:
-      "Update product successfully",
-
+    message: "Update product successfully",
     data: {
-      id: Number(id),
-
+      id: numericId,
       ...productData,
-
       status:
         Number(
-          productData.stockQuantity
+          productData.quantity ??
+          productData.stockQuantity ??
+          0
         ) > 0
           ? "ACTIVE"
           : "OUT_OF_STOCK",
-
-      lastModifiedDate:
-        new Date().toISOString(),
+      lastModifiedDate: new Date().toISOString(),
     },
   };
 };

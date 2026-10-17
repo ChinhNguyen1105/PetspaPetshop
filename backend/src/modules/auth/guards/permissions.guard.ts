@@ -67,6 +67,10 @@ export class PermissionsGuard implements CanActivate {
       path: '/api/v1/payment/vnpay/return',
       method: 'ALL',
     },
+    {
+      path: '/api/v1/files/download',
+      method: 'GET',
+    },
   ];
 
   constructor(
@@ -74,11 +78,8 @@ export class PermissionsGuard implements CanActivate {
     private readonly permissionService: PermissionService,
   ) {}
 
-  async canActivate(
-    context: ExecutionContext,
-  ): Promise<boolean> {
-    const request =
-      context.switchToHttp().getRequest<Request>();
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<Request>();
 
     if (request.method === 'OPTIONS') {
       return true;
@@ -90,8 +91,7 @@ export class PermissionsGuard implements CanActivate {
         : request.path === route.path;
 
       const methodMatches =
-        route.method === 'ALL' ||
-        request.method === route.method;
+        route.method === 'ALL' || request.method === route.method;
 
       return pathMatches && methodMatches;
     });
@@ -100,8 +100,7 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const user =
-      request.user as UserPrincipal | undefined;
+    const user = request.user as UserPrincipal | undefined;
 
     if (!user) {
       throw new ForbiddenException(
@@ -115,25 +114,20 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const apiPath = this.buildApiPath(
-      request,
-      routePath,
-    );
+    const apiPath = this.buildApiPath(request, routePath);
 
     const method = request.method;
 
-    const authorities =
-      user.getAuthorities() ?? [];
+    const authorities = user.getAuthorities() ?? [];
 
     if (authorities.includes('ROLE_ADMIN')) {
       return true;
     }
 
-    const permission =
-      await this.permissionService.findByApiPathAndMethod(
-        apiPath,
-        method,
-      );
+    const permission = await this.permissionService.findByApiPathAndMethod(
+      apiPath,
+      method,
+    );
 
     if (!permission) {
       throw new ForbiddenException(
@@ -142,8 +136,7 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const hasPermission =
-      permission.name !== null &&
-      authorities.includes(permission.name);
+      permission.name !== null && authorities.includes(permission.name);
 
     if (!hasPermission) {
       throw new ForbiddenException(
@@ -154,39 +147,25 @@ export class PermissionsGuard implements CanActivate {
     return true;
   }
 
-  private buildApiPath(
-    request: Request,
-    routePath: string,
-  ): string {
-    const normalizedRoutePath =
-      this.normalizeApiPath(routePath);
+  private buildApiPath(request: Request, routePath: string): string {
+    const normalizedRoutePath = this.normalizeApiPath(routePath);
 
-    if (
-      normalizedRoutePath.startsWith('/api/v1')
-    ) {
+    if (normalizedRoutePath.startsWith('/api/v1')) {
       return normalizedRoutePath;
     }
 
     const baseUrl = request.baseUrl ?? '';
 
-    const fullPath =
-      `${baseUrl}/${routePath}`.replace(
-        /\/+/g,
-        '/',
-      );
+    const fullPath = `${baseUrl}/${routePath}`.replace(/\/+/g, '/');
 
     return this.normalizeApiPath(fullPath);
   }
 
-  private normalizeApiPath(
-    path: string,
-  ): string {
+  private normalizeApiPath(path: string): string {
     if (path.startsWith('/api/v1')) {
       return path;
     }
 
-    return `/api/v1${
-      path.startsWith('/') ? '' : '/'
-    }${path}`;
+    return `/api/v1${path.startsWith('/') ? '' : '/'}${path}`;
   }
 }

@@ -1,406 +1,744 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useProductStore } from "../../store/productStore";
-import { useCategoryStore } from "../../store/categoryStore";
-import { useProductImageStore } from "../../store/productImageStore";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  Calendar,
+  Clock,
+  AlertCircle,
+  Plus,
+  X,
+  Notebook,
+  CheckCircle2,
+} from "lucide-react";
+import validateBookingForm from "../../utils/bookingValidator";
 
-const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
-  const isEdit = !!initialData;
-  const productId = initialData?.id;
+import { useServiceStore } from "../../store/serviceStore";
+import { useUserStore } from "../../store/userStore";
+import { usePetStore } from "../../store/petStore";
+import { useBookingStore } from "../../store/bookingStore";
+import { SLOT_TIMES } from "../../constants";
 
-  const { loading: loadingProduct } = useProductStore();
-  const { categories, fetchCategories } = useCategoryStore();
+const BookingFormAdmin = ({ initialData, onSubmit, onClose }) => {
+  // ─── STORE DATA ──────────────────────────────────────────────────────────────
+  const { services, fetchServices } = useServiceStore();
+  const { users, fetchUsers } = useUserStore();
+  const { pets, fetchPets, loading: loadingPets } = usePetStore();
+  const fetchUnavailableSlots = useBookingStore(
+    (state) => state.fetchUnavailableSlots,
+  );
+  const unavailableSlots = useBookingStore((state) => state.unavailableSlots);
+  const bookingStoreError = useBookingStore((state) => state.error);
 
-  // 1. Đồng bộ Store: Lấy các phương thức và object quản lý ảnh dựa trên ID sản phẩm
-  const {
-    imagesByProductId,
-    loading: loadingImages,
-    fetchImages,
-    uploadImages,
-    deleteImage,
-    setMainImage,
-    clearImages,
-  } = useProductImageStore();
+  // ─── LOCAL UI STATE ──────────────────────────────────────────────────────────
+  const [loading, setLoading] = useState(true);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [petsError, setPetsError] = useState("");
+  const [formErrors, setFormErrors] = useState({});
+  const [userError, setUserError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Trích xuất mảng ảnh thực tế của sản phẩm hiện tại, bọc giáp an toàn tuyệt đối bằng fallback || []
-  const productImages = productId ? imagesByProductId?.[productId] || [] : [];
-
-  // State quản lý dữ liệu form bám sát theo Class ReqCreateProduct DTO
+  // Form data
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    categoryId: "",
-    quantity: "",
+    userEmail: initialData?.user?.email ?? "",
+    petId: initialData?.pet?.id ?? "",
+    date: initialData?.bookingDate || "",
+    time: initialData?.startTime || "",
+    note: initialData?.note || "",
+    serviceIds: initialData?.services?.map((s) => s.id.toString()) || [],
   });
 
-  // Dùng ref để clear input file dễ dàng sau khi upload thành công
-  const fileInputRef = useRef(null);
+  // SLOT_TIMES là toàn bộ ca làm việc. Store cung cấp các ca đã bị đặt;
+  // form ghép hai nguồn để vẫn hiển thị ca bận và disable chúng.
+  const slots = useMemo(() => {
+    const bookedSlots = Array.isArray(unavailableSlots) ? unavailableSlots : [];
 
-  // Kích hoạt fetch các danh mục có loại là PRODUCT
-  useEffect(() => {
-    if (fetchCategories) {
-      fetchCategories({ type: "PRODUCT" });
-    }
-  }, [fetchCategories]);
-
-  // Đổ dữ liệu ban đầu hoặc Fetch ảnh từ server về nếu là Mode Edit
-  useEffect(() => {
-    if (initialData) {
-      setFormData({
-        name: initialData.name || "",
-        description: initialData.description || "",
-        price: initialData.price ?? "",
-        categoryId: initialData.categoryId || initialData.category?.id || "",
-        quantity:
-          initialData.quantity ??
-          initialData.stockQuantity ??
-          initialData.stock_quantity ??
-          "",
-      });
-
-      if (initialData.id) {
-        fetchImages(initialData.id);
-      }
-    } else {
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        categoryId: "",
-        quantity: "",
-      });
-      // Tùy chọn xóa dữ liệu ảnh tạm thời khi đóng/mở form tạo mới
-      if (clearImages) clearImages();
-    }
-  }, [initialData, fetchImages, clearImages]);
-
-  // Xử lý upload tập tin hình ảnh (Hỗ trợ chọn nhiều ảnh cùng lúc)
-  const handleFileChange = async (e) => {
-    const fileList = e.target.files;
-    if (!fileList || fileList.length === 0 || !productId) return;
-
-    // Ép kiểu FileList thành một Array thực thụ
-    const filesArray = Array.from(fileList);
-
-    // Kiểm tra giới hạn số lượng ảnh (Tối đa 6) - Sử dụng optional chaining an toàn
-    if ((productImages?.length || 0) + filesArray.length > 6) {
-      alert(
-        `Hệ thống chỉ hỗ trợ tối đa 6 ảnh minh họa. Hiện tại sản phẩm đã có ${productImages?.length || 0} ảnh.`,
+    const toSeconds = (value) => {
+      if (typeof value !== "string") return null;
+      const match = value.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if (!match) return null;
+      return (
+        Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3] || 0)
       );
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    try {
-      // Truyền mảng chuẩn (Array) và kèm productId chính xác
-      await uploadImages(productId, filesArray);
-    } catch (err) {
-      alert(
-        "Tải tập tin hình ảnh lên thất bại, vui lòng kiểm tra lại định dạng tệp.",
-      );
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const handleRemoveGalleryImage = async (imageId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa hình ảnh này không?"))
-      return;
-    try {
-      await deleteImage(imageId);
-      // Tùy chọn reload lại danh sách ảnh từ server sau khi xóa thành công
-      if (productId) fetchImages(productId);
-    } catch (err) {
-      alert("Xóa ảnh thất bại!");
-    }
-  };
-
-  const handleSetMainImage = async (imageId) => {
-    if (!productId) return;
-    try {
-      await setMainImage(productId, imageId);
-      // Tùy chọn reload lại danh sách ảnh để đồng bộ lại flag isThumbnail/isMain mới nhất
-      fetchImages(productId);
-    } catch (err) {
-      alert("Thay đổi ảnh đại diện chính thất bại!");
-    }
-  };
-
-  // Validate và submit payload chuẩn DTO
-  const handleSubmitForm = () => {
-    if (!formData.name.trim()) return alert("Tên sản phẩm không được để trống");
-    if (!formData.description.trim())
-      return alert("Mô tả sản phẩm không được để trống");
-    if (formData.price === "" || Number(formData.price) < 0)
-      return alert("Giá sản phẩm không hợp lệ");
-    if (!formData.categoryId) return alert("Vui lòng chọn danh mục");
-    if (formData.quantity === "" || Number(formData.quantity) < 0)
-      return alert("Số lượng nhập kho không hợp lệ");
-
-    const submitPayload = {
-      name: formData.name.trim(),
-      description: formData.description.trim(),
-      price: Number(formData.price),
-      categoryId: Number(formData.categoryId),
-      quantity: Number(formData.quantity),
     };
 
-    if (isEdit && productId) {
-      submitPayload.id = Number(productId);
+    const getTimeValue = (item, keys) => {
+      if (typeof item === "string") return item;
+      for (const key of keys) {
+        if (item?.[key] != null) return item[key];
+      }
+      return null;
+    };
+
+    return SLOT_TIMES.map((slot) => {
+      const slotStart = toSeconds(slot.startTime);
+      const slotEnd = toSeconds(slot.endTime);
+      const booked = bookedSlots.some((item) => {
+        const bookedStartValue = getTimeValue(item, [
+          "startTime",
+          "start_time",
+          "bookingStartTime",
+          "time",
+          "slotTime",
+        ]);
+        const bookedEndValue = getTimeValue(item, [
+          "endTime",
+          "end_time",
+          "bookingEndTime",
+        ]);
+        const bookedStart = toSeconds(bookedStartValue);
+        const bookedEnd = toSeconds(bookedEndValue);
+
+        // Nếu API trả một giờ đơn lẻ thì chỉ đánh dấu ô bắt đầu tại giờ đó.
+        if (bookedStart == null) return false;
+        if (bookedEnd == null) return bookedStart === slotStart;
+
+        // Nếu API trả khoảng thời gian đặt, disable mọi ô giao với khoảng đó.
+        return slotStart < bookedEnd && slotEnd > bookedStart;
+      });
+
+      const isOwnCurrentBookingSlot =
+        initialData &&
+        formData.date === initialData.bookingDate &&
+        slotStart != null &&
+        toSeconds(initialData.startTime) != null &&
+        toSeconds(initialData.endTime) != null &&
+        slotStart < toSeconds(initialData.endTime) &&
+        slotEnd > toSeconds(initialData.startTime);
+
+      return {
+        ...slot,
+        available: !booked || Boolean(isOwnCurrentBookingSlot),
+        reason: booked && !isOwnCurrentBookingSlot ? "BOOKED" : undefined,
+      };
+    });
+  }, [unavailableSlots, initialData, formData.date]);
+
+  // ─── MATCHED USER (tra cứu bằng email) ──────────────────────────────────────
+  const matchedUser = useMemo(() => {
+    const email = formData.userEmail?.trim().toLowerCase();
+    if (!email) return undefined;
+
+    return users.find((u) => u.email?.trim().toLowerCase() === email);
+  }, [users, formData.userEmail]);
+
+  // ─── TÍNH TOÁN GIÁ TRỊ PHÁT SINH ────────────────────────────────────────────
+  const selectedServices = useMemo(
+    () => services.filter((s) => formData.serviceIds.includes(s.id.toString())),
+    [services, formData.serviceIds],
+  );
+
+  const totalDuration = useMemo(
+    () =>
+      selectedServices.reduce((sum, s) => sum + (s.durationMin || 0), 0) || 30,
+    [selectedServices],
+  );
+
+  const totalAmount = useMemo(
+    () => selectedServices.reduce((sum, s) => sum + (s.basePrice || 0), 0),
+    [selectedServices],
+  );
+
+  const slotsNeeded = Math.ceil(totalDuration / 30);
+  // ─── FETCH METADATA BAN ĐẦU TỪ STORES ──────────────────────────────────────
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchServices(), fetchUsers()]);
+      } catch (error) {
+        console.error("Lỗi tải dịch vụ hoặc khách hàng:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, [fetchServices, fetchUsers]);
+
+  // ─── KIỂM TRA EMAIL KHÁCH HÀNG ──────────────────────────────────────────────
+  useEffect(() => {
+    const email = formData.userEmail?.trim();
+    if (!email) {
+      setUserError("");
+      return;
     }
 
-    onSubmit(submitPayload);
+    // Chỉ báo không tìm thấy khi email có vẻ đã nhập đầy đủ.
+    if (!matchedUser) {
+      setUserError("Không tìm thấy khách hàng với email này.");
+    } else {
+      setUserError("");
+    }
+  }, [formData.userEmail, matchedUser]);
+
+  // ─── LẤY PET BẰNG QUERY ĐÃ TÍCH HỢP TRONG PET STORE ────────────────────────
+  useEffect(() => {
+    if (!matchedUser?.id) {
+      setPetsError("");
+      setFormData((prev) => ({ ...prev, petId: "" }));
+      return;
+    }
+
+    setPetsError("");
+    setFormData((prev) => ({ ...prev, petId: "" }));
+
+    fetchPets({
+      page: 1,
+      pageSize: 100,
+      filter: `user_id:${matchedUser.id}`,
+    }).catch((error) => {
+      console.error("Lỗi lấy danh sách thú cưng của khách hàng:", error);
+      setPetsError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể tải danh sách thú cưng của khách hàng.",
+      );
+    });
+  }, [matchedUser?.id, fetchPets]);
+
+  // ─── LẤY CÁC CA ĐÃ ĐẶT TỪ BOOKING STORE THEO NGÀY ───────────────────────────
+  useEffect(() => {
+    if (!formData.date) {
+      setLoadingSlots(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingSlots(true);
+
+    fetchUnavailableSlots({ date: formData.date })
+      .catch((err) => {
+        console.error("Lỗi lấy các khung giờ đã đặt:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.date, fetchUnavailableSlots]);
+
+  // ─── THUẬT TOÁN KIỂM TRA N SLOT LIÊN TIẾP ───────────────────────────────────
+  const checkConsecutiveSlots = useCallback(
+    (startIndex) => {
+      if (startIndex < 0 || startIndex >= slots.length)
+        return { available: false, reason: "INVALID_INDEX" };
+
+      for (let i = 0; i < slotsNeeded; i++) {
+        const slot = slots[startIndex + i];
+        if (!slot) return { available: false, reason: "OVER_WORKING_HOURS" };
+
+        const isOwnCurrentSlot =
+          initialData &&
+          formData.date === initialData.bookingDate &&
+          slot.startTime === initialData.startTime;
+
+        if (!slot.available && !isOwnCurrentSlot) {
+          return {
+            available: false,
+            reason: i === 0 ? slot.reason : "INSUFFICIENT_CONSECUTIVE_SLOTS",
+          };
+        }
+      }
+      return { available: true };
+    },
+    [slots, slotsNeeded, initialData, formData.date],
+  );
+
+  const selectedStartIndex = useMemo(
+    () =>
+      formData.time
+        ? slots.findIndex((s) => s.startTime === formData.time)
+        : -1,
+    [formData.time, slots],
+  );
+
+  useEffect(() => {
+    if (selectedStartIndex !== -1) {
+      const evaluation = checkConsecutiveSlots(selectedStartIndex);
+      if (!evaluation.available) setFormData((prev) => ({ ...prev, time: "" }));
+    }
+  }, [slotsNeeded, slots, selectedStartIndex, checkConsecutiveSlots]);
+
+  // Auto-select earliest available consecutive block
+  useEffect(() => {
+    if (!formData.date) return;
+    if (!formData.serviceIds || formData.serviceIds.length === 0) return;
+    if (formData.time) return; // keep user selection
+    if (!slots || slots.length === 0) return;
+
+    for (let i = 0; i < slots.length; i++) {
+      const evaluation = checkConsecutiveSlots(i);
+      if (evaluation.available) {
+        setFormData((prev) => ({ ...prev, time: slots[i].startTime }));
+        break;
+      }
+    }
+  }, [
+    slots,
+    slotsNeeded,
+    formData.date,
+    formData.serviceIds,
+    formData.time,
+    checkConsecutiveSlots,
+  ]);
+
+  // ─── HANDLERS ────────────────────────────────────────────────────────────────
+  const handleServiceToggle = (serviceIdStr) => {
+    setFormData((prev) => {
+      const isExist = prev.serviceIds.includes(serviceIdStr);
+      const updatedIds = isExist
+        ? prev.serviceIds.filter((id) => id !== serviceIdStr)
+        : [...prev.serviceIds, serviceIdStr];
+      return { ...prev, serviceIds: updatedIds };
+    });
   };
 
+  const handleSelectSlot = (slot, index) => {
+    const evaluation = checkConsecutiveSlots(index);
+    if (!evaluation.available) return;
+    setFormData((prev) => ({ ...prev, time: slot.startTime }));
+  };
+
+  // ─── SUBMIT: VALIDATE FORM VÀ GỬI DỮ LIỆU CHO COMPONENT CHA ─────────────────
+  // BookingManagement sẽ mở ConfirmModal; API chỉ được gọi sau khi admin xác nhận.
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    setSubmitError("");
+    setUserError("");
+
+    // bookingValidator yêu cầu customerId, còn payload API dùng userId.
+    const validationPayload = {
+      serviceIds: formData.serviceIds,
+      date: formData.date,
+      time: formData.time,
+      customerId: matchedUser?.id ?? "",
+      petId: formData.petId,
+    };
+
+    const errors = validateBookingForm(validationPayload, {
+      requireGroomer: false,
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    if (!matchedUser?.id) {
+      setUserError("Vui lòng nhập email hợp lệ của khách hàng.");
+      return;
+    }
+
+    setFormErrors({});
+
+    const endTime =
+      slots[selectedStartIndex + slotsNeeded - 1]?.endTime || formData.time;
+
+    // User ID là UUID, không ép sang Number; pet/service ID là số.
+    const payload = {
+      userId: matchedUser.id,
+      petId: Number(formData.petId),
+      serviceIds: formData.serviceIds.map(Number),
+      bookingDate: formData.date,
+      startTime: formData.time,
+      endTime,
+      note: formData.note?.trim() || "",
+      durationMinutes: totalDuration,
+    };
+
+    if (typeof onSubmit !== "function") {
+      setSubmitError(
+        "Không thể gửi biểu mẫu: component cha chưa truyền onSubmit.",
+      );
+      console.error("BookingFormAdmin: onSubmit prop is missing.");
+      return;
+    }
+
+    onSubmit(payload);
+  };
+
+  // ─── BADGE LÝ DO SLOT ────────────────────────────────────────────────────────
+  const getReasonBadge = (reason) => {
+    switch (reason) {
+      case "BOOKED":
+        return { label: "Kín lịch", color: "bg-red-100 text-red-500" };
+      case "OUTSIDE_WORKING_HOURS":
+        return { label: "Ngoài giờ", color: "bg-gray-200 text-gray-500" };
+      case "OVER_WORKING_HOURS":
+        return { label: "Cuối ca", color: "bg-gray-200 text-gray-500" };
+      case "INSUFFICIENT_CONSECUTIVE_SLOTS":
+        return { label: "Thiếu ô tiếp", color: "bg-amber-100 text-amber-600" };
+      default:
+        return { label: "Hết chỗ", color: "bg-gray-200 text-gray-500" };
+    }
+  };
+
+  // Hiển thị lý do nút xác nhận đang bị khóa để dễ kiểm tra form.
+  const submitDisabledReason = !formData.time
+    ? "Bạn chưa chọn khung giờ."
+    : isSubmitting
+      ? "Đang gửi yêu cầu tạo lịch."
+      : !matchedUser
+        ? "Chưa tìm thấy khách hàng theo email."
+        : !formData.petId
+          ? "Bạn chưa chọn thú cưng."
+          : "";
+
+  // ─── LOADING TOÀN TRANG ──────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="py-12 text-center text-sm font-semibold text-gray-500 animate-pulse">
+        Đang tải cấu hình biểu mẫu toàn hệ thống...
+      </div>
+    );
+  }
+
+  // ─── RENDER ──────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 relative">
-      {/* Loading Overlay khi hệ thống đang xử lý sản phẩm */}
-      {loadingProduct && (
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] flex flex-col items-center justify-center z-50">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
-          <span className="text-sm font-medium text-gray-600">
-            Đang xử lý dữ liệu sản phẩm...
-          </span>
+    <form
+      noValidate
+      onSubmit={handleFormSubmit}
+      className="space-y-6 text-left max-h-[75vh] overflow-y-auto pr-2"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+    >
+      {(submitError || bookingStoreError) && (
+        <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-sm text-red-600 font-medium">
+          {submitError || bookingStoreError}
         </div>
       )}
 
-      {/* ── Group 1: Tên & Danh mục sản phẩm ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tên sản phẩm *
-          </label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, name: e.target.value }))
-            }
-            placeholder="Nhập tên sản phẩm..."
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Danh mục sản phẩm *
-          </label>
-          <select
-            value={formData.categoryId}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, categoryId: e.target.value }))
-            }
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500"
-          >
-            <option value="">-- Chọn danh mục --</option>
-            {categories &&
-              categories
-                .filter(
-                  (cat) =>
-                    cat.categoryType === "PRODUCT" ||
-                    cat.type === "PRODUCT" ||
-                    !cat.categoryType,
-                )
-                .map((cat) => (
-                  <option key={cat.value || cat.id} value={cat.value || cat.id}>
-                    {cat.label || cat.name}
-                  </option>
-                ))}
-          </select>
-        </div>
-      </div>
-
-      {/* ── Group 2: Mô tả sản phẩm ── */}
+      {/* 1. CHỌN DỊCH VỤ */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Mô tả sản phẩm *
+        <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2">
+          1. Dịch vụ chăm sóc <span className="text-red-500">*</span>
         </label>
-        <textarea
-          rows="3"
-          value={formData.description}
-          onChange={(e) =>
-            setFormData((p) => ({ ...p, description: e.target.value }))
-          }
-          placeholder="Mô tả chi tiết các đặc tính, công dụng sản phẩm..."
-          className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-        />
+        <div className="flex flex-wrap gap-2 mb-2">
+          {services.map((s) => {
+            const isChecked = formData.serviceIds.includes(s.id.toString());
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => handleServiceToggle(s.id.toString())}
+                className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  isChecked
+                    ? "bg-orange-50 border-orange-400 text-orange-600 shadow-sm"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                {isChecked ? <X size={12} /> : <Plus size={12} />}
+                {s.name} ({s.durationMin}p)
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedServices.length > 0 && (
+          <div className="p-3 bg-gray-50 rounded-xl text-xs text-gray-500 flex justify-between items-center font-medium">
+            <span>Đã chọn: {selectedServices.length} dịch vụ</span>
+            <span>
+              Tổng thời gian:{" "}
+              <strong className="text-orange-500 font-bold">
+                {totalDuration} phút
+              </strong>
+            </span>
+          </div>
+        )}
+
+        {formErrors.serviceIds && (
+          <p className="text-xs font-semibold text-red-500 mt-1 flex items-center gap-1">
+            <AlertCircle size={12} /> {formErrors.serviceIds}
+          </p>
+        )}
       </div>
 
-      {/* ── Group 3: Giá bán & Số lượng ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Giá sản phẩm (đ) *
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={formData.price}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, price: e.target.value }))
-            }
-            placeholder="Nhập giá bán..."
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium text-gray-800"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Số lượng nhập kho ban đầu *
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={formData.quantity}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, quantity: e.target.value }))
-            }
-            placeholder="Nhập số lượng tồn..."
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-      </div>
+      {/* 2. KHÁCH HÀNG: TÌM THEO EMAIL */}
+      <div className="space-y-4 bg-orange-50/30 p-4 rounded-2xl border border-orange-100/50">
+        <label className="block text-xs font-black text-gray-400 uppercase tracking-wider">
+          2. Thông tin khách hàng <span className="text-red-500">*</span>
+        </label>
 
-      {/* ── Group 4: Quản lý Album Ảnh (Chỉ hiển thị khi EDIT) ── */}
-      {isEdit && (
-        <div className="space-y-4 border-t border-gray-100 pt-4 relative">
-          {loadingImages && (
-            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10">
-              <span className="text-xs font-semibold text-gray-500 animate-pulse">
-                Đang đồng bộ tập tin ảnh...
-              </span>
-            </div>
-          )}
-
-          <label className="block text-sm font-semibold text-gray-800">
-            Quản lý Album Ảnh sản phẩm
-          </label>
-            
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
           <div>
-            <p className="text-xs text-gray-500 mb-2">
-              Danh sách hình ảnh chi tiết từ hệ thống (
-              {productImages?.length || 0}/6)
-            </p>
-            <p className="text-[11px] text-gray-400 mb-3">
-              * Mẹo: Click trực tiếp vào một ảnh để cấu hình đặt làm ảnh hiển
-              thị chính (Thumbnail).
-            </p>
+            <label className="block text-xs font-bold text-gray-500 mb-1">
+              Email khách hàng <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              placeholder="Nhập email khách hàng"
+              value={formData.userEmail}
+              onChange={(e) => {
+                const userEmail = e.target.value;
+                setFormData((prev) => ({ ...prev, userEmail, petId: "" }));
+                setFormErrors((prev) => ({
+                  ...prev,
+                  customerId: "",
+                  userId: "",
+                  petId: "",
+                }));
+              }}
+              className={`w-full p-2.5 rounded-xl border outline-none text-sm text-gray-700 focus:border-orange-500 ${
+                formErrors.customerId || formErrors.userId
+                  ? "border-red-400"
+                  : "border-gray-200"
+              }`}
+            />
+          </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
-              {(productImages || []).map((img) => {
-                const isMain = img.isThumbnail || img.isMain;
-                const currentImgUrl = img.imageUrl || img.url;
-                return (
-                  <div
-                    key={img.id}
-                    className={`relative group aspect-square rounded-xl border overflow-hidden cursor-pointer ${
-                      isMain
-                        ? "border-orange-500 ring-2 ring-orange-400/30"
-                        : "border-gray-200"
-                    }`}
-                  >
-                    <img
-                      src={currentImgUrl}
-                      alt={`gallery-${img.id}`}
-                      className="w-full h-full object-cover bg-gray-50"
-                      onClick={() => handleSetMainImage(img.id)}
-                      title="Click để đặt làm ảnh hiển thị chính"
-                      onError={(e) => {
-                        e.target.src = "https://placehold.co/300x300";
-                      }}
-                    />
-
-                    {isMain && (
-                      <span className="absolute bottom-1 left-1 bg-orange-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold shadow">
-                        Chính
-                      </span>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveGalleryImage(img.id);
-                      }}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow hover:bg-red-600"
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-
-              {(productImages?.length || 0) < 6 && (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/40 transition-colors text-gray-400 hover:text-blue-500"
-                >
-                  <span className="text-2xl leading-none">+</span>
-                  <span className="text-[10px] mt-1">Tải ảnh lên</span>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 mb-1">
+              Kết quả tra cứu
+            </label>
+            {matchedUser ? (
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-2 text-xs font-bold">
+                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                <div>
+                  <p>{matchedUser.name}</p>
+                  <p className="font-medium text-gray-400 text-[10px]">
+                    {matchedUser.email}
+                  </p>
                 </div>
-              )}
-            </div>
-
-            {/* Input file ẩn */}
-            <div className="hidden">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-                multiple
-              />
-            </div>
-
-            {(productImages?.length || 0) < 6 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-slate-900 transition-colors flex items-center gap-1.5 shadow-sm"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2}
-                    stroke="currentColor"
-                    className="w-4 h-4"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 12 12M12 3v13.5"
-                    />
-                  </svg>
-                  Chọn tệp từ thiết bị
-                </button>
-                <span className="text-xs text-gray-400">
-                  Hỗ trợ các định dạng .png, .jpg, .jpeg, .webp
-                </span>
+              </div>
+            ) : (
+              <div className="p-2.5 bg-gray-100 text-gray-400 border border-dashed rounded-xl text-xs font-medium text-center">
+                Chưa có dữ liệu
               </div>
             )}
           </div>
         </div>
+
+        {userError && (
+          <p className="text-xs font-semibold text-red-500 mt-1">{userError}</p>
+        )}
+
+        {(formErrors.customerId || formErrors.userId) && (
+          <p className="text-xs font-semibold text-red-500 flex items-center gap-1">
+            <AlertCircle size={12} />
+            {formErrors.customerId || formErrors.userId}
+          </p>
+        )}
+
+        {/* CHỌN THÚ CƯNG */}
+        <div>
+          <label className="block text-xs font-bold text-gray-500 mb-1">
+            Chọn Thú cưng tương ứng <span className="text-red-500">*</span>
+          </label>
+          {petsError && (
+            <p className="mb-2 text-xs font-semibold text-red-500">
+              {petsError}
+            </p>
+          )}
+          <select
+            className={`w-full p-2.5 rounded-xl border outline-none bg-white font-medium text-sm text-gray-700 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+              formErrors.petId ? "border-red-400" : "border-gray-200"
+            }`}
+            value={formData.petId}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, petId: e.target.value }))
+            }
+            disabled={!matchedUser || loadingPets}
+          >
+            {!matchedUser ? (
+              <option value="">-- Vui lòng nhập email hợp lệ trước --</option>
+            ) : loadingPets ? (
+              <option value="">Đang tải danh sách pet của khách...</option>
+            ) : pets.length === 0 ? (
+              <option value="">Tài khoản khách này chưa đăng ký Pet nào</option>
+            ) : (
+              <>
+                <option value="">-- Chọn thú cưng nhận dịch vụ --</option>
+                {pets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.specie})
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+          {formErrors.petId && (
+            <p className="text-xs font-semibold text-red-500 mt-1 flex items-center gap-1">
+              <AlertCircle size={12} /> {formErrors.petId}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 3. NGÀY HẸN */}
+      <div>
+        <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <Calendar size={14} /> 3. Chọn ngày đặt lịch{" "}
+          <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="date"
+          min={new Date().toISOString().split("T")[0]}
+          value={formData.date}
+          onChange={(e) =>
+            setFormData((prev) => ({
+              ...prev,
+              date: e.target.value,
+              time: "",
+            }))
+          }
+          className={`w-full p-3 rounded-xl border outline-none bg-white font-medium text-sm text-gray-700 focus:border-orange-500 ${
+            formErrors.date ? "border-red-400" : "border-gray-200"
+          }`}
+        />
+        {formErrors.date && (
+          <p className="text-xs font-semibold text-red-500 mt-1 flex items-center gap-1">
+            <AlertCircle size={12} /> {formErrors.date}
+          </p>
+        )}
+      </div>
+
+      {/* 4. KHUNG GIỜ */}
+      <div>
+        <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <Clock size={14} /> 4. Trạng thái ca trống{" "}
+          <span className="text-red-500">*</span>
+        </label>
+
+        {!formData.date ? (
+          <div className="p-4 bg-gray-50 text-gray-400 rounded-xl border border-dashed border-gray-200 text-center text-xs flex items-center justify-center gap-1.5">
+            <AlertCircle size={14} /> Vui lòng chọn{" "}
+            <strong>Ngày đặt lịch</strong> để hiển thị ca trống.
+          </div>
+        ) : formData.serviceIds.length === 0 ? (
+          <div className="p-4 bg-amber-50 text-amber-600 rounded-xl border border-dashed border-amber-200 text-center text-xs font-bold">
+            Vui lòng chọn dịch vụ ở mục 1 để tính toán thời lượng giữ ô!
+          </div>
+        ) : loadingSlots ? (
+          <div className="grid grid-cols-2 gap-2 animate-pulse">
+            {[1, 2, 3, 4].map((n) => (
+              <div key={n} className="h-14 bg-gray-100 rounded-xl" />
+            ))}
+          </div>
+        ) : slots.length === 0 ? (
+          <div className="p-4 bg-red-50 text-red-500 rounded-xl border border-red-100 text-center text-xs font-bold">
+            Không có ca làm việc hoặc đã kín lịch vào ngày này!
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 bg-gray-50 rounded-xl border">
+            {slots.map((slot, index) => {
+              const evaluation = checkConsecutiveSlots(index);
+              const isAvailable = evaluation.available;
+              const reason = isAvailable
+                ? null
+                : evaluation.reason || slot.reason;
+              const isInSelectedBlock =
+                selectedStartIndex >= 0 &&
+                index >= selectedStartIndex &&
+                index < selectedStartIndex + slotsNeeded;
+              const isActualStart = formData.time === slot.startTime;
+              const badge = reason ? getReasonBadge(reason) : null;
+
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  disabled={!isAvailable}
+                  onClick={() => handleSelectSlot(slot, index)}
+                  className={`p-2 rounded-xl border text-left relative transition-all flex flex-col justify-between h-14 ${
+                    isInSelectedBlock
+                      ? "bg-orange-500 text-white border-orange-500 shadow-sm font-bold scale-[1.01]"
+                      : !isAvailable
+                        ? "bg-gray-100 border-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-white hover:bg-orange-50/40 border-gray-200 text-gray-700 hover:border-orange-300 cursor-pointer font-semibold"
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs tracking-wide font-bold">
+                      {slot.startTime} – {slot.endTime}
+                    </span>
+                    {!isAvailable && badge && (
+                      <span
+                        className={`text-[8px] px-1 py-0.5 rounded font-bold uppercase tracking-wider ${badge.color}`}
+                      >
+                        {badge.label}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`text-[9px] block font-medium truncate ${
+                      isInSelectedBlock ? "text-orange-100" : "text-gray-400"
+                    }`}
+                  >
+                    {isInSelectedBlock
+                      ? isActualStart
+                        ? `Bắt đầu (${totalDuration}p)`
+                        : "Chuỗi giữ chỗ"
+                      : isAvailable
+                        ? "Đủ điều kiện chọn"
+                        : reason === "INSUFFICIENT_CONSECUTIVE_SLOTS"
+                          ? "Thiếu ô liền kề"
+                          : "Không thể chọn"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {formErrors.time && (
+          <p className="text-xs font-semibold text-red-500 mt-1 flex items-center gap-1">
+            <AlertCircle size={12} /> {formErrors.time}
+          </p>
+        )}
+      </div>
+
+      {/* GHI CHÚ */}
+      <div>
+        <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <Notebook size={14} /> Ghi chú lịch hẹn
+        </label>
+        <textarea
+          rows="2"
+          placeholder="Yêu cầu đặc biệt về sức khỏe hoặc hành vi của bé..."
+          value={formData.note}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, note: e.target.value }))
+          }
+          className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 text-gray-700"
+        />
+      </div>
+
+      {/* TỔNG TIỀN */}
+      {totalAmount > 0 && (
+        <div className="p-3 bg-orange-50/50 rounded-xl border border-orange-100 flex justify-between items-center">
+          <span className="text-xs font-bold text-gray-600">
+            Doanh thu dự kiến:
+          </span>
+          <strong className="text-lg font-black text-orange-600">
+            {totalAmount.toLocaleString("vi-VN")} đ
+          </strong>
+        </div>
       )}
 
-      {/* ── Group 5: Actions Footer ── */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+      {/* FOOTER ACTIONS */}
+      <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100 sticky bottom-0 bg-white">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50"
+          className="px-4 py-2 border border-gray-200 text-gray-500 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all"
         >
-          Hủy bỏ
+          Hủy
         </button>
-        <button
-          type="button"
-          onClick={handleSubmitForm}
-          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          {isEdit ? "Cập nhật sản phẩm" : "Tạo sản phẩm mới"}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="submit"
+            disabled={Boolean(submitDisabledReason)}
+            title={submitDisabledReason || "Xác nhận tạo lịch hẹn"}
+            className="px-5 py-2 bg-orange-500 text-white text-sm font-black rounded-xl hover:bg-opacity-95 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
+          >
+            Xác nhận lịch đặt
+          </button>
+          {submitDisabledReason && (
+            <p className="text-[11px] text-red-500">{submitDisabledReason}</p>
+          )}
+        </div>
       </div>
-    </div>
+    </form>
   );
 };
 
-export default ProductFormAdmin;
+export default BookingFormAdmin;
