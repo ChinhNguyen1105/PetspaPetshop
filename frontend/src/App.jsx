@@ -1,59 +1,59 @@
-﻿import React, { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import Header from "./components/layout/Header";
-import Footer from "./components/layout/Footer";
-import ToastContainer from "./components/ui/ToastContainer";
+import Header from "./layouts/public/Header.jsx";
+import Footer from "./layouts/public/Footer.jsx";
+import ToastContainer from "./shared/components/ToastContainer.jsx";
 
 // Pages - Shop
-import HomePage from "./pages/home/HomePage";
-import ProductList from "./pages/shop/ProductList";
-import ProductDetail from "./pages/shop/ProductDetail";
-import Cart from "./pages/shop/Cart";
-import Checkout from "./pages/shop/Checkout";
-import VNPayReturnPage from "./pages/shop/VNPayReturnPage";
-import OrderSuccess from "./pages/order/OrderSuccess";
+import HomePage from "./modules/home/pages/HomePage.jsx";
+import ProductList from "./modules/products/pages/public/ProductList.jsx";
+import ProductDetail from "./modules/products/pages/public/ProductDetail.jsx";
+import Cart from "./modules/cart/pages/Cart.jsx";
+import Checkout from "./modules/orders/pages/Checkout.jsx";
+import VNPayReturnPage from "./modules/payments/pages/VNPayReturnPage.jsx";
+import OrderSuccess from "./modules/orders/pages/public/OrderSuccess.jsx";
 
 // Pages - Spa
-import ServiceList from "./pages/spa/ServiceList";
-import ServiceDetail from "./pages/spa/ServiceDetail";
-import BookingList from "./pages/spa/BookingList";
-import BookingDetail from "./pages/spa/BookingDetail";
-import BookingCreate from "./pages/spa/BookingCreate";
+import ServiceList from "./modules/services/pages/public/ServiceList.jsx";
+import ServiceDetail from "./modules/services/pages/public/ServiceDetail.jsx";
+import BookingList from "./modules/bookings/pages/public/BookingList.jsx";
+import BookingDetail from "./modules/bookings/pages/public/BookingDetail.jsx";
+import BookingCreate from "./modules/bookings/pages/public/BookingCreate.jsx";
 
 // Pages - Profile & Pet
-import Profile from "./pages/profile/Profile";
-import PetEdit from "./pages/pet/PetEdit";
-import PetDetail from "./pages/pet/PetDetail";
-import PetCreate from "./pages/pet/PetCreate";
+import Profile from "./modules/users/pages/public/Profile.jsx";
+import PetEdit from "./modules/pets/pages/public/PetEdit.jsx";
+import PetDetail from "./modules/pets/pages/public/PetDetail.jsx";
+import PetCreate from "./modules/pets/pages/public/PetCreate.jsx";
 
 // Pages - Review
-import CreateOrderReview from "./pages/review/CreateProductReview";
-import CreateBookingReview from "./pages/review/CreateBookingReview";
+import CreateOrderReview from "./modules/reviews/pages/CreateProductReview.jsx";
+import CreateBookingReview from "./modules/reviews/pages/CreateBookingReview.jsx";
 
-import OrderDetail from "./pages/order/OrderDetail";
-import AboutUs from "./pages/about/AboutUs";
-import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
+import OrderDetail from "./modules/orders/pages/public/OrderDetail.jsx";
+import AboutUs from "./modules/about/pages/public/AboutUs.jsx";
+import Login from "./modules/auth/pages/Login.jsx";
+import Register from "./modules/auth/pages/Register.jsx";
 
-import { useAuthStore } from "./store/authStore";
+import { useAuthStore } from "./modules/auth/store/authStore.js";
 import "./styles/animations.css";
 
-import Dashboard from "./pages/admin/dashboard/Dashboard";
-import AdminLayout from "./pages/admin/AdminLayout";
-import ProductManagement from "./pages/admin/products/ProductManagement";
-import CategoryManagement from "./pages/admin/categories/CategoryManagement";
-import ServiceManagement from "./pages/admin/services/ServiceManagement";
-import BookingManagement from "./pages/admin/bookings/BookingManagement";
-import OrderManagement from "./pages/admin/orders/OrderManagement";
-import UserManagement from "./pages/admin/users/UserManagement";
-import RevenueReport from "./pages/admin/reports/RevenueReport";
-import RoleManagement from "./pages/admin/roles/roleManagement";
-import InventoryListManagement from "./pages/admin/inventory/inventoryListManagement";
-import InventoryTransManagement from "./pages/admin/inventory/inventoryTransManagement";
-import PermissionManagement from "./pages/admin/roles/permissionManagement";
+import Dashboard from "./modules/dashboard/pages/admin/Dashboard.jsx";
+import AdminLayout from "./layouts/admin/AdminLayout.jsx";
+import ProductManagement from "./modules/products/pages/admin/ProductManagement.jsx";
+import CategoryManagement from "./modules/categories/pages/admin/CategoryManagement.jsx";
+import ServiceManagement from "./modules/services/pages/admin/ServiceManagement.jsx";
+import BookingManagement from "./modules/bookings/pages/admin/BookingManagement.jsx";
+import OrderManagement from "./modules/orders/pages/admin/OrderManagement.jsx";
+import UserManagement from "./modules/users/pages/admin/UserManagement.jsx";
+import RevenueReport from "./modules/reports/pages/admin/RevenueReport.jsx";
+import RoleManagement from "./modules/roles/pages/admin/RoleManagement.jsx";
+import InventoryListManagement from "./modules/inventory/pages/admin/InventoryListManagement.jsx";
+import InventoryTransManagement from "./modules/inventory/pages/admin/InventoryTransactionManagement.jsx";
+import PermissionManagement from "./modules/permissions/pages/admin/PermissionManagement.jsx";
 
 // Import Role Route Guard động
-import RoleRoute from "./routes/RoleRoute";
+import RoleRoute from "./app/router/RoleRoute.jsx";
 
 // ----------------------------------------------------------------------
 // ROUTE GUARDS
