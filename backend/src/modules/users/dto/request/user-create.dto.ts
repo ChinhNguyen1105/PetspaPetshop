@@ -6,10 +6,9 @@
 
 import { GenderEnum } from 'src/common/constants/gender.enum';
 import { EnumValue } from 'src/common/validators/enum-value.decorator';
-import { FlagUserDateAuditingDto } from 'src/common/dto/common/flag-user-date-auditing.dto';
 import { Role } from 'src/modules/roles/entities/role.entity';
 
-export class UserCreateDto extends FlagUserDateAuditingDto {
+export class UserCreateDto  {
   @IsNotEmpty({
     message: 'Email is required',
   })

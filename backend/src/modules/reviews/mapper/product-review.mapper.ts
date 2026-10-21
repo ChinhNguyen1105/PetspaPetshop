@@ -11,7 +11,10 @@ export class ProductReviewMapper {
     dto.id = productReview.id;
     dto.rating = productReview.rating;
     dto.comment = productReview.comment;
+
     dto.userName = productReview.user?.name ?? null;
+    dto.avatarUrl = productReview.user?.avatarUrl ?? null;
+
     dto.productId = productReview.product?.id ?? null;
     dto.createdDate = productReview.createdDate;
 
@@ -19,8 +22,6 @@ export class ProductReviewMapper {
   }
 
   toDtoList(productReviews: ProductReview[]): ProductReviewDto[] {
-    return productReviews.map((productReview) =>
-      this.toDto(productReview),
-    );
+    return productReviews.map((productReview) => this.toDto(productReview));
   }
 }

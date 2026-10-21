@@ -1,4 +1,5 @@
-﻿import {
+﻿import { Type } from 'class-transformer';
+import {
   IsDefined,
   IsNotEmpty,
   IsNumber,
@@ -26,6 +27,7 @@ export class ReqCreatePetDto {
   gender: string;
 
   @IsDefined({ message: 'Birthday is required' })
+  @Type(() => Date)
   @IsDate()
   birthday: Date;
 

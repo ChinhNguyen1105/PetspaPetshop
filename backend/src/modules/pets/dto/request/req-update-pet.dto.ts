@@ -1,4 +1,5 @@
-﻿import {
+﻿import { Type } from 'class-transformer';
+import {
   IsDefined,
   IsNotEmpty,
   IsNumber,
@@ -6,6 +7,7 @@
   IsPositive,
   IsDate,
   IsOptional,
+  IsInt,
 } from 'class-validator';
 
 import { GenderEnum } from 'src/common/constants/gender.enum';
@@ -13,6 +15,7 @@ import { EnumValue } from 'src/common/validators/enum-value.decorator';
 
 export class ReqUpdatePetDto {
   @IsDefined({ message: 'Pet ID is required' })
+  @IsInt()
   id: number;
 
   @IsNotEmpty({ message: 'Name is required' })
@@ -29,6 +32,7 @@ export class ReqUpdatePetDto {
   gender: string;
 
   @IsDefined({ message: 'Birthday is required' })
+  @Type(() => Date)
   @IsDate()
   birthday: Date;
 
