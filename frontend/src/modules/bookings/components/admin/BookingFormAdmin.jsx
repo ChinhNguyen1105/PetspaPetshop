@@ -8,7 +8,7 @@ import {
   Notebook,
   CheckCircle2,
 } from "lucide-react";
-import validateBookingForm from "../../../../shared/validators/bookingValidator.js";
+import validateBookingForm from "../../validators/bookingValidator.js";
 
 import { useServiceStore } from "../../../services/store/serviceStore.js";
 import { useUserStore } from "../../../users/store/userStore.js";

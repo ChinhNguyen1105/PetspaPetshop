@@ -12,36 +12,35 @@ import {
   X,
   Filter,
 } from "lucide-react";
+
 import Loading from "../../../../shared/components/Loading.jsx";
 import ConfirmModal from "../../../../shared/components/ConfirmModal.jsx";
-import { useCartStore } from "../../../cart/store/cartStore.js";
-import { useCategoryStore } from "../../store/categoryStore.js";
 import Pagination from "../../../../shared/components/Pagination.jsx";
 
+import { useCartStore } from "../../../cart/store/cartStore.js";
+import { useCategoryStore } from "../../store/categoryStore.js";
+import { validateCategory } from "../../validators/categoryValidator.js";
+
 const CategoryManagement = () => {
-  // ── Store: Categories & Server Pagination (meta) ──
+  // STORE
   const categories = useCategoryStore((state) => state.categories) || [];
-
   const categoryMeta = useCategoryStore((state) => state.categoryMeta);
-
   const loading = useCategoryStore((state) => state.loading);
-
   const errorStore = useCategoryStore((state) => state.error);
 
   const fetchCategories = useCategoryStore((state) => state.fetchCategories);
-
   const createCategory = useCategoryStore((state) => state.createCategory);
-
   const updateCategory = useCategoryStore((state) => state.updateCategory);
-
   const deleteCategory = useCategoryStore((state) => state.deleteCategory);
 
-  // ── LOCAL UI STATE ──
+  const showToast = useCartStore((state) => state.showToast);
+
+  // FILTER STATE
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // State quản lý Form
+  // FORM STATE
   const [formData, setFormData] = useState({
     id: null,
     name: "",
@@ -50,8 +49,10 @@ const CategoryManagement = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [formError, setFormError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Trạng thái cho Modal Xác nhận
+  // CONFIRM MODAL
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     type: "",
@@ -60,9 +61,7 @@ const CategoryManagement = () => {
     pendingData: null,
   });
 
-  const showToast = useCartStore((state) => state.showToast);
-
-  // ───────────────────────── FILTER ─────────────────────────
+  // FETCH CATEGORIES
   useEffect(() => {
     const filters = [];
 
@@ -81,7 +80,7 @@ const CategoryManagement = () => {
     });
   }, [currentPage, searchTerm, selectedType, fetchCategories]);
 
-  // ───────────────────────── FILTER HANDLERS ─────────────────────────
+  // FILTER HANDLERS
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
@@ -100,27 +99,31 @@ const CategoryManagement = () => {
 
   const hasActiveFilters = searchTerm.trim() !== "" || selectedType !== "";
 
-  // ───────────────────────── FORM ─────────────────────────
+  // FORM HANDLERS
   const handleInputChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
 
-    if (formError) {
-      setFormError("");
-    }
+    setFieldErrors((prev) => ({
+      ...prev,
+      [name]: "",
+    }));
+
+    setFormError("");
   };
 
   const handleEditClick = (category) => {
     setIsEditing(true);
     setFormError("");
+    setFieldErrors({});
 
     setFormData({
       id: category.id,
-      name: category.name,
+      name: category.name || "",
       categoryType: category.categoryType || "PRODUCT",
     });
   };
@@ -128,6 +131,7 @@ const CategoryManagement = () => {
   const resetForm = () => {
     setIsEditing(false);
     setFormError("");
+    setFieldErrors({});
 
     setFormData({
       id: null,
@@ -136,54 +140,92 @@ const CategoryManagement = () => {
     });
   };
 
+  const closeConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      type: "",
+      title: "",
+      message: "",
+      pendingData: null,
+    });
+  };
+
+  // VALIDATE AND SUBMIT FORM
   const handleFormSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim()) {
-      setFormError("Tên danh mục không được để trống!");
+    const validation = validateCategory(formData);
+
+    setFieldErrors(validation.errors);
+    setFormError("");
+
+    if (!validation.isValid) {
       return;
     }
+
+    const validatedData = {
+      ...validation.data,
+      ...(isEditing ? { id: formData.id } : {}),
+    };
 
     if (isEditing) {
       setConfirmModal({
         isOpen: true,
         type: "CONFIRM_SUBMIT",
         title: "Xác nhận cập nhật",
-        message: `Bạn có chắc chắn muốn lưu các thay đổi cho danh mục nhóm "${formData.name}" không?`,
-        pendingData: formData,
+        message: `Bạn có chắc chắn muốn lưu các thay đổi cho danh mục "${validatedData.name}" không?`,
+        pendingData: validatedData,
       });
-    } else {
-      executeSaveCategory(formData);
+
+      return;
     }
+
+    executeSaveCategory(validatedData);
   };
 
+  // CREATE / UPDATE CATEGORY
   const executeSaveCategory = async (dataToSave) => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setFormError("");
+
     try {
       let res;
 
       if (isEditing) {
-        // UPDATE:
-        // Có thể gửi id vì backend cần biết category nào cần cập nhật.
-        res = await updateCategory(dataToSave.id, dataToSave);
-
-        if (res && res.success) {
-          showToast("Cập nhật danh mục thành công!", "success");
-        }
-      } else {
-        // CREATE:
-        // Không gửi id trong payload.
-        // Backend sẽ tự sinh id bằng PrimaryGeneratedColumn.
-        const createPayload = {
+        res = await updateCategory(dataToSave.id, {
           name: dataToSave.name,
           categoryType: dataToSave.categoryType,
-        };
-
-        res = await createCategory(createPayload);
-
-        if (res && res.success) {
-          showToast("Thêm danh mục mới thành công!", "success");
-        }
+        });
+      } else {
+        res = await createCategory({
+          name: dataToSave.name,
+          categoryType: dataToSave.categoryType,
+        });
       }
+
+      if (!res || !res.success) {
+        const message =
+          res?.message ||
+          res?.error ||
+          "Không thể lưu danh mục. Vui lòng thử lại.";
+
+        setFormError(
+          typeof message === "string"
+            ? message
+            : "Không thể lưu danh mục. Vui lòng thử lại.",
+        );
+
+        return;
+      }
+
+      showToast(
+        isEditing
+          ? "Cập nhật danh mục thành công!"
+          : "Thêm danh mục mới thành công!",
+        "success",
+      );
 
       resetForm();
       closeConfirmModal();
@@ -198,17 +240,25 @@ const CategoryManagement = () => {
         filters.push(`categoryType:${selectedType}`);
       }
 
-      fetchCategories({
+      await fetchCategories({
         page: currentPage,
         pageSize: 10,
         ...(filters.length > 0 ? { filter: filters.join(",") } : {}),
       });
     } catch (err) {
-      setFormError("Đã xảy ra lỗi hệ thống, vui lòng thử lại.");
+      console.error("Save category failed:", err);
+
+      setFormError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Đã xảy ra lỗi hệ thống, vui lòng thử lại.",
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // ───────────────────────── DELETE ─────────────────────────
+  // DELETE CATEGORY
   const handleOpenDeleteModal = (id, name) => {
     setConfirmModal({
       isOpen: true,
@@ -223,29 +273,73 @@ const CategoryManagement = () => {
   };
 
   const executeDeleteCategory = async () => {
-    const { id, name } = confirmModal.pendingData;
+    const pendingData = confirmModal.pendingData;
+
+    if (!pendingData || isSubmitting) return;
+
+    const { id, name } = pendingData;
+
+    setIsSubmitting(true);
 
     try {
       const res = await deleteCategory(id);
 
-      if (res && res.success) {
-        showToast(`Xóa danh mục "${name}" thành công!`, "success");
+      if (!res || !res.success) {
+        showToast(
+          res?.message ||
+            res?.error ||
+            "Không thể xóa danh mục. Vui lòng thử lại.",
+          "error",
+        );
 
-        if (isEditing && formData.id === id) {
-          resetForm();
-        }
+        closeConfirmModal();
+        return;
+      }
 
-        const nextTargetPage =
-          categories.length === 1 ? Math.max(currentPage - 1, 1) : currentPage;
+      showToast(`Xóa danh mục "${name}" thành công!`, "success");
 
-        setCurrentPage(nextTargetPage);
+      if (isEditing && String(formData.id) === String(id)) {
+        resetForm();
       }
 
       closeConfirmModal();
+
+      const nextTargetPage =
+        categories.length === 1 ? Math.max(currentPage - 1, 1) : currentPage;
+
+      setCurrentPage(nextTargetPage);
+
+      // Nếu vẫn ở trang hiện tại, useEffect có thể không chạy.
+      if (nextTargetPage === currentPage) {
+        const filters = [];
+
+        if (searchTerm.trim()) {
+          filters.push(`name~*${searchTerm.trim()}*`);
+        }
+
+        if (selectedType) {
+          filters.push(`categoryType:${selectedType}`);
+        }
+
+        await fetchCategories({
+          page: currentPage,
+          pageSize: 10,
+          ...(filters.length > 0 ? { filter: filters.join(",") } : {}),
+        });
+      }
     } catch (err) {
-      showToast("Đã xảy ra lỗi hệ thống khi xóa danh mục.", "error");
+      console.error("Delete category failed:", err);
+
+      showToast(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Đã xảy ra lỗi hệ thống khi xóa danh mục.",
+        "error",
+      );
 
       closeConfirmModal();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -259,21 +353,9 @@ const CategoryManagement = () => {
     }
   };
 
-  const closeConfirmModal = () => {
-    setConfirmModal({
-      isOpen: false,
-      type: "",
-      title: "",
-      message: "",
-      pendingData: null,
-    });
-  };
-
-  // ───────────────────────── PAGINATION ─────────────────────────
+  // PAGINATION
   const totalItems = categoryMeta?.total || 0;
-
   const totalPages = categoryMeta?.pages || 1;
-
   const pageSize = categoryMeta?.pageSize || 10;
 
   const getGlobalIndex = (index) => {
@@ -289,39 +371,50 @@ const CategoryManagement = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+    <div className="min-h-screen space-y-6 bg-gray-50 p-6">
+      {/* HEADER */}
       <div>
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+        <div className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400">
           <span>Quản lý Shop</span>
           <ChevronRight size={12} />
           <span className="text-orange-500">Danh mục</span>
         </div>
 
-        <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+        <h1 className="text-3xl font-black tracking-tight text-slate-800">
           DANH MỤC HỆ THỐNG
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* FORM THÊM / SỬA */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 lg:sticky lg:top-6">
-          <div className="flex items-center gap-2 text-base font-black text-slate-800 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        {/* FORM CREATE / UPDATE */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm lg:sticky lg:top-6">
+          <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-3 text-base font-black uppercase tracking-wide text-slate-800">
             <FolderPlus size={18} className="text-orange-500" />
-
             {isEditing ? "Cập nhật danh mục" : "Thêm danh mục mới"}
           </div>
 
-          <form onSubmit={handleFormSubmit} className="space-y-4">
+          <form onSubmit={handleFormSubmit} className="space-y-4" noValidate>
             {formError && (
-              <div className="p-3 bg-red-50 border border-red-100 text-red-500 rounded-xl text-xs font-bold flex items-center gap-2">
-                <AlertCircle size={14} className="flex-shrink-0" />
-
+              <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-bold text-red-500">
+                <AlertCircle size={14} className="shrink-0" />
                 <span>{formError}</span>
               </div>
             )}
 
+            {errorStore && !formError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-500">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>
+                  {typeof errorStore === "string"
+                    ? errorStore
+                    : "Không thể tải danh sách danh mục."}
+                </span>
+              </div>
+            )}
+
+            {/* CATEGORY NAME */}
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-gray-400">
                 Tên danh mục <span className="text-red-500">*</span>
               </label>
 
@@ -331,12 +424,25 @@ const CategoryManagement = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Ví dụ: Tắm & Vệ sinh, Thức ăn hạt..."
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500 focus:bg-white transition-all text-gray-700"
+                maxLength={100}
+                aria-invalid={Boolean(fieldErrors.name)}
+                className={`w-full rounded-xl border bg-gray-50 px-3 py-2.5 text-sm text-gray-700 transition-all focus:bg-white focus:outline-none ${
+                  fieldErrors.name
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-gray-200 focus:border-orange-500"
+                }`}
               />
+
+              {fieldErrors.name && (
+                <p className="mt-1 text-xs font-medium text-red-500">
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
 
+            {/* CATEGORY TYPE */}
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="mb-1.5 block text-xs font-black uppercase tracking-wider text-gray-400">
                 Loại danh mục <span className="text-red-500">*</span>
               </label>
 
@@ -344,33 +450,50 @@ const CategoryManagement = () => {
                 name="categoryType"
                 value={formData.categoryType}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500 focus:bg-white transition-all text-gray-700 font-bold"
+                aria-invalid={Boolean(fieldErrors.categoryType)}
+                className={`w-full rounded-xl border bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-700 transition-all focus:bg-white focus:outline-none ${
+                  fieldErrors.categoryType
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-gray-200 focus:border-orange-500"
+                }`}
               >
                 <option value="PRODUCT">SẢN PHẨM (PRODUCT)</option>
-
                 <option value="SERVICE">DỊCH VỤ (SERVICE)</option>
               </select>
+
+              {fieldErrors.categoryType && (
+                <p className="mt-1 text-xs font-medium text-red-500">
+                  {fieldErrors.categoryType}
+                </p>
+              )}
             </div>
 
+            {/* ACTIONS */}
             <div className="flex gap-2 pt-2">
               <button
                 type="submit"
-                className={`flex-1 py-2.5 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm ${
+                disabled={isSubmitting}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold text-white shadow-sm transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
                   isEditing
                     ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-orange-500 hover:bg-opacity-90"
+                    : "bg-orange-500 hover:bg-orange-600"
                 }`}
               >
                 <CheckCircle size={16} />
-
-                {isEditing ? "Cập nhật" : "Tạo danh mục"}
+                {isSubmitting
+                  ? "Đang xử lý..."
+                  : isEditing
+                    ? "Cập nhật"
+                    : "Tạo danh mục"}
               </button>
 
               {isEditing && (
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold rounded-xl text-sm transition-all"
+                  disabled={isSubmitting}
+                  className="rounded-xl bg-gray-100 px-3 py-2.5 text-sm font-bold text-gray-500 transition-all hover:bg-gray-200 disabled:opacity-60"
+                  title="Hủy chỉnh sửa"
                 >
                   <X size={16} />
                 </button>
@@ -379,15 +502,14 @@ const CategoryManagement = () => {
           </form>
         </div>
 
-        {/* BẢNG HIỂN THỊ DANH SÁCH */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-2 flex flex-col justify-between min-h-[400px]">
+        {/* CATEGORY TABLE */}
+        <div className="flex min-h-[400px] flex-col justify-between overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:col-span-2">
           <div>
             {/* FILTER BAR */}
-            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* SEARCH */}
-                <div className="relative flex-1 max-w-xs">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
+            <div className="border-b border-gray-100 bg-gray-50/50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative max-w-xs flex-1">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                     <Search size={16} />
                   </span>
 
@@ -396,39 +518,34 @@ const CategoryManagement = () => {
                     placeholder="Tìm danh mục..."
                     value={searchTerm}
                     onChange={handleSearchChange}
-                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-slate-700 transition-all text-gray-700"
+                    className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-xs text-gray-700 transition-all focus:border-slate-700 focus:outline-none"
                   />
                 </div>
 
-                {/* TYPE FILTER */}
                 <div className="relative sm:w-48">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                     <Filter size={15} />
                   </span>
 
                   <select
                     value={selectedType}
                     onChange={handleTypeChange}
-                    className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-slate-700 transition-all text-gray-700 font-bold appearance-none cursor-pointer"
+                    className="w-full cursor-pointer appearance-none rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-8 text-xs font-bold text-gray-700 transition-all focus:border-slate-700 focus:outline-none"
                   >
                     <option value="">Tất cả loại</option>
-
                     <option value="PRODUCT">Sản phẩm</option>
-
                     <option value="SERVICE">Dịch vụ</option>
                   </select>
                 </div>
 
-                {/* CLEAR FILTER */}
                 {hasActiveFilters && (
                   <button
                     type="button"
                     onClick={handleClearFilters}
-                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-100 px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:bg-gray-200 hover:text-slate-700"
                     title="Xóa bộ lọc"
                   >
                     <RefreshCw size={14} />
-
                     <span className="hidden sm:inline">Xóa lọc</span>
                   </button>
                 )}
@@ -439,14 +556,11 @@ const CategoryManagement = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-gray-600">
                 <thead>
-                  <tr className="bg-gray-50/70 text-gray-400 text-xs uppercase font-black tracking-wider border-b border-gray-100">
-                    <th className="p-4 w-16 text-center">STT</th>
-
+                  <tr className="border-b border-gray-100 bg-gray-50/70 text-xs font-black uppercase tracking-wider text-gray-400">
+                    <th className="w-16 p-4 text-center">STT</th>
                     <th className="p-4">Tên danh mục</th>
-
                     <th className="p-4">Phân loại</th>
-
-                    <th className="p-4 text-right w-32">Hành động</th>
+                    <th className="w-32 p-4 text-right">Hành động</th>
                   </tr>
                 </thead>
 
@@ -454,26 +568,29 @@ const CategoryManagement = () => {
                   {categories.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="4"
-                        className="p-12 text-center text-gray-400 font-medium"
+                        colSpan={4}
+                        className="p-12 text-center font-medium text-gray-400"
                       >
                         <div className="flex flex-col items-center justify-center space-y-2">
                           <Layers size={32} className="text-gray-300" />
-
                           <span>
-                            Không tìm thấy danh mục nào phù hợp từ hệ thống.
+                            {hasActiveFilters
+                              ? "Không tìm thấy danh mục phù hợp."
+                              : "Chưa có danh mục nào trong hệ thống."}
                           </span>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     categories.map((category, index) => {
-                      const isRowEditing = formData.id === category.id;
+                      const isRowEditing =
+                        String(formData.id) === String(category.id) &&
+                        isEditing;
 
                       return (
                         <tr
                           key={category.id}
-                          className={`transition-colors group ${
+                          className={`group transition-colors ${
                             isRowEditing
                               ? "bg-orange-50/40 hover:bg-orange-50/50"
                               : "hover:bg-gray-50/50"
@@ -485,7 +602,7 @@ const CategoryManagement = () => {
 
                           <td className="p-4">
                             <div
-                              className={`font-bold text-base transition-colors ${
+                              className={`text-base font-bold transition-colors ${
                                 isRowEditing
                                   ? "text-orange-500"
                                   : "text-gray-800"
@@ -497,10 +614,10 @@ const CategoryManagement = () => {
 
                           <td className="p-4">
                             <span
-                              className={`text-[10px] font-extrabold px-2 py-1 rounded-full border ${
+                              className={`rounded-full border px-2 py-1 text-[10px] font-extrabold ${
                                 category.categoryType === "SERVICE"
-                                  ? "bg-purple-50 text-purple-600 border-purple-100"
-                                  : "bg-teal-50 text-teal-600 border-teal-100"
+                                  ? "border-purple-100 bg-purple-50 text-purple-600"
+                                  : "border-teal-100 bg-teal-50 text-teal-600"
                               }`}
                             >
                               {category.categoryType || "PRODUCT"}
@@ -508,15 +625,16 @@ const CategoryManagement = () => {
                           </td>
 
                           <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center justify-end gap-2 opacity-80 transition-opacity group-hover:opacity-100">
                               <button
                                 type="button"
                                 onClick={() => handleEditClick(category)}
-                                className={`p-2 rounded-xl border transition-all ${
+                                className={`rounded-xl border p-2 transition-all ${
                                   isRowEditing
-                                    ? "text-orange-500 bg-orange-100 border-orange-200"
-                                    : "text-blue-600 hover:bg-blue-50 border-transparent hover:border-blue-200"
+                                    ? "border-orange-200 bg-orange-100 text-orange-500"
+                                    : "border-transparent text-blue-600 hover:border-blue-200 hover:bg-blue-50"
                                 }`}
+                                title="Chỉnh sửa danh mục"
                               >
                                 <Edit2 size={14} />
                               </button>
@@ -529,7 +647,8 @@ const CategoryManagement = () => {
                                     category.name,
                                   )
                                 }
-                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 transition-all"
+                                className="rounded-xl border border-transparent p-2 text-red-500 transition-all hover:border-red-200 hover:bg-red-50"
+                                title="Xóa danh mục"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -545,7 +664,7 @@ const CategoryManagement = () => {
           </div>
 
           {/* PAGINATION */}
-          <div className="bg-gray-50/50 px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-4 py-3">
             <div className="text-xs font-bold text-gray-400">
               Tổng cộng: <span className="text-slate-700">{totalItems}</span>{" "}
               danh mục
@@ -559,12 +678,13 @@ const CategoryManagement = () => {
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              onPageChange={(page) => setCurrentPage(page)}
+              onPageChange={setCurrentPage}
             />
           </div>
         </div>
       </div>
 
+      {/* CONFIRM MODAL */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={closeConfirmModal}

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { CalendarClock, AlertCircle } from "lucide-react";
 
-import Modal from "../../../../shared/components/Modal.jsx";
 import PaymentModal from "../../../payments/components/PaymentModal.jsx";
 import BookingForm from "../../components/BookingForm.jsx";
 import RecommendedServices from "../../../services/pages/public/RecommendService.jsx";
+import Modal from "../../../../shared/components/Modal.jsx";
 
 import { useAuthStore } from "../../../auth/store/authStore.js";
 import { useServiceStore } from "../../../services/store/serviceStore.js";
@@ -15,9 +15,7 @@ import { SLOT_TIMES } from "../../../../shared/constants/index.js";
 
 const BookingCreate = () => {
   const navigate = useNavigate();
-
   const { id: serviceIdFromParams } = useParams();
-
   const [searchParams] = useSearchParams();
 
   const initialServiceId = (
@@ -51,12 +49,18 @@ const BookingCreate = () => {
 
   // ─── LOCAL STATE ───
   const [slots, setSlots] = useState([]);
-
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-
   const [createdBookingData, setCreatedBookingData] = useState(null);
-
   const [errors, setErrors] = useState({});
+  const [isConfirmExitOpen, setIsConfirmExitOpen] = useState(false);
+
+  // Chặn gửi nhiều request trước khi Zustand kịp cập nhật submitting.
+  const submitLockRef = useRef(false);
+
+  // Đánh dấu lịch hẹn ĐÃ được tạo thành công trên server.
+  // Một khi đã true thì không bao giờ gọi createBooking lần nữa
+  // trong phiên làm việc của trang này.
+  const bookingCreatedRef = useRef(false);
 
   const [formData, setFormData] = useState({
     serviceIds: initialServiceId ? [initialServiceId] : [],
@@ -84,7 +88,7 @@ const BookingCreate = () => {
 
   const slotsNeeded = Math.ceil(totalDuration / 30);
 
-  // ─── HELPER: tính endTime ───
+  // ─── HELPER: TÍNH END TIME ───
   const computeEndTime = useCallback(
     (startTime) => {
       if (!startTime) {
@@ -92,13 +96,9 @@ const BookingCreate = () => {
       }
 
       const [hours, minutes] = startTime.split(":").map(Number);
-
       const startMinutes = hours * 60 + minutes;
-
       const endMinutes = startMinutes + totalDuration;
-
       const endHours = Math.floor(endMinutes / 60) % 24;
-
       const endMinutesValue = endMinutes % 60;
 
       return `${String(endHours).padStart(2, "0")}:${String(
@@ -289,6 +289,9 @@ const BookingCreate = () => {
 
   // ─── RECOMMENDED SERVICE ───
   const handleSelectRecommendedService = (id) => {
+    // Lịch đã tạo thì không cho thay đổi dịch vụ nữa.
+    if (bookingCreatedRef.current) return;
+
     handleServiceToggle(id);
 
     window.scrollTo({
@@ -301,56 +304,60 @@ const BookingCreate = () => {
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
 
-    setErrors({});
+    // Lịch hẹn đã được tạo trước đó: tuyệt đối không tạo thêm.
+    // Chỉ mở lại modal thanh toán (nếu có dữ liệu đơn hàng) và giữ form bị khóa.
+    if (bookingCreatedRef.current) {
+      if (createdBookingData) {
+        setIsPaymentModalOpen(true);
+      }
+      return true;
+    }
+
+    // Chặn click liên tục ngay lập tức.
+    if (submitLockRef.current || submitting) {
+      return false;
+    }
 
     if (!formData.serviceIds.length) {
       setErrors({
         submit: "Vui lòng chọn ít nhất một dịch vụ.",
       });
-
-      return;
+      return false;
     }
 
     if (!formData.petId) {
       setErrors({
         submit: "Vui lòng chọn thú cưng.",
       });
-
-      return;
+      return false;
     }
 
     if (!formData.date) {
       setErrors({
         submit: "Vui lòng chọn ngày.",
       });
-
-      return;
+      return false;
     }
 
     if (!formData.time) {
       setErrors({
         submit: "Vui lòng chọn giờ.",
       });
-
-      return;
+      return false;
     }
+
+    submitLockRef.current = true;
+    setErrors({});
 
     try {
       const payload = {
         userId: user?.id,
-
         serviceIds: formData.serviceIds.map(Number),
-
         petId: Number(formData.petId),
-
         bookingDate: formData.date,
-
         startTime: formData.time,
-
         endTime: computeEndTime(formData.time),
-
         note: formData.note,
-
         durationMinutes: totalDuration,
       };
 
@@ -358,34 +365,39 @@ const BookingCreate = () => {
 
       /*
        * API thực tế:
-       *
        * {
        *   statusCode: 201,
        *   body: {
        *     status: "SUCCESS",
-       *     data: {
-       *       id: "37",
-       *       orderId: "67",
-       *       ...
-       *     }
+       *     data: { id, orderId, ... }
        *   }
        * }
        */
-
       const bookingData = response?.body?.data ?? response?.data ?? null;
 
       if (response?.success === false || !bookingData) {
         setErrors({
-          submit: response?.message || "Hệ thống từ chối tạo lịch hẹn.",
+          submit:
+            response?.message ||
+            response?.body?.message ||
+            "Hệ thống từ chối tạo lịch hẹn.",
         });
-
-        return;
+        return false;
       }
 
-      /*
-       * PaymentModal cần Order ID,
-       * không phải Booking ID.
-       */
+      // Từ đây lịch hẹn ĐÃ tồn tại trên server -> khóa vĩnh viễn việc tạo mới.
+      bookingCreatedRef.current = true;
+
+      if (!bookingData.orderId) {
+        setErrors({
+          submit:
+            "Lịch hẹn đã được tạo nhưng không tìm thấy mã đơn hàng thanh toán. Vui lòng kiểm tra tại mục Lịch hẹn của tôi.",
+        });
+        // Trả về true để BookingForm giữ nút bị khóa (tránh tạo trùng lịch).
+        return true;
+      }
+
+      // PaymentModal cần Order ID, không phải Booking ID.
       setCreatedBookingData({
         id: bookingData.orderId,
         orderId: bookingData.orderId,
@@ -393,32 +405,62 @@ const BookingCreate = () => {
         amount: totalAmount,
       });
 
-      /*
-       * Booking tạo thành công
-       * → mở modal thanh toán.
-       */
+      // Mở modal thanh toán sau khi tạo lịch thành công.
       setIsPaymentModalOpen(true);
+      return true;
     } catch (error) {
       console.error("Create booking error:", error);
 
       setErrors({
-        submit: "Đã xảy ra lỗi hệ thống. Xin thử lại sau!",
+        submit:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Đã xảy ra lỗi hệ thống. Xin thử lại sau!",
       });
+      return false;
+    } finally {
+      // Chỉ mở khóa khi lịch CHƯA được tạo (thất bại -> cho phép thử lại).
+      if (!bookingCreatedRef.current) {
+        submitLockRef.current = false;
+      }
     }
   };
 
   // ─── PAYMENT SUCCESS ───
   const handlePaymentSuccess = () => {
-    /*
-     * 1. Đóng PaymentModal
-     * 2. Xóa dữ liệu payment tạm
-     * 3. Chuyển sang My Bookings
-     */
     setIsPaymentModalOpen(false);
-
     setCreatedBookingData(null);
 
     navigate("/my-bookings");
+  };
+
+  // ─── CLOSE PAYMENT MODAL ───
+  // Lịch hẹn đã được tạo nên không đóng thẳng modal thanh toán:
+  // hiển thị modal xác nhận trước khi cho người dùng thoát.
+  const handleClosePaymentModal = () => {
+    // Đang hiển thị modal xác nhận thì bỏ qua (tránh xung đột phím Escape
+    // vì cả hai modal cùng lắng nghe sự kiện này).
+    if (isConfirmExitOpen) return;
+
+    if (bookingCreatedRef.current) {
+      setIsConfirmExitOpen(true);
+      return;
+    }
+
+    setIsPaymentModalOpen(false);
+  };
+
+  // Người dùng chọn tiếp tục thanh toán: chỉ đóng modal xác nhận.
+  const handleCancelExit = () => {
+    setIsConfirmExitOpen(false);
+  };
+
+  // Người dùng xác nhận thoát: đóng cả hai modal và về trang hồ sơ.
+  const handleConfirmExit = () => {
+    setIsConfirmExitOpen(false);
+    setIsPaymentModalOpen(false);
+
+    navigate("/profile");
   };
 
   return (
@@ -433,7 +475,6 @@ const BookingCreate = () => {
           {errors.submit && (
             <div className="p-4 mb-4 bg-red-50 text-red-600 rounded-2xl text-sm font-semibold flex items-center gap-2">
               <AlertCircle size={18} />
-
               {errors.submit}
             </div>
           )}
@@ -469,10 +510,42 @@ const BookingCreate = () => {
       {/* Payment Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
+        onClose={handleClosePaymentModal}
         orderData={createdBookingData}
         onPaymentSuccess={handlePaymentSuccess}
       />
+
+      {/* Confirm Exit Modal (render sau PaymentModal để nằm phía trên) */}
+      <Modal
+        isOpen={isConfirmExitOpen}
+        onClose={handleCancelExit}
+        title="Xác nhận thoát"
+        size="sm"
+        zIndex="z-[110]"
+      >
+        <p className="text-sm text-gray-600 font-medium mb-6">
+          Lịch hẹn của bạn đã được tạo nhưng chưa thanh toán. Bạn có chắc chắn
+          muốn thoát khỏi bước thanh toán không?
+        </p>
+
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={handleCancelExit}
+            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all"
+          >
+            Tiếp tục thanh toán
+          </button>
+
+          <button
+            type="button"
+            onClick={handleConfirmExit}
+            className="px-4 py-2.5 bg-red-500 text-white text-sm font-black rounded-xl hover:bg-red-600 transition-all"
+          >
+            Thoát
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 };

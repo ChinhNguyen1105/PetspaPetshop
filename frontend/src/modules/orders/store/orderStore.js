@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import OrderService from "../api/OrderService.js";
 
 export const useOrderStore = create((set, get) => ({
@@ -286,53 +286,37 @@ export const useOrderStore = create((set, get) => ({
   },
 
   /* ================= CANCEL ================= */
-  cancelOrder: async (
-    orderId,
-    options = {},
-  ) => {
+  cancelOrder: async (orderId, options = {}) => {
     try {
-      set({
-        submitting: true,
-        error: null,
-      });
+      set({ submitting: true, error: null });
+      const res = await OrderService.cancelOrder(orderId, options);
+      
+      const status = res?.body?.status || res?.status;
+      const responseData = res?.body;
+      console.log("cancel status", status);
+      if (status === "SUCCESS" || res?.success) {
+        set((state) => ({
+          orders: state.orders.map((o) =>
+            String(o.id) === String(orderId)
+              ? { ...o, status: "CANCELLED", paymentStatus: "FAILED" }
+              : o
+          ),
+          myOrders: state.myOrders.map((o) =>
+            String(o.id) === String(orderId)
+              ? { ...o, status: "CANCELLED", paymentStatus: "FAILED" }
+              : o
+          ),
+          currentOrder:
+            state.currentOrder && String(state.currentOrder.id) === String(orderId)
+              ? { ...state.currentOrder, status: "CANCELLED", paymentStatus: "FAILED" }
+              : state.currentOrder,
+          submitting: false,
+        }));
 
-      const res =
-        await OrderService.cancelOrder(
-          orderId,
-          options,
-        );
+        return responseData;
+      }
 
-      set((state) => ({
-        orders: state.orders.map((o) =>
-          String(o.id) === String(orderId)
-            ? {
-                ...o,
-                status: "CANCELLED",
-              }
-            : o,
-        ),
-
-        myOrders: state.myOrders.map((o) =>
-          String(o.id) === String(orderId)
-            ? {
-                ...o,
-                status: "CANCELLED",
-              }
-            : o,
-        ),
-
-        currentOrder:
-          String(state.currentOrder?.id) ===
-          String(orderId)
-            ? {
-                ...state.currentOrder,
-                status: "CANCELLED",
-              }
-            : state.currentOrder,
-
-        submitting: false,
-      }));
-
+      set({ submitting: false });
       return res;
     } catch (err) {
       set({
@@ -342,7 +326,6 @@ export const useOrderStore = create((set, get) => ({
           err?.message ||
           "Cancel order failed",
       });
-
       throw err;
     }
   },

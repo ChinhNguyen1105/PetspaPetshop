@@ -12,11 +12,7 @@ export class BookingRepository {
     private readonly repository: Repository<Booking>,
   ) {}
 
-  findByUserId(
-    userId: string,
-    page: number,
-    pageSize: number,
-  ) {
+  findByUserId(userId: string, page: number, pageSize: number) {
     return this.repository
       .createQueryBuilder('booking')
       .leftJoin('booking.user', 'user')
@@ -42,10 +38,7 @@ export class BookingRepository {
       .getManyAndCount();
   }
 
-  findByBookingDateAndStatusNot(
-    bookingDate: Date,
-    status: BookingStatus,
-  ) {
+  findByBookingDateAndStatusNot(bookingDate: Date, status: BookingStatus) {
     return this.repository
       .createQueryBuilder('booking')
       .where('booking.bookingDate = :bookingDate', { bookingDate })
@@ -53,9 +46,7 @@ export class BookingRepository {
       .getMany();
   }
 
-  findByStatusNotAndDeleteFlagFalseAndActiveFlagTrue(
-    status: BookingStatus,
-  ) {
+  findByStatusNotAndDeleteFlagFalseAndActiveFlagTrue(status: BookingStatus) {
     return this.repository
       .createQueryBuilder('booking')
       .where('booking.status != :status', { status })
@@ -64,10 +55,7 @@ export class BookingRepository {
       .getMany();
   }
 
-  findByStartTimeBetween(
-    startTime: Date,
-    endTime: Date,
-  ) {
+  findByStartTimeBetween(startTime: Date, endTime: Date) {
     return this.repository
       .createQueryBuilder('booking')
       .where('booking.startTime BETWEEN :startTime AND :endTime', {
@@ -77,11 +65,7 @@ export class BookingRepository {
       .getMany();
   }
 
-  findByStatus(
-    status: BookingStatus,
-    page: number,
-    pageSize: number,
-  ) {
+  findByStatus(status: BookingStatus, page: number, pageSize: number) {
     return this.repository
       .createQueryBuilder('booking')
       .where('booking.status = :status', { status })
@@ -107,5 +91,13 @@ export class BookingRepository {
 
   getRepository(): Repository<Booking> {
     return this.repository;
+  }
+  findAllByUserId(userId: string) {
+    return this.repository
+      .createQueryBuilder('booking')
+      .leftJoin('booking.user', 'user')
+      .where('user.id = :userId', { userId })
+      .orderBy('booking.createdDate', 'DESC')
+      .getManyAndCount();
   }
 }

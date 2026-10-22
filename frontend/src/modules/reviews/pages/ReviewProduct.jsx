@@ -1,6 +1,7 @@
 import React from "react";
-import { Star, User } from "lucide-react";
+import { Star } from "lucide-react";
 import { formatDate } from "../../../shared/utils/formatDate.js";
+import UserAvatar from "../../users/components/admin/UserAvatar";
 
 const ReviewProduct = ({ reviews = [] }) => {
   return (
@@ -15,10 +16,11 @@ const ReviewProduct = ({ reviews = [] }) => {
             const customerName =
               review.userName ||
               review.customer?.full_name ||
+              review.user?.full_name ||
               "Khách hàng PetSpa";
+
             const reviewDate = review.createdDate || review.created_at;
-            const starRating = review.star ?? review.rating ?? 5;
-            const avatar = review.avatarUrl;
+            const starRating = Number(review.star ?? review.rating ?? 5);
 
             return (
               <div
@@ -27,17 +29,19 @@ const ReviewProduct = ({ reviews = [] }) => {
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-pet-blue/10 rounded-full flex items-center justify-center text-pet-blue shrink-0 overflow-hidden">
-                      {avatar ? (
-                        <img
-                          src={avatar}
-                          alt={customerName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User size={18} />
-                      )}
-                    </div>
+                    <UserAvatar
+                      user={{
+                        id: review.userId || review.user?.id,
+                        name: customerName,
+                        avatarUrl:
+                          review.avatarUrl ||
+                          review.user?.avatarUrl ||
+                          review.user?.avatar ||
+                          "",
+                      }}
+                      className="w-9 h-9 shrink-0"
+                    />
+
                     <div>
                       <p className="font-bold text-gray-800 text-sm">
                         {customerName}

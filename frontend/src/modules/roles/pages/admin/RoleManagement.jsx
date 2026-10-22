@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 
 import { useRoleStore } from "../../store/roleStore.js";
 import { usePermissionStore } from "../../../permissions/store/permissionStore.js";
 import { useCartStore } from "../../../cart/store/cartStore.js";
+import { validateRolePermissionForm } from "../../validators/roleValidator.js";
 
 import {
   Shield,
@@ -21,10 +22,7 @@ import Loading from "../../../../shared/components/Loading.jsx";
 import ConfirmModal from "../../../../shared/components/ConfirmModal.jsx";
 
 const RoleManagement = () => {
-  // =========================================================
   // 1. STORE
-  // =========================================================
-
   const roles = useRoleStore((state) => state.roles);
   const loadingRoles = useRoleStore((state) => state.loading);
   const errorRoles = useRoleStore((state) => state.error);
@@ -32,11 +30,8 @@ const RoleManagement = () => {
   const updateRole = useRoleStore((state) => state.updateRole);
 
   const permissions = usePermissionStore((state) => state.permissions);
-
   const loadingPermissions = usePermissionStore((state) => state.loading);
-
   const errorPermissions = usePermissionStore((state) => state.error);
-
   const fetchPermissions = usePermissionStore(
     (state) => state.fetchPermissions,
   );
@@ -44,19 +39,12 @@ const RoleManagement = () => {
   const showToast = useCartStore((state) => state.showToast);
 
   const isLoadingCombined = loadingRoles || loadingPermissions;
-
   const combinedError = errorRoles || errorPermissions;
-
   const permissionContainerRef = useRef(null);
 
-  // =========================================================
   // 2. LOCAL STATE
-  // =========================================================
-
   const [selectedRole, setSelectedRole] = useState(null);
-
   const [checkedPermissionIds, setCheckedPermissionIds] = useState([]);
-
   const [selectedModule, setSelectedModule] = useState("");
 
   const [confirmModal, setConfirmModal] = useState({
@@ -67,39 +55,31 @@ const RoleManagement = () => {
     pendingData: null,
   });
 
-  // =========================================================
   // 3. LOAD ROLES
-  // =========================================================
-
   useEffect(() => {
     const initRoles = async () => {
-      const rolesRes = await fetchRoles({
-        pageSize: 100,
-      });
+      try {
+        const rolesRes = await fetchRoles({ pageSize: 100 });
 
-      if (rolesRes && rolesRes.length > 0) {
-        const firstRole = rolesRes[0];
+        if (Array.isArray(rolesRes) && rolesRes.length > 0) {
+          const firstRole = rolesRes[0];
 
-        setSelectedRole(firstRole);
-
-        setCheckedPermissionIds(
-          firstRole.permissions
-            ? firstRole.permissions.map((permission) => permission.id)
-            : [],
-        );
+          setSelectedRole(firstRole);
+          setCheckedPermissionIds(
+            (firstRole.permissions || []).map((permission) =>
+              Number(permission.id),
+            ),
+          );
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải danh sách vai trò:", error);
       }
     };
 
     initRoles();
   }, [fetchRoles]);
 
-  // =========================================================
   // 4. LẤY DANH SÁCH MODULE
-  //
-  // Module được lấy từ permissions của các role.
-  // Không phụ thuộc vào page permission hiện tại.
-  // =========================================================
-
   const moduleKeys = useMemo(() => {
     const moduleSet = new Set();
 
@@ -128,27 +108,16 @@ const RoleManagement = () => {
     return Array.from(moduleSet).sort();
   }, [roles, permissions]);
 
-  // =========================================================
   // 5. CHỌN MODULE MẶC ĐỊNH
-  // =========================================================
-
   useEffect(() => {
     if (moduleKeys.length > 0 && !moduleKeys.includes(selectedModule)) {
       setSelectedModule(moduleKeys[0]);
     }
   }, [moduleKeys, selectedModule]);
 
-  // =========================================================
   // 6. FETCH PERMISSION THEO MODULE
-  //
-  // BE:
-  // /permissions?page=1&pageSize=100&filter=module:USER
-  // =========================================================
-
   useEffect(() => {
-    if (!selectedModule) {
-      return;
-    }
+    if (!selectedModule) return;
 
     fetchPermissions({
       page: 1,
@@ -161,28 +130,20 @@ const RoleManagement = () => {
     }
   }, [selectedModule, fetchPermissions]);
 
-  // =========================================================
   // 7. ĐỒNG BỘ ROLE SAU KHI STORE UPDATE
-  // =========================================================
-
   useEffect(() => {
-    if (!selectedRole || roles.length === 0) {
-      return;
-    }
+    if (!selectedRole || roles.length === 0) return;
 
     const updatedRole = roles.find((role) => role.id === selectedRole.id);
+    if (!updatedRole) return;
 
-    if (!updatedRole) {
-      return;
-    }
+    const updatedIds = (updatedRole.permissions || []).map((permission) =>
+      Number(permission.id),
+    );
 
-    const updatedIds = updatedRole.permissions
-      ? updatedRole.permissions.map((permission) => permission.id)
-      : [];
-
-    const currentIds = selectedRole.permissions
-      ? selectedRole.permissions.map((permission) => permission.id)
-      : [];
+    const currentIds = (selectedRole.permissions || []).map((permission) =>
+      Number(permission.id),
+    );
 
     if (JSON.stringify(updatedIds) !== JSON.stringify(currentIds)) {
       setSelectedRole(updatedRole);
@@ -190,28 +151,18 @@ const RoleManagement = () => {
     }
   }, [roles]);
 
-  // =========================================================
   // 8. CHỌN ROLE
-  // =========================================================
-
   const handleSelectRole = (role) => {
     setSelectedRole(role);
 
-    const extractedIds = role.permissions
-      ? role.permissions.map((permission) => permission.id)
-      : [];
-
-    setCheckedPermissionIds(extractedIds);
+    setCheckedPermissionIds(
+      (role.permissions || []).map((permission) => Number(permission.id)),
+    );
   };
 
-  // =========================================================
   // 9. PERMISSION CỦA MODULE HIỆN TẠI
-  // =========================================================
-
   const currentModulePermissions = useMemo(() => {
-    if (!permissions || permissions.length === 0) {
-      return [];
-    }
+    if (!permissions || permissions.length === 0) return [];
 
     return permissions.filter((permission) => {
       const moduleName =
@@ -223,25 +174,21 @@ const RoleManagement = () => {
     });
   }, [permissions, selectedModule]);
 
-  // =========================================================
   // 10. TOGGLE PERMISSION
-  // =========================================================
-
   const handleTogglePermission = (permissionId) => {
+    const normalizedId = Number(permissionId);
+
     setCheckedPermissionIds((prev) =>
-      prev.includes(permissionId)
-        ? prev.filter((id) => id !== permissionId)
-        : [...prev, permissionId],
+      prev.includes(normalizedId)
+        ? prev.filter((id) => id !== normalizedId)
+        : [...prev, normalizedId],
     );
   };
 
-  // =========================================================
   // 11. TOGGLE TOÀN BỘ MODULE
-  // =========================================================
-
   const handleToggleModuleAll = () => {
-    const moduleIds = currentModulePermissions.map(
-      (permission) => permission.id,
+    const moduleIds = currentModulePermissions.map((permission) =>
+      Number(permission.id),
     );
 
     const isAllSelected =
@@ -259,29 +206,38 @@ const RoleManagement = () => {
     }
   };
 
-  // =========================================================
   // 12. TRẠNG THÁI MODULE
-  // =========================================================
-
   const isAllModuleChecked =
     currentModulePermissions.length > 0 &&
     currentModulePermissions.every((permission) =>
-      checkedPermissionIds.includes(permission.id),
+      checkedPermissionIds.includes(Number(permission.id)),
     );
 
   const isSomeModuleChecked =
     currentModulePermissions.some((permission) =>
-      checkedPermissionIds.includes(permission.id),
+      checkedPermissionIds.includes(Number(permission.id)),
     ) && !isAllModuleChecked;
 
-  // =========================================================
-  // 13. SUBMIT
-  // =========================================================
-
+  // 13. VALIDATE VÀ SUBMIT
   const handleFormSubmit = (event) => {
     event.preventDefault();
 
     if (!selectedRole) {
+      showToast("Vui lòng chọn vai trò cần cập nhật.", "error");
+      return;
+    }
+
+    const validation = validateRolePermissionForm({
+      roleId: Number(selectedRole.id),
+      name: selectedRole.name,
+      permissionIds: checkedPermissionIds.map(Number),
+    });
+
+    if (!validation.isValid) {
+      showToast(
+        validation.message || "Dữ liệu phân quyền không hợp lệ.",
+        "error",
+      );
       return;
     }
 
@@ -290,18 +246,21 @@ const RoleManagement = () => {
       type: "CONFIRM_SUBMIT",
       title: "Xác nhận cập nhật phân quyền",
       message: `Bạn có chắc chắn muốn cập nhật lại ma trận quyền hạn cho vai trò "${selectedRole.name}" không?`,
-      pendingData: checkedPermissionIds,
+      pendingData: validation.data.permissionIds,
     });
   };
 
-  // =========================================================
   // 14. SAVE
-  // =========================================================
-
   const executeSavePermissions = async () => {
+    if (!selectedRole || !Array.isArray(confirmModal.pendingData)) {
+      closeConfirmModal();
+      showToast("Dữ liệu cập nhật phân quyền không hợp lệ.", "error");
+      return;
+    }
+
     try {
       const formattedPermissions = confirmModal.pendingData.map((id) => ({
-        id,
+        id: Number(id),
       }));
 
       const updatePayload = {
@@ -327,16 +286,12 @@ const RoleManagement = () => {
     } catch (error) {
       console.error("Lỗi khi cập nhật phân quyền:", error);
 
-      showToast("Đã xảy ra lỗi hệ thống khi cập nhật quyền.", "error");
-
       closeConfirmModal();
+      showToast("Đã xảy ra lỗi hệ thống khi cập nhật quyền.", "error");
     }
   };
 
-  // =========================================================
   // 15. CONFIRM
-  // =========================================================
-
   const handleConfirmAction = () => {
     if (confirmModal.type === "CONFIRM_SUBMIT") {
       executeSavePermissions();
@@ -355,28 +310,25 @@ const RoleManagement = () => {
     });
   };
 
-  // =========================================================
   // 16. REFRESH
-  // =========================================================
-
   const handleRefresh = async () => {
-    await fetchRoles({
-      pageSize: 100,
-    });
+    try {
+      await fetchRoles({ pageSize: 100 });
 
-    if (selectedModule) {
-      await fetchPermissions({
-        page: 1,
-        pageSize: 100,
-        filter: `module:${selectedModule}`,
-      });
+      if (selectedModule) {
+        await fetchPermissions({
+          page: 1,
+          pageSize: 100,
+          filter: `module:${selectedModule}`,
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi khi làm mới dữ liệu phân quyền:", error);
+      showToast("Không thể làm mới dữ liệu phân quyền.", "error");
     }
   };
 
-  // =========================================================
   // 17. LOADING
-  // =========================================================
-
   if (isLoadingCombined && roles.length === 0) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -385,10 +337,7 @@ const RoleManagement = () => {
     );
   }
 
-  // =========================================================
   // 18. UI
-  // =========================================================
-
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6 bg-gray-50 min-h-screen flex flex-col">
       {/* HEADER */}
@@ -396,9 +345,7 @@ const RoleManagement = () => {
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
             <span>Quản lý Cấu hình</span>
-
             <ChevronRight size={12} />
-
             <span className="text-orange-500">Phân quyền Hệ thống</span>
           </div>
 
@@ -424,7 +371,6 @@ const RoleManagement = () => {
       {combinedError && (
         <div className="p-3 bg-red-50 border border-red-100 text-red-500 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0">
           <AlertCircle size={14} className="flex-shrink-0" />
-
           <span>{combinedError}</span>
         </div>
       )}
@@ -523,7 +469,6 @@ const RoleManagement = () => {
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <div className="flex items-center gap-2 shrink-0">
                 <Layers size={15} className="text-orange-500" />
-
                 <span className="text-[11px] font-black text-gray-500 uppercase">
                   Chọn phân hệ
                 </span>
@@ -561,13 +506,11 @@ const RoleManagement = () => {
             {!selectedModule ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 font-medium space-y-2">
                 <Layers size={32} className="text-gray-300" />
-
                 <span className="text-sm">Chưa có phân hệ quyền hạn.</span>
               </div>
             ) : loadingPermissions ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <Loading size="large" />
-
                 <span className="mt-3 text-xs text-gray-400 font-bold">
                   Đang tải quyền của phân hệ {selectedModule}...
                 </span>
@@ -575,7 +518,6 @@ const RoleManagement = () => {
             ) : currentModulePermissions.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 font-medium space-y-2">
                 <Layers size={32} className="text-gray-300" />
-
                 <span className="text-sm">
                   Không tìm thấy quyền hạn trong phân hệ {selectedModule}.
                 </span>
@@ -611,14 +553,23 @@ const RoleManagement = () => {
                 {/* PERMISSION LIST */}
                 <div className="p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
                   {currentModulePermissions.map((permission) => {
-                    const isChecked = checkedPermissionIds.includes(
-                      permission.id,
-                    );
+                    const permissionId = Number(permission.id);
+                    const isChecked =
+                      checkedPermissionIds.includes(permissionId);
 
                     return (
                       <div
                         key={permission.id}
-                        onClick={() => handleTogglePermission(permission.id)}
+                        role="checkbox"
+                        aria-checked={isChecked}
+                        tabIndex={0}
+                        onClick={() => handleTogglePermission(permissionId)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleTogglePermission(permissionId);
+                          }
+                        }}
                         className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-all duration-150 cursor-pointer select-none group ${
                           isChecked
                             ? "bg-orange-50/40 border-orange-200/80 shadow-xs"

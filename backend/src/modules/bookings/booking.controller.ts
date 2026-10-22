@@ -39,9 +39,7 @@ export class BookingController {
   }
 
   @Get(UrlConstant.Booking.GET_ALL_BOOKINGS)
-  async getAllBookings(
-    @Query() query: BookingQueryDto,
-  ) {
+  async getAllBookings(@Query() query: BookingQueryDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
       await this.bookingService.getAllBookings(query),
@@ -49,16 +47,10 @@ export class BookingController {
   }
 
   @Get(UrlConstant.Booking.GET_MY_BOOKINGS)
-  async getMyBookings(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe)
-    page: number,
-
-    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe)
-    pageSize: number,
-  ) {
+  async getMyBookings() {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.getMyBookings(page, pageSize),
+      await this.bookingService.getMyBookings(),
     );
   }
 
@@ -75,23 +67,15 @@ export class BookingController {
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.getBookingsByStatus(
-        status,
-        page,
-        pageSize,
-      ),
+      await this.bookingService.getBookingsByStatus(status, page, pageSize),
     );
   }
 
   @Get(UrlConstant.Booking.GET_BOOKED_TIMES)
-  async getOccupiedBookingTimes(
-    @Query() reqDto: ReqBookingDateDto,
-  ) {
+  async getOccupiedBookingTimes(@Query() reqDto: ReqBookingDateDto) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.getBookedTimeSlots(
-        reqDto.bookingDate,
-      ),
+      await this.bookingService.getBookedTimeSlots(reqDto.bookingDate),
     );
   }
 
@@ -127,10 +111,7 @@ export class BookingController {
   ) {
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.bookingService.updateBookingStatus(
-        id,
-        status,
-      ),
+      await this.bookingService.updateBookingStatus(id, status),
     );
   }
 }

@@ -79,6 +79,50 @@ const BookingManagement = () => {
   const statusFilters = BOOKING_STATUS_LIST;
 
   // =========================================================
+  // HELPER: KIỂM TRA LỊCH HẸN ĐÃ QUA THỜI GIAN BẮT ĐẦU
+  // =========================================================
+  const isBookingInPast = (booking) => {
+    if (!booking?.bookingDate || !booking?.startTime) {
+      return false;
+    }
+
+    const date = String(booking.bookingDate).slice(0, 10);
+    const time = String(booking.startTime).slice(0, 8);
+
+    const bookingDateTime = new Date(`${date}T${time}`);
+
+    if (Number.isNaN(bookingDateTime.getTime())) {
+      return false;
+    }
+
+    return bookingDateTime.getTime() < Date.now();
+  };
+
+  // =========================================================
+  // HELPER: LẤY THÔNG BÁO LỖI TỪ API
+  // =========================================================
+  const getErrorMessage = (error, fallback) => {
+    const data = error?.response?.data ?? error?.data ?? error;
+
+    let message =
+      data?.message ?? data?.body?.message ?? data?.response?.data?.message;
+
+    if (Array.isArray(message)) {
+      message = message.join(", ");
+    }
+
+    if (typeof message === "string" && message.trim()) {
+      if (message.includes("Booking start time cannot be in the past")) {
+        return "Không thể đặt hoặc cập nhật lịch hẹn có thời gian bắt đầu trong quá khứ.";
+      }
+
+      return message;
+    }
+
+    return fallback;
+  };
+
+  // =========================================================
   // DEBOUNCE SEARCH
   // =========================================================
   useEffect(() => {
@@ -106,22 +150,18 @@ const BookingManagement = () => {
   useEffect(() => {
     const filterConditions = [];
 
-    // Filter by booking ID
     if (debouncedFilters.id && !isNaN(debouncedFilters.id)) {
       filterConditions.push(`id:${debouncedFilters.id}`);
     }
 
-    // Filter by customer name
     if (debouncedFilters.name) {
       filterConditions.push(`userName~*${debouncedFilters.name}*`);
     }
 
-    // Filter by pet name
     if (debouncedFilters.petName) {
       filterConditions.push(`petName~*${debouncedFilters.petName}*`);
     }
 
-    // Filter by booking status
     if (selectedStatus !== "ALL") {
       filterConditions.push(`status:${selectedStatus}`);
     }
@@ -145,6 +185,14 @@ const BookingManagement = () => {
   };
 
   const handleOpenEditModal = (booking) => {
+    if (isBookingInPast(booking)) {
+      showToast(
+        "Không thể chỉnh sửa lịch hẹn đã qua thời gian bắt đầu.",
+        "error",
+      );
+      return;
+    }
+
     setModalType("EDIT");
     setSelectedBooking(booking);
     setIsModalOpen(true);
@@ -203,6 +251,22 @@ const BookingManagement = () => {
 
     if (!formData) return;
 
+    // Kiểm tra lại trước khi gửi API, phòng trường hợp lịch đã qua
+    // trong lúc người dùng mở form chỉnh sửa.
+    if (
+      modalType === "EDIT" &&
+      selectedBooking &&
+      isBookingInPast(selectedBooking)
+    ) {
+      showToast(
+        "Không thể chỉnh sửa lịch hẹn đã qua thời gian bắt đầu.",
+        "error",
+      );
+      closeConfirmModal();
+      setIsModalOpen(false);
+      return;
+    }
+
     try {
       let result;
 
@@ -230,8 +294,6 @@ const BookingManagement = () => {
           setSelectedStatus("ALL");
           setCurrentPage(1);
 
-          // Effect sẽ gọi lại API khi bộ lọc thay đổi.
-          // Nếu các bộ lọc đã ở trạng thái mặc định, tải lại trực tiếp.
           if (
             !debouncedFilters.id &&
             !debouncedFilters.name &&
@@ -252,7 +314,10 @@ const BookingManagement = () => {
       }
     } catch (error) {
       console.error("Lỗi khi xử lý lưu dữ liệu form:", error);
-      showToast("Đã xảy ra lỗi, không thể lưu dữ liệu.", "error");
+      showToast(
+        getErrorMessage(error, "Đã xảy ra lỗi, không thể lưu dữ liệu."),
+        "error",
+      );
     }
   };
 
@@ -294,7 +359,13 @@ const BookingManagement = () => {
       }
     } catch (error) {
       console.error("Gặp lỗi khi cập nhật trạng thái:", error);
-      showToast("Đã xảy ra lỗi hệ thống khi cập nhật trạng thái.", "error");
+      showToast(
+        getErrorMessage(
+          error,
+          "Đã xảy ra lỗi hệ thống khi cập nhật trạng thái.",
+        ),
+        "error",
+      );
     }
   };
 
@@ -341,7 +412,10 @@ const BookingManagement = () => {
       }
     } catch (error) {
       console.error("Lỗi khi hủy lịch:", error);
-      showToast("Đã xảy ra lỗi khi tiến hành hủy lịch.", "error");
+      showToast(
+        getErrorMessage(error, "Đã xảy ra lỗi khi tiến hành hủy lịch."),
+        "error",
+      );
     }
   };
 
@@ -550,117 +624,135 @@ const BookingManagement = () => {
                     </td>
                   </tr>
                 ) : (
-                  bookings.map((booking) => (
-                    <tr
-                      key={booking.id}
-                      className="hover:bg-gray-50/50 transition-colors group"
-                    >
-                      {/* BOOKING ID */}
-                      <td className="p-4 text-center font-bold text-blue-600 font-mono text-xs">
-                        #{booking.id}
-                      </td>
+                  bookings.map((booking) => {
+                    const isPast = isBookingInPast(booking);
 
-                      {/* CUSTOMER & PET */}
-                      <td className="p-4">
-                        <div className="font-bold text-gray-800 text-base flex items-center gap-1.5">
-                          <User size={14} className="text-gray-400" />
-                          {booking.userName || "—"}
-                        </div>
+                    return (
+                      <tr
+                        key={booking.id}
+                        className="hover:bg-gray-50/50 transition-colors group"
+                      >
+                        {/* BOOKING ID */}
+                        <td className="p-4 text-center font-bold text-blue-600 font-mono text-xs">
+                          #{booking.id}
+                        </td>
 
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          Thú cưng:{" "}
-                          <span className="font-bold text-orange-500">
-                            {booking.petName || "—"}
-                          </span>
-                        </div>
-                      </td>
+                        {/* CUSTOMER & PET */}
+                        <td className="p-4">
+                          <div className="font-bold text-gray-800 text-base flex items-center gap-1.5">
+                            <User size={14} className="text-gray-400" />
+                            {booking.userName || "—"}
+                          </div>
 
-                      {/* SERVICES */}
-                      <td className="p-4">
-                        <div className="space-y-1">
-                          {booking.bookingDetails?.length > 0 ? (
-                            booking.bookingDetails.map((detail) => (
-                              <div
-                                key={detail.id}
-                                className="text-xs bg-gray-50 border px-2 py-0.5 rounded-md inline-block mr-1 text-gray-700 font-medium"
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            Thú cưng:{" "}
+                            <span className="font-bold text-orange-500">
+                              {booking.petName || "—"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* SERVICES */}
+                        <td className="p-4">
+                          <div className="space-y-1">
+                            {booking.bookingDetails?.length > 0 ? (
+                              booking.bookingDetails.map((detail) => (
+                                <div
+                                  key={detail.id}
+                                  className="text-xs bg-gray-50 border px-2 py-0.5 rounded-md inline-block mr-1 text-gray-700 font-medium"
+                                >
+                                  {detail.serviceName}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* BOOKING TIME */}
+                        <td className="p-4">
+                          <div className="font-bold text-gray-800 flex items-center gap-1">
+                            <Clock size={14} className="text-gray-400" />
+                            {booking.startTime || "--:--"} -{" "}
+                            {booking.endTime || "--:--"}
+                          </div>
+
+                          <div className="text-xs font-semibold text-gray-400 mt-0.5">
+                            {booking.bookingDate || "—"}
+                          </div>
+                        </td>
+
+                        {/* PRICE */}
+                        <td className="p-4 font-black text-gray-900 text-base">
+                          {formatPrice(booking.actualPrice ?? 0)}
+                        </td>
+
+                        {/* STATUS */}
+                        <td className="p-4 text-center">
+                          {renderStatusBadge(booking.status)}
+                        </td>
+
+                        {/* ACTIONS */}
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleOpenEditModal(booking)}
+                              disabled={isPast}
+                              className={`p-2 rounded-xl border transition-all ${
+                                isPast
+                                  ? "text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed"
+                                  : "text-blue-600 hover:bg-blue-50 border-transparent hover:border-blue-200"
+                              }`}
+                              title={
+                                isPast
+                                  ? "Không thể chỉnh sửa lịch hẹn đã qua"
+                                  : "Chỉnh sửa chi tiết"
+                              }
+                              aria-label={
+                                isPast
+                                  ? "Lịch hẹn đã qua, không thể chỉnh sửa"
+                                  : "Chỉnh sửa chi tiết"
+                              }
+                            >
+                              <Edit2 size={16} />
+                            </button>
+
+                            {booking.status === "PENDING" && (
+                              <button
+                                onClick={() =>
+                                  handleStatusChangeClick(
+                                    booking.id,
+                                    booking.userName,
+                                    "CONFIRMED",
+                                  )
+                                }
+                                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl border border-transparent hover:border-emerald-200 transition-all"
+                                title="Xác nhận lịch hẹn"
                               >
-                                {detail.serviceName}
-                              </div>
-                            ))
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </div>
-                      </td>
+                                <CheckCircle size={16} />
+                              </button>
+                            )}
 
-                      {/* BOOKING TIME */}
-                      <td className="p-4">
-                        <div className="font-bold text-gray-800 flex items-center gap-1">
-                          <Clock size={14} className="text-gray-400" />
-                          {booking.startTime || "--:--"} -{" "}
-                          {booking.endTime || "--:--"}
-                        </div>
-
-                        <div className="text-xs font-semibold text-gray-400 mt-0.5">
-                          {booking.bookingDate || "—"}
-                        </div>
-                      </td>
-
-                      {/* PRICE */}
-                      <td className="p-4 font-black text-gray-900 text-base">
-                        {formatPrice(booking.actualPrice ?? 0)}
-                      </td>
-
-                      {/* STATUS */}
-                      <td className="p-4 text-center">
-                        {renderStatusBadge(booking.status)}
-                      </td>
-
-                      {/* ACTIONS */}
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleOpenEditModal(booking)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl border border-transparent hover:border-blue-200 transition-all"
-                            title="Chỉnh sửa chi tiết"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-
-                          {booking.status === "PENDING" && (
-                            <button
-                              onClick={() =>
-                                handleStatusChangeClick(
-                                  booking.id,
-                                  booking.userName,
-                                  "CONFIRMED",
-                                )
-                              }
-                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl border border-transparent hover:border-emerald-200 transition-all"
-                              title="Xác nhận lịch hẹn"
-                            >
-                              <CheckCircle size={16} />
-                            </button>
-                          )}
-
-                          {booking.status !== "CANCELLED" && (
-                            <button
-                              onClick={() =>
-                                handleConfirmCancelBooking(
-                                  booking.id,
-                                  booking.userName,
-                                )
-                              }
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 transition-all"
-                              title="Hủy lịch đặt"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            {booking.status !== "CANCELLED" && (
+                              <button
+                                onClick={() =>
+                                  handleConfirmCancelBooking(
+                                    booking.id,
+                                    booking.userName,
+                                  )
+                                }
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 transition-all"
+                                title="Hủy lịch đặt"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

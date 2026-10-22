@@ -5,7 +5,7 @@ import { Eye, EyeOff, Lock, Mail, ArrowRight } from "lucide-react";
 import { Input } from "../../../shared/components/Input.jsx";
 import { useAuthStore } from "../store/authStore.js";
 
-import authValidator from "../../../shared/validators/authValidator.js";
+import authValidator from "../validators/authValidator.js";
 
 const { validateLoginForm } = authValidator;
 

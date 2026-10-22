@@ -1,6 +1,7 @@
 import React from "react";
-import { Star, User } from "lucide-react";
+import { Star } from "lucide-react";
 import { formatDate } from "../../../shared/utils/formatDate.js";
+import UserAvatar from "../../users/components/admin/UserAvatar.jsx";
 
 const ReviewService = ({ reviews = [] }) => {
   return (
@@ -8,6 +9,7 @@ const ReviewService = ({ reviews = [] }) => {
       <h3 className="text-2xl font-black text-pet-blue mb-8">
         Đánh giá từ khách hàng
       </h3>
+
       <div className="grid gap-6">
         {reviews.length > 0 ? (
           reviews.map((review) => (
@@ -17,36 +19,52 @@ const ReviewService = ({ reviews = [] }) => {
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-pet-blue/10 rounded-full flex items-center justify-center text-pet-blue shrink-0 overflow-hidden">
-                    {review.avatarUrl ? (
-                      <img
-                        src={review.avatarUrl}
-                        alt={review.customerName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User size={18} />
-                    )}
-                  </div>
+                  <UserAvatar
+                    user={{
+                      id: review.userId || review.user?.id,
+                      name:
+                        review.userName ||
+                        review.user?.name ||
+                        review.customerName ||
+                        "Khách hàng PetSpa",
+                      avatarUrl:
+                        review.avatarUrl ||
+                        review.user?.avatarUrl ||
+                        review.user?.avatar ||
+                        "",
+                    }}
+                    className="w-10 h-10 shrink-0"
+                  />
+
                   <div>
-                    <p className="font-bold text-gray-800">{review.userName}</p>
+                    <p className="font-bold text-gray-800">
+                      {review.userName ||
+                        review.customerName ||
+                        "Khách hàng PetSpa"}
+                    </p>
                     <p className="text-xs text-gray-400">
-                      {formatDate(review.createdDate)}
+                      {review.createdDate
+                        ? formatDate(review.createdDate)
+                        : "Gần đây"}
                     </p>
                   </div>
                 </div>
+
                 <div className="flex text-pet-orange gap-0.5">
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
                       size={14}
-                      fill={i < review.rating ? "currentColor" : "none"}
+                      fill={
+                        i < Number(review.rating || 0) ? "currentColor" : "none"
+                      }
                     />
                   ))}
                 </div>
               </div>
+
               <p className="text-gray-600 text-sm leading-relaxed italic">
-                "{review.comment}"
+                "{review.comment || "Chưa có nội dung đánh giá."}"
               </p>
             </div>
           ))

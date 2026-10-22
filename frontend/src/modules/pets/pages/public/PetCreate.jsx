@@ -1,135 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { PawPrint, HeartPulse, Scale, Calendar, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
-import { Input } from '../../../../shared/components/Input.jsx';
-import { Button } from '../../../../shared/components/Button.jsx';
-import { usePetStore } from '../../store/petStore.js';
-import { useCartStore } from '../../../cart/store/cartStore.js'; 
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  PawPrint,
+  HeartPulse,
+  Scale,
+  Calendar,
+  FileText,
+  ArrowLeft,
+  AlertCircle,
+} from "lucide-react";
+
+import { Input } from "../../../../shared/components/Input.jsx";
+import { Button } from "../../../../shared/components/Button.jsx";
+import { usePetStore } from "../../store/petStore.js";
+import { useCartStore } from "../../../cart/store/cartStore.js";
+import { validatePetForm } from "../../validators/petFormValidator.js";
+
+const getToday = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
 
 const PetCreate = () => {
   const navigate = useNavigate();
 
-  // Đọc trạng thái loading và các action từ Zustand Store
   const { createPet, loading, error: storeError, clearError } = usePetStore();
-  const { showToastNotification } = useCartStore(); 
+  const { showToast } = useCartStore();
 
-  // Khởi tạo form data
   const [formData, setFormData] = useState({
-    name: '',
-    specie: '',          // Nhập chữ tự do (Ví dụ: DOG, CAT, RABBIT...)
-    gender: 'MALE',      // Select cố định mặc định là MALE phù hợp với Enum DB
-    birthday: '',        // Chuỗi LocalDate dạng YYYY-MM-DD
-    weight: '',          // Kiểu số thực Float cho cân nặng
-    healthStatus: ''     // Chuỗi văn bản trạng thái sức khỏe
+    name: "",
+    specie: "",
+    gender: "MALE",
+    birthday: "",
+    weight: "",
+    healthStatus: "",
   });
 
-  const [validationError, setValidationError] = useState('');
+  const [validationError, setValidationError] = useState("");
 
-  // Tự động dọn dẹp lỗi cũ của Store khi truy cập trang
   useEffect(() => {
     clearError?.();
   }, [clearError]);
 
-  // Cập nhật state khi người dùng nhập liệu văn bản / số / select
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ 
-      ...prev, 
-      [name]: name === 'weight' ? (value !== '' ? parseFloat(value) : '') : value 
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value,
     }));
+
+    setValidationError("");
   };
 
-  // GỬI DỮ LIỆU TẠO MỚI QUA ACTION CỦA STORE
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setValidationError('');
-    
-    // Validation Client cơ bản
-    if (!formData.name.trim()) return setValidationError('Vui lòng điền tên của bé. ❌');
-    if (!formData.specie.trim()) return setValidationError('Vui lòng nhập loại thú cưng (Ví dụ: DOG, CAT...). ❌');
-    if (!formData.birthday) return setValidationError('Vui lòng nhập ngày sinh. ❌');
-    if (formData.weight === '' || formData.weight <= 0) {
-      return setValidationError('Cân nặng phải là số thực dương lớn hơn 0. ❌');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setValidationError("");
+
+    const validation = validatePetForm(formData);
+
+    if (!validation.success) {
+      setValidationError(
+        validation.error.issues[0]?.message || "Dữ liệu không hợp lệ.",
+      );
+      return;
     }
 
-    // Đóng gói dữ liệu gửi đi (specie tự động viết hoa toàn bộ để đồng bộ)
-    const submitData = {
-      name: formData.name.trim(),
-      specie: formData.specie.trim().toUpperCase(), 
-      gender: formData.gender, // Giữ nguyên giá trị MALE/FEMALE từ select
-      birthday: formData.birthday,
-      weight: formData.weight,
-      healthStatus: formData.healthStatus.trim() || 'Bình thường'
+    const payload = {
+      ...validation.data,
+      healthStatus: validation.data.healthStatus || "Bình thường",
     };
 
-    // Gọi action createPet từ Zustand store
-    const response = await createPet(submitData);
+    try {
+      const response = await createPet(payload);
 
-    // Xử lý phản hồi từ kết quả trả về
-    if (response && !storeError) {
-      if (showToastNotification) {
-        showToastNotification("Đăng ký hồ sơ bé thành công! 🎉");
-      } else {
-        alert("Đăng ký hồ sơ bé thành công!");
+      if (
+        !response ||
+        response.status === "ERROR" ||
+        response.success === false
+      ) {
+        setValidationError(
+          response?.message || storeError || "Không thể tạo hồ sơ thú cưng.",
+        );
+        return;
       }
-      navigate('/profile', { state: { activeTab: "pets" } }); 
-    } else if (storeError) {
-      if (showToastNotification) {
-        showToastNotification(`${storeError} ❌`);
-      } else {
-        alert(storeError);
-      }
+
+      showToast?.("Đăng ký hồ sơ bé thành công!");
+      navigate("/profile", { state: { activeTab: "pets" } });
+    } catch (error) {
+      setValidationError(
+        error?.message || "Đã xảy ra lỗi khi tạo hồ sơ thú cưng.",
+      );
     }
   };
 
-  // Lấy ngày hiện tại làm mốc tối đa cho trường Birthday tránh chọn ngày tương lai (@PastOrPresent)
-  const todayStr = new Date().toISOString().split('T')[0];
+  const displayedError = validationError || storeError;
 
   return (
-    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-left max-w-2xl mx-auto my-6">
-      
-      {/* Header */}
-      <div className="flex items-center gap-4 pb-4 border-b border-gray-50 mb-6">
-        <button 
-          onClick={() => navigate("/profile", { state: { activeTab: "pets" } })} 
-          className="p-2 hover:bg-gray-50 rounded-xl text-gray-500 transition-colors"
+    <div className="my-6 mx-auto max-w-2xl rounded-3xl border border-gray-100 bg-white p-8 text-left shadow-sm">
+      <div className="mb-6 flex items-center gap-4 border-b border-gray-50 pb-4">
+        <button
           type="button"
+          onClick={() => navigate("/profile", { state: { activeTab: "pets" } })}
+          className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-50"
+          aria-label="Quay lại hồ sơ"
         >
           <ArrowLeft size={20} />
         </button>
+
         <div>
-          <h2 className="text-xl font-black text-pet-blue uppercase tracking-tight flex items-center gap-2">
-            <PawPrint size={22} /> Đăng ký thành viên mới
+          <h2 className="flex items-center gap-2 text-xl font-black uppercase tracking-tight text-pet-blue">
+            <PawPrint size={22} />
+            Đăng ký thành viên mới
           </h2>
-          <p className="text-xs text-gray-400 font-medium">Khởi tạo thông số sinh trắc học chuẩn DTO để áp dụng dịch vụ Spa</p>
+          <p className="text-xs font-medium text-gray-400">
+            Khởi tạo thông tin thú cưng để quản lý và sử dụng dịch vụ Spa.
+          </p>
         </div>
       </div>
 
-      {/* Khối hiển thị lỗi Client / Server */}
-      {(validationError || storeError) && (
-        <div className="mb-5 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-700 text-sm font-medium">
-          <AlertCircle className="flex-shrink-0 text-red-500 mt-0.5" size={18} />
-          <div>{validationError || storeError}</div>
+      {displayedError && (
+        <div
+          role="alert"
+          className="mb-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-700"
+        >
+          <AlertCircle
+            className="mt-0.5 flex-shrink-0 text-red-500"
+            size={18}
+          />
+          <div>{displayedError}</div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        
-        {/* Tên Thú Cưng */}
         <Input
           label="Tên của bé *"
           icon={PawPrint}
           name="name"
           value={formData.name}
           onChange={handleInputChange}
-          placeholder="Nhập tên bé (ví dụ: Cậu Vàng, Bin Bin...)"
+          placeholder="Nhập tên bé..."
           required
         />
 
-        {/* Loài (Input tự do) & Giới tính (Select cố định theo Enum DB) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Input
-            label="Loại thú cưng *"
+            label="Loài thú cưng *"
             icon={HeartPulse}
             name="specie"
             value={formData.specie}
@@ -138,37 +158,39 @@ const PetCreate = () => {
             required
           />
 
-          {/* Trường Giới tính dùng Select chuẩn Enum */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-              <HeartPulse size={15} className="text-gray-400" /> Giới tính *
+            <label className="mb-1.5 flex items-center gap-1 text-sm font-bold text-gray-700">
+              <HeartPulse size={15} className="text-gray-400" />
+              Giới tính *
             </label>
             <select
               name="gender"
               value={formData.gender}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold transition-all outline-none focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10 h-[46px] text-gray-800 bg-[image:none]"
+              required
+              className="h-[46px] w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 outline-none transition-all focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10"
             >
-              <option value="MALE">🎯 Đực (MALE)</option>
-              <option value="FEMALE">🎀 Cái (FEMALE)</option>
+              <option value="MALE">Đực (MALE)</option>
+              <option value="FEMALE">Cái (FEMALE)</option>
+              <option value="UNKNOWN">Chưa rõ (UNKNOWN)</option>
             </select>
           </div>
         </div>
 
-        {/* Ngày sinh & Cân nặng */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-              <Calendar size={15} className="text-gray-400" /> Ngày sinh sinh học *
+            <label className="mb-1.5 flex items-center gap-1 text-sm font-bold text-gray-700">
+              <Calendar size={15} className="text-gray-400" />
+              Ngày sinh *
             </label>
             <input
               type="date"
               name="birthday"
-              max={todayStr}
               value={formData.birthday}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10 transition-all text-gray-800 bg-white h-[46px]"
+              max={getToday()}
               required
+              className="h-[46px] w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 outline-none transition-all focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10"
             />
           </div>
 
@@ -177,7 +199,7 @@ const PetCreate = () => {
             icon={Scale}
             type="number"
             step="0.1"
-            min="0.01"
+            min="0.1"
             name="weight"
             value={formData.weight}
             onChange={handleInputChange}
@@ -186,36 +208,39 @@ const PetCreate = () => {
           />
         </div>
 
-        {/* Trạng thái sức khỏe / Lưu ý Spa */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-            <FileText size={15} className="text-gray-400" /> Tình trạng sức khỏe & Lưu ý đặc biệt
+          <label className="mb-1.5 flex items-center gap-1 text-sm font-bold text-gray-700">
+            <FileText size={15} className="text-gray-400" />
+            Tình trạng sức khỏe và lưu ý đặc biệt
           </label>
           <textarea
             name="healthStatus"
             value={formData.healthStatus}
             onChange={handleInputChange}
-            rows="4"
-            placeholder="Ghi chú tiền sử bệnh lý, dị ứng thuốc, dị ứng thức ăn hoặc các biểu hiện đặc biệt để nhân viên lưu ý khi làm dịch vụ..."
-            className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm font-medium transition-all outline-none focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10 resize-none leading-relaxed text-gray-800"
+            rows={4}
+            maxLength={1000}
+            placeholder="Ghi chú bệnh lý, dị ứng hoặc những lưu ý đặc biệt..."
+            className="w-full resize-none rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium leading-relaxed text-gray-800 outline-none transition-all focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10"
           />
         </div>
 
-        {/* Footer Nút hành động */}
-        <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
+        <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/profile", { state: { activeTab: "pets" } })}
+            onClick={() =>
+              navigate("/profile", { state: { activeTab: "pets" } })
+            }
             disabled={loading}
-            className="rounded-xl font-bold px-6"
+            className="rounded-xl px-6 font-bold"
           >
             Hủy bỏ
           </Button>
+
           <Button
             type="submit"
             disabled={loading}
-            className="rounded-xl font-black px-8 shadow-md shadow-pet-blue/10 uppercase text-sm tracking-wider flex items-center gap-2"
+            className="flex items-center gap-2 rounded-xl px-8 text-sm font-black uppercase tracking-wider shadow-md shadow-pet-blue/10"
           >
             {loading ? "Đang lưu hồ sơ..." : "Hoàn tất đăng ký"}
           </Button>

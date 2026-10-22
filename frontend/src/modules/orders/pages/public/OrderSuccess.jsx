@@ -32,7 +32,7 @@ const OrderSuccess = () => {
 
         <div className="space-y-3">
           <button
-            onClick={() => navigate("/profile/orders")}
+            onClick={() => navigate(`/profile/orders/${order.id}`)}
             className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium transition"
           >
             Xem đơn hàng

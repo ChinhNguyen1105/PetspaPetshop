@@ -1,5 +1,6 @@
-import React, { useEffect } from "react";
+﻿import React, { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+
 import Header from "./layouts/public/Header.jsx";
 import Footer from "./layouts/public/Footer.jsx";
 import ToastContainer from "./shared/components/ToastContainer.jsx";
@@ -27,7 +28,7 @@ import PetDetail from "./modules/pets/pages/public/PetDetail.jsx";
 import PetCreate from "./modules/pets/pages/public/PetCreate.jsx";
 
 // Pages - Review
-import CreateOrderReview from "./modules/reviews/pages/CreateProductReview.jsx";
+import CreateOrderReview from "./modules/reviews/pages/CreateOrderReview.jsx";
 import CreateBookingReview from "./modules/reviews/pages/CreateBookingReview.jsx";
 
 import OrderDetail from "./modules/orders/pages/public/OrderDetail.jsx";
@@ -38,6 +39,7 @@ import Register from "./modules/auth/pages/Register.jsx";
 import { useAuthStore } from "./modules/auth/store/authStore.js";
 import "./styles/animations.css";
 
+// Pages - Admin
 import Dashboard from "./modules/dashboard/pages/admin/Dashboard.jsx";
 import AdminLayout from "./layouts/admin/AdminLayout.jsx";
 import ProductManagement from "./modules/products/pages/admin/ProductManagement.jsx";
@@ -52,17 +54,44 @@ import InventoryListManagement from "./modules/inventory/pages/admin/InventoryLi
 import InventoryTransManagement from "./modules/inventory/pages/admin/InventoryTransactionManagement.jsx";
 import PermissionManagement from "./modules/permissions/pages/admin/PermissionManagement.jsx";
 
-// Import Role Route Guard động
+// Route Guards
 import RoleRoute from "./app/router/RoleRoute.jsx";
+import AdminRoute from "./app/router/AdminRoute.jsx";
+import CustomerRouteGuard from "./app/router/CustomerRouteGuard.jsx";
 
 // ----------------------------------------------------------------------
-// ROUTE GUARDS
+// ROLE CONFIG
+// ----------------------------------------------------------------------
+
+const customerRoles = ["ROLE_USER"];
+
+// ----------------------------------------------------------------------
+// AUTH ROUTES
 // ----------------------------------------------------------------------
 
 const AnonymousRoute = ({ children }) => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isAuthenticated = useAuthStore(
+    (state) => state.isAuthenticated
+  );
 
-  return !isAuthenticated ? children : <Navigate to="/" replace />;
+  const user = useAuthStore((state) => state.user);
+
+  if (!isAuthenticated) {
+    return children;
+  }
+
+  const rawRole =
+    user?.role?.roleName ||
+    user?.role?.name ||
+    (typeof user?.role === "string" ? user.role : "");
+
+  const role = rawRole.toUpperCase();
+
+  if (["ROLE_ADMIN", "ROLE_STAFF"].includes(role)) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  return <Navigate to="/" replace />;
 };
 
 // ----------------------------------------------------------------------
@@ -81,16 +110,9 @@ function App() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin");
 
-  // --------------------------------------------------------------------
-  // ROLE CONFIG
-  // --------------------------------------------------------------------
-
-  const customerRoles = ["ROLE_USER"];
-  const adminRoles = ["ROLE_ADMIN", "ROLE_STAFF"];
-
-  // --------------------------------------------------------------------
-  // RENDER
-  // --------------------------------------------------------------------
+  const isAuthRoute =
+    location.pathname === "/login" ||
+    location.pathname === "/register";
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -101,23 +123,67 @@ function App() {
       <main className="flex-grow pt-20">
         <Routes>
           {/* ========================================================= */}
-          {/* PUBLIC ROUTES - KHÔNG CẦN ĐĂNG NHẬP */}
+          {/* PUBLIC ROUTES */}
+          {/* Admin/Staff truy cập sẽ bị CustomerRouteGuard chặn */}
           {/* ========================================================= */}
 
-          <Route path="/" element={<HomePage />} />
+          <Route
+            path="/"
+            element={
+              <CustomerRouteGuard>
+                <HomePage />
+              </CustomerRouteGuard>
+            }
+          />
 
-          <Route path="/about" element={<AboutUs />} />
+          <Route
+            path="/about"
+            element={
+              <CustomerRouteGuard>
+                <AboutUs />
+              </CustomerRouteGuard>
+            }
+          />
 
-          <Route path="/shop" element={<ProductList />} />
+          <Route
+            path="/shop"
+            element={
+              <CustomerRouteGuard>
+                <ProductList />
+              </CustomerRouteGuard>
+            }
+          />
 
-          <Route path="/shop/product/:id" element={<ProductDetail />} />
+          <Route
+            path="/shop/product/:id"
+            element={
+              <CustomerRouteGuard>
+                <ProductDetail />
+              </CustomerRouteGuard>
+            }
+          />
 
-          <Route path="/spa" element={<ServiceList />} />
+          <Route
+            path="/spa"
+            element={
+              <CustomerRouteGuard>
+                <ServiceList />
+              </CustomerRouteGuard>
+            }
+          />
 
-          <Route path="/spa/service/:id" element={<ServiceDetail />} />
+          <Route
+            path="/spa/service/:id"
+            element={
+              <CustomerRouteGuard>
+                <ServiceDetail />
+              </CustomerRouteGuard>
+            }
+          />
 
           {/* ========================================================= */}
           {/* AUTH ROUTES */}
+          {/* Login/Register được giữ riêng, không bọc CustomerRouteGuard */}
           {/* ========================================================= */}
 
           <Route
@@ -139,189 +205,243 @@ function App() {
           />
 
           {/* ========================================================= */}
-          {/* PROTECTED CUSTOMER ROUTES */}
+          {/* CUSTOMER ROUTES */}
+          {/* CustomerRouteGuard chặn Admin/Staff trước */}
+          {/* RoleRoute kiểm tra quyền đăng nhập của customer */}
           {/* ========================================================= */}
 
           <Route
             path="/shop/cart"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <Cart />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <Cart />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/shop/checkout"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <Checkout />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <Checkout />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/spa/booking/create"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <BookingCreate />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <BookingCreate />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/booking/create/:id"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <BookingCreate />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <BookingCreate />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/spa/bookings"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <BookingList />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <BookingList />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/spa/booking/:id"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <BookingDetail />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <BookingDetail />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
-          {/* ========================================================= */}
-          {/* ORDER SUCCESS - COD */}
-          {/* ========================================================= */}
+          {/* ORDER SUCCESS */}
 
           <Route
             path="/order-success"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <OrderSuccess />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <OrderSuccess />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
-          {/* ========================================================= */}
           {/* VNPAY RETURN */}
-          {/* ========================================================= */}
 
           <Route
             path="/payment/vnpay/return"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <VNPayReturnPage />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <VNPayReturnPage />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
-          {/* ========================================================= */}
           {/* PROFILE & PETS */}
-          {/* ========================================================= */}
 
           <Route
             path="/profile"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <Profile />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <Profile />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/profile/orders/:id"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <OrderDetail />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <OrderDetail />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/profile/pets/detail/:id"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <PetDetail />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <PetDetail />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/profile/pets/edit/:id"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <PetEdit />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <PetEdit />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/profile/pets/create"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <PetCreate />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <PetCreate />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
-          {/* ========================================================= */}
           {/* REVIEWS */}
-          {/* ========================================================= */}
 
           <Route
             path="/review/create/product/:orderId"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <CreateOrderReview />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <CreateOrderReview />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           <Route
             path="/review/create/booking/:bookingId"
             element={
-              <RoleRoute allowedRoles={customerRoles}>
-                <CreateBookingReview />
-              </RoleRoute>
+              <CustomerRouteGuard>
+                <RoleRoute allowedRoles={customerRoles}>
+                  <CreateBookingReview />
+                </RoleRoute>
+              </CustomerRouteGuard>
             }
           />
 
           {/* ========================================================= */}
           {/* ADMIN ROUTES */}
+          {/* Chỉ Admin/Staff được truy cập */}
           {/* ========================================================= */}
 
           <Route
             path="/admin"
             element={
-              <RoleRoute allowedRoles={adminRoles}>
+              <AdminRoute>
                 <AdminLayout />
-              </RoleRoute>
+              </AdminRoute>
             }
           >
+            <Route
+              index
+              element={<Navigate to="dashboard" replace />}
+            />
+
             <Route path="dashboard" element={<Dashboard />} />
 
-            <Route path="products/list" element={<ProductManagement />} />
+            <Route
+              path="products/list"
+              element={<ProductManagement />}
+            />
 
-            <Route path="categories" element={<CategoryManagement />} />
+            <Route
+              path="categories"
+              element={<CategoryManagement />}
+            />
 
-            <Route path="services/list" element={<ServiceManagement />} />
+            <Route
+              path="services/list"
+              element={<ServiceManagement />}
+            />
 
-            <Route path="bookings" element={<BookingManagement />} />
+            <Route
+              path="bookings"
+              element={<BookingManagement />}
+            />
 
-            <Route path="orders" element={<OrderManagement />} />
+            <Route
+              path="orders"
+              element={<OrderManagement />}
+            />
 
-            <Route path="users" element={<UserManagement />} />
+            <Route
+              path="users"
+              element={<UserManagement />}
+            />
 
-            <Route path="reports" element={<RevenueReport />} />
+            <Route
+              path="reports"
+              element={<RevenueReport />}
+            />
 
-            <Route path="roles" element={<RoleManagement />} />
+            <Route
+              path="roles"
+              element={<RoleManagement />}
+            />
 
             <Route
               path="inventory/list"
@@ -333,14 +453,32 @@ function App() {
               element={<InventoryTransManagement />}
             />
 
-            <Route path="permission" element={<PermissionManagement />} />
+            <Route
+              path="permission"
+              element={<PermissionManagement />}
+            />
+
+            {/* URL không tồn tại trong khu vực admin */}
+            <Route
+              path="*"
+              element={<Navigate to="/admin/dashboard" replace />}
+            />
           </Route>
 
           {/* ========================================================= */}
           {/* FALLBACK */}
+          {/* Admin/Staff không được rơi về public homepage */}
           {/* ========================================================= */}
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
+            }
+          />
         </Routes>
       </main>
 

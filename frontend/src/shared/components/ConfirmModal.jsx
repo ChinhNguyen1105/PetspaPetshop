@@ -1,24 +1,28 @@
-import React from 'react';
-import { AlertTriangle } from 'lucide-react';
-import Modal from './Modal.jsx'; // Kế thừa từ Modal nền tảng của bạn
+import React from "react";
+import { AlertTriangle } from "lucide-react";
+import Modal from "./Modal.jsx"; // Kế thừa từ Modal nền tảng của bạn
 
-const ConfirmModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title = "Xác nhận thao tác", 
+const ConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title = "Xác nhận thao tác",
   message = "Bạn có chắc chắn muốn thực hiện hành động này?",
   type = "warning", // 'danger' (cho xóa) hoặc 'warning' (cho hủy/cập nhật)
   confirmText = "Đồng ý",
-  cancelText = "Quay lại"
+  cancelText = "Quay lại",
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="p-1 space-y-4">
         <div className="flex items-start gap-3.5">
-          <div className={`p-2.5 rounded-xl flex-shrink-0 ${
-            type === 'danger' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'
-          }`}>
+          <div
+            className={`p-2.5 rounded-xl flex-shrink-0 ${
+              type === "danger"
+                ? "bg-red-50 text-red-500"
+                : "bg-amber-50 text-amber-500"
+            }`}
+          >
             <AlertTriangle size={24} />
           </div>
           <div>
@@ -40,9 +44,9 @@ const ConfirmModal = ({
             type="button"
             onClick={onConfirm}
             className={`px-4 py-2 text-white font-bold text-sm rounded-xl shadow-sm transition-all active:scale-95 ${
-              type === 'danger' 
-                ? 'bg-red-500 hover:bg-red-600' 
-                : 'bg-orange-500 hover:bg-orange-600'
+              type === "danger"
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-orange-500 hover:bg-orange-600"
             }`}
           >
             {confirmText}

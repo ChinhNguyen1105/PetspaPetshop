@@ -97,6 +97,7 @@ const createUser = async (userData) => {
       id: Number(userData.role?.id || userData.role),
     },
   };
+ console.log("[CREATE USER] Payload gửi backend:", payload);
 
   const response = await api.post(
     URL_CONSTANT.User.CREATE_USER,

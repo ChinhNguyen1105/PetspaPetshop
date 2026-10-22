@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Camera, UploadCloud, X, Eye, EyeOff } from "lucide-react";
 import { useRoleStore } from "../../../roles/store/roleStore.js";
 import UserAvatar from "./UserAvatar.jsx";
+import { validateUserForm } from "../../validators/userValidator.js";
+import { validateImageFile } from "../../../../shared/validators/imageValidator.js";
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
+const MAX_FILE_SIZE_MB = 2;
 
 const initialFormState = {
   name: "",
@@ -75,6 +77,7 @@ const UserFormAdmin = ({
         roleId: customerRole ? String(customerRole.id) : "",
       });
 
+      setPreviewUrl("");
       setErrors({});
       return;
     }
@@ -152,18 +155,14 @@ const UserFormAdmin = ({
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setErrors((previous) => ({
-        ...previous,
-        avatar: "Vui lòng chọn tệp hình ảnh.",
-      }));
-      return;
-    }
+    const validation = validateImageFile(file, {
+      maxSizeMB: MAX_FILE_SIZE_MB,
+    });
 
-    if (file.size > MAX_FILE_SIZE) {
+    if (!validation.isValid) {
       setErrors((previous) => ({
         ...previous,
-        avatar: "Ảnh đại diện không được vượt quá 2 MB.",
+        avatar: validation.message || "Ảnh đại diện không hợp lệ.",
       }));
       return;
     }
@@ -194,43 +193,10 @@ const UserFormAdmin = ({
   };
 
   const validateForm = () => {
-    const nextErrors = {};
+    const validation = validateUserForm(formData, { isEditMode });
 
-    if (!formData.name.trim()) {
-      nextErrors.name = "Vui lòng nhập họ và tên.";
-    }
-
-    if (!formData.email.trim()) {
-      nextErrors.email = "Vui lòng nhập email.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      nextErrors.email = "Email không đúng định dạng.";
-    }
-
-    if (!isEditMode && !formData.password.trim()) {
-      nextErrors.password = "Vui lòng nhập mật khẩu.";
-    }
-
-    if (!isEditMode && formData.password.length < 6) {
-      nextErrors.password = "Mật khẩu phải có ít nhất 6 ký tự.";
-    }
-
-    if (formData.password && formData.password.length < 6) {
-      nextErrors.password = "Mật khẩu phải có ít nhất 6 ký tự.";
-    }
-
-    if (!formData.roleId) {
-      nextErrors.roleId = "Vui lòng chọn vai trò.";
-    }
-
-    if (
-      formData.dateOfBirth &&
-      Number.isNaN(Date.parse(formData.dateOfBirth))
-    ) {
-      nextErrors.dateOfBirth = "Ngày sinh không hợp lệ.";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    setErrors(validation.errors);
+    return validation.isValid;
   };
 
   const handleSubmit = async (event) => {
@@ -275,8 +241,6 @@ const UserFormAdmin = ({
       }
 
       // Nếu component cha chưa xử lý upload, thực hiện tại đây.
-      // Component cha nên trả về { success: true, avatarUploaded: true }
-      // khi đã hoàn tất cả cập nhật thông tin và upload ảnh.
       const avatarAlreadyUploaded = result?.avatarUploaded === true;
 
       if (
@@ -373,7 +337,7 @@ const UserFormAdmin = ({
             Chọn ảnh
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={handleFileChange}
               disabled={isBusy}
@@ -394,7 +358,7 @@ const UserFormAdmin = ({
         </div>
 
         <p className="text-xs text-gray-500">
-          Chỉ hỗ trợ tệp hình ảnh, dung lượng tối đa 2 MB.
+          Chỉ hỗ trợ JPG, PNG, WEBP; dung lượng tối đa 2 MB.
         </p>
 
         {formData.rawFile && (

@@ -112,7 +112,7 @@ export const useBookingStore = create((set, get) => ({
         );
 
       console.log(
-        "booking/my:",
+        "my booking:",
         res
       );
 

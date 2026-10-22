@@ -17,7 +17,7 @@ import ServiceCard from "../../services/components/ServiceCard.jsx";
 import { useProductStore } from "../../products/store/productStore.js";
 import { useServiceStore } from "../../services/store/serviceStore.js";
 import { useCategoryStore } from "../../categories/store/categoryStore.js";
-import { useCart } from "../../cart/hooks/useCart.js";
+import { useCartStore } from "../../cart/store/cartStore.js";
 
 const PRODUCT_TABS = [
   { value: "ALL", label: "Tất cả" },
@@ -93,9 +93,6 @@ const normalizeText = (value) =>
     .toLowerCase()
     .trim();
 
-const getCategoryId = (category) =>
-  category?.id ?? category?.categoryId ?? null;
-
 const getCategoryName = (category) =>
   category?.name ?? category?.categoryName ?? "";
 
@@ -143,7 +140,9 @@ const findServiceCategory = (categories, group) => {
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+
+  // CART STORE: thay thế useCart hook
+  const addItem = useCartStore((state) => state.addItem);
 
   const [activeTab, setActiveTab] = useState("ALL");
 
@@ -162,22 +161,21 @@ const HomePage = () => {
   const [serviceGroupsLoading, setServiceGroupsLoading] = useState(false);
   const [serviceGroupsError, setServiceGroupsError] = useState(false);
 
-  const {
-    products: allProducts = [],
-    loading: productLoading,
-    fetchProducts,
-  } = useProductStore();
+  const productsFromStore = useProductStore((state) => state.products);
+  const productLoading = useProductStore((state) => state.loading);
+  const fetchProducts = useProductStore((state) => state.fetchProducts);
 
-  const { fetchServices } = useServiceStore();
+  const fetchServices = useServiceStore((state) => state.fetchServices);
 
-  const {
-    categories: allCategories = [],
-    loading: categoryLoading,
-    fetchCategories,
-  } = useCategoryStore();
+  const categoriesFromStore = useCategoryStore((state) => state.categories);
+  const categoryLoading = useCategoryStore((state) => state.loading);
+  const fetchCategories = useCategoryStore((state) => state.fetchCategories);
 
-  const products = Array.isArray(allProducts) ? allProducts : [];
-  const categories = Array.isArray(allCategories) ? allCategories : [];
+  const products = Array.isArray(productsFromStore) ? productsFromStore : [];
+
+  const categories = Array.isArray(categoriesFromStore)
+    ? categoriesFromStore
+    : [];
 
   // Tải sản phẩm và danh mục.
   useEffect(() => {
@@ -269,7 +267,7 @@ const HomePage = () => {
     };
   }, [categories, fetchServices]);
 
-  // Lọc sản phẩm theo product.name, không dựa vào categoryId/categoryName.
+  // Lọc sản phẩm theo tên.
   const filteredProducts = useMemo(() => {
     if (activeTab === "ALL") {
       return products.slice(0, 4);
@@ -288,6 +286,7 @@ const HomePage = () => {
       .slice(0, 4);
   }, [products, activeTab]);
 
+  // Cuộn danh sách dịch vụ.
   const scrollServices = (groupKey, direction, totalServices) => {
     const maxOffset = Math.max(0, totalServices - SERVICE_VISIBLE_COUNT);
 
@@ -300,6 +299,7 @@ const HomePage = () => {
     }));
   };
 
+  // Render từng nhóm dịch vụ.
   const renderServiceSection = (group) => {
     const groupServices = servicesByGroup[group.key] ?? [];
 
@@ -521,7 +521,7 @@ const HomePage = () => {
                 >
                   <ProductCard
                     product={product}
-                    onAddToCart={() => addToCart(product)}
+                    onAddToCart={() => addItem(product, 1)}
                     onClick={() => navigate(`/shop/product/${product.id}`)}
                   />
                 </ScrollReveal>

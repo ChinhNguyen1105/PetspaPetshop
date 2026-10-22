@@ -1,37 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Trash2, Plus, Minus, Image } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Trash2, Plus, Minus, Image } from "lucide-react";
 
-import { useCartStore } from '../store/cartStore.js';
-import { useProductImageStore } from '../../products/store/productImageStore.js';
+import { useCartStore } from "../store/cartStore.js";
+import { useProductImageStore } from "../../products/store/productImageStore.js";
 
-import { Button } from '../../../shared/components/Button.jsx';
-import { formatPrice } from '../../../shared/utils/formatPrice.js';
+import {
+  validateCartItemId,
+  validateCartQuantity,
+  validateCartSummary,
+} from "../validators/cartValidator.js";
 
-/*
-|--------------------------------------------------------------------------
-| FALLBACK IMAGE
-|--------------------------------------------------------------------------
-*/
+import { Button } from "../../../shared/components/Button.jsx";
+import { formatPrice } from "../../../shared/utils/formatPrice.js";
+
 const FALLBACK_IMG =
-  'https://images.unsplash.com/photo-1548767797-d8c844163c4c?q=80&w=200';
+  "https://images.unsplash.com/photo-1548767797-d8c844163c4c?q=80&w=200";
 
-/*
-|--------------------------------------------------------------------------
-| SUB-COMPONENT: CART ITEM ROW
-|--------------------------------------------------------------------------
-*/
-const CartItemRow = ({
-  item,
-  updateQuantity,
-  removeItem,
-}) => {
+const CartItemRow = ({ item, updateQuantity, removeItem, showToast }) => {
   const [imgUrl, setImgUrl] = useState(FALLBACK_IMG);
   const [loadingImg, setLoadingImg] = useState(true);
+  const [quantityError, setQuantityError] = useState("");
 
-  const fetchImages = useProductImageStore(
-    (state) => state.fetchImages
-  );
+  const fetchImages = useProductImageStore((state) => state.fetchImages);
 
   useEffect(() => {
     let isMounted = true;
@@ -39,91 +30,50 @@ const CartItemRow = ({
     const loadProductThumbnail = async () => {
       setLoadingImg(true);
 
-      /*
-       * 1. Ưu tiên ảnh mà Backend đã map trực tiếp vào CartItemDto
-       */
       if (
-        item.productImage &&
-        typeof item.productImage === 'string' &&
-        item.productImage.trim() !== ''
+        typeof item?.productImage === "string" &&
+        item.productImage.trim() !== ""
       ) {
         if (isMounted) {
           setImgUrl(item.productImage);
           setLoadingImg(false);
         }
-
         return;
       }
 
-      /*
-       * 2. Nếu Backend chưa có productImage,
-       *    lấy danh sách ảnh từ ProductImageStore
-       */
-      if (!item.productId) {
+      if (!item?.productId) {
         if (isMounted) {
           setImgUrl(FALLBACK_IMG);
           setLoadingImg(false);
         }
-
         return;
       }
 
       try {
         const res = await fetchImages(item.productId);
 
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
-        /*
-         * ProductImageStore có thể trả:
-         *
-         * [
-         *   { imageUrl: '...' }
-         * ]
-         *
-         * hoặc:
-         *
-         * {
-         *   data: [...]
-         * }
-         *
-         * Hỗ trợ cả hai trường hợp để tránh lỗi fallback.
-         */
         const images = Array.isArray(res)
           ? res
           : Array.isArray(res?.data)
             ? res.data
-            : [];
+            : Array.isArray(res?.data?.data)
+              ? res.data.data
+              : [];
 
-        /*
-         * Tìm ảnh thumbnail trước.
-         * Nếu không có thumbnail thì lấy ảnh main.
-         * Nếu vẫn không có thì lấy ảnh đầu tiên.
-         */
         const mainImg =
-          images.find(
-            (img) => img?.isThumbnail === true
-          ) ||
-          images.find(
-            (img) => img?.isMain === true
-          ) ||
+          images.find((img) => img?.isThumbnail === true) ||
+          images.find((img) => img?.isMain === true) ||
           images[0];
 
-        const imageUrl =
-          mainImg?.imageUrl ||
-          mainImg?.url ||
-          '';
+        const imageUrl = mainImg?.imageUrl || mainImg?.url || "";
 
-        if (imageUrl) {
-          setImgUrl(imageUrl);
-        } else {
-          setImgUrl(FALLBACK_IMG);
-        }
+        setImgUrl(imageUrl || FALLBACK_IMG);
       } catch (error) {
         console.error(
           `Không thể lấy ảnh cho sản phẩm ${item.productId}:`,
-          error
+          error,
         );
 
         if (isMounted) {
@@ -141,130 +91,176 @@ const CartItemRow = ({
     return () => {
       isMounted = false;
     };
-  }, [
-    item.productId,
-    item.productImage,
-    fetchImages,
-  ]);
+  }, [item?.productId, item?.productImage, fetchImages]);
 
-  /*
-   * Nếu URL ảnh Backend/store bị lỗi,
-   * chuyển sang fallback và không thử lại fallback.
-   */
   const handleImageError = (event) => {
     if (event.currentTarget.src !== FALLBACK_IMG) {
       event.currentTarget.src = FALLBACK_IMG;
     }
   };
 
+  const handleUpdateQuantity = (nextQuantity) => {
+    const idValidation = validateCartItemId(item?.id);
+
+    if (!idValidation.isValid) {
+      showToast(idValidation.error, "error");
+      return;
+    }
+
+    const quantityValidation = validateCartQuantity(nextQuantity);
+
+    if (!quantityValidation.isValid) {
+      const message =
+        quantityValidation.errors?.quantity ||
+        "Số lượng sản phẩm không hợp lệ.";
+
+      setQuantityError(message);
+      showToast(message, "error");
+      return;
+    }
+
+    setQuantityError("");
+    updateQuantity(item.id, quantityValidation.data.quantity);
+  };
+
+  const handleRemoveItem = () => {
+    const idValidation = validateCartItemId(item?.id);
+
+    if (!idValidation.isValid) {
+      showToast(idValidation.error, "error");
+      return;
+    }
+
+    removeItem(item.id);
+  };
+
+  const quantity = Number(item?.quantity);
+  const validQuantity = Number.isInteger(quantity) && quantity >= 1;
+
   return (
-    <div className="bg-white p-4 rounded-2xl flex items-center gap-4 shadow-sm border border-gray-50 hover:border-gray-100 transition-all">
-
-      {/* Khu vực ảnh */}
-      <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0 relative border border-gray-100">
-        {loadingImg ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
-            <Image
-              className="text-gray-300 animate-bounce"
-              size={20}
+    <div className="rounded-2xl border border-gray-50 bg-white p-4 shadow-sm transition-all hover:border-gray-100">
+      <div className="flex items-center gap-4">
+        {/* Ảnh sản phẩm */}
+        <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+          {loadingImg ? (
+            <div className="absolute inset-0 flex animate-pulse items-center justify-center bg-gray-100">
+              <Image className="animate-bounce text-gray-300" size={20} />
+            </div>
+          ) : (
+            <img
+              src={imgUrl || FALLBACK_IMG}
+              className="h-full w-full object-cover"
+              alt={item?.productName || "Sản phẩm"}
+              onError={handleImageError}
             />
+          )}
+        </div>
+
+        {/* Thông tin sản phẩm */}
+        <div className="min-w-0 flex-grow text-left">
+          <h3 className="line-clamp-1 font-bold text-gray-800">
+            {item?.productName || "Sản phẩm"}
+          </h3>
+
+          <p className="mt-0.5 font-black text-pet-orange">
+            {formatPrice(item?.productPrice)}
+          </p>
+        </div>
+
+        {/* Số lượng */}
+        <div className="flex flex-shrink-0 flex-col items-center gap-1">
+          <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 p-1.5">
+            <button
+              type="button"
+              aria-label="Giảm số lượng"
+              onClick={() => handleUpdateQuantity(quantity - 1)}
+              disabled={!validQuantity || quantity <= 1}
+              className="cursor-pointer rounded-lg bg-white p-1 text-gray-600 shadow-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Minus size={14} />
+            </button>
+
+            <span className="w-8 text-center text-sm font-bold text-gray-800">
+              {validQuantity ? quantity : "—"}
+            </span>
+
+            <button
+              type="button"
+              aria-label="Tăng số lượng"
+              onClick={() => handleUpdateQuantity(quantity + 1)}
+              disabled={!validQuantity}
+              className="cursor-pointer rounded-lg bg-white p-1 text-gray-600 shadow-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Plus size={14} />
+            </button>
           </div>
-        ) : (
-          <img
-            src={imgUrl || FALLBACK_IMG}
-            className="w-full h-full object-cover"
-            alt={item.productName || 'Sản phẩm'}
-            onError={handleImageError}
-          />
-        )}
-      </div>
 
-      {/* Thông tin sản phẩm */}
-      <div className="flex-grow text-left">
-        <h3 className="font-bold text-gray-800 line-clamp-1">
-          {item.productName}
-        </h3>
+          {quantityError && (
+            <p className="max-w-32 text-center text-xs text-red-500">
+              {quantityError}
+            </p>
+          )}
+        </div>
 
-        <p className="text-pet-orange font-black mt-0.5">
-          {formatPrice(item.productPrice)}
-        </p>
-      </div>
-
-      {/* Bộ điều khiển số lượng */}
-      <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100">
+        {/* Xóa sản phẩm */}
         <button
-          onClick={() =>
-            updateQuantity(
-              item.id,
-              item.quantity - 1
-            )
-          }
-          className="p-1 bg-white shadow-sm rounded-lg hover:bg-gray-100 text-gray-600 transition-colors cursor-pointer"
-          disabled={item.quantity <= 1}
+          type="button"
+          aria-label="Xóa sản phẩm khỏi giỏ hàng"
+          onClick={handleRemoveItem}
+          className="flex-shrink-0 cursor-pointer rounded-xl border-none bg-transparent p-2 text-red-400 transition-all hover:bg-red-50 hover:text-red-500"
         >
-          <Minus size={14} />
-        </button>
-
-        <span className="w-8 text-center font-bold text-gray-800 text-sm">
-          {item.quantity}
-        </span>
-
-        <button
-          onClick={() =>
-            updateQuantity(
-              item.id,
-              item.quantity + 1
-            )
-          }
-          className="p-1 bg-white shadow-sm rounded-lg hover:bg-gray-100 text-gray-600 transition-colors cursor-pointer"
-        >
-          <Plus size={14} />
+          <Trash2 size={20} />
         </button>
       </div>
-
-      {/* Xóa sản phẩm */}
-      <button
-        onClick={() => removeItem(item.id)}
-        className="text-red-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition-all cursor-pointer border-none bg-transparent"
-      >
-        <Trash2 size={20} />
-      </button>
     </div>
   );
 };
 
-/*
-|--------------------------------------------------------------------------
-| MAIN COMPONENT: CART
-|--------------------------------------------------------------------------
-*/
 const Cart = () => {
-  const {
-    itemDtoList,
-    totalAmount,
-    removeItem,
-    updateQuantity,
-    fetchCart,
-    isLoading,
-  } = useCartStore();
+  const itemDtoList = useCartStore((state) => state.itemDtoList);
+  const totalAmount = useCartStore((state) => state.totalAmount);
+  const removeItem = useCartStore((state) => state.removeItem);
+  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const fetchCart = useCartStore((state) => state.fetchCart);
+  const isLoading = useCartStore((state) => state.isLoading);
+  const showToast = useCartStore((state) => state.showToast);
 
-  /*
-   * Load cart khi component mount
-   */
   useEffect(() => {
     fetchCart();
   }, [fetchCart]);
 
-  /*
-   * Loading
-   */
-  if (
-    isLoading &&
-    itemDtoList.length === 0
-  ) {
+  const safeItems = Array.isArray(itemDtoList) ? itemDtoList : [];
+
+  const summaryValidation = validateCartSummary({
+    itemDtoList: safeItems,
+    totalAmount,
+  });
+
+  const invalidItems = safeItems.filter(
+    (item) => !validateCartItemForDisplay(item),
+  );
+
+  function validateCartItemForDisplay(item) {
+    const quantity = Number(item?.quantity);
+    const price = Number(item?.productPrice);
+
     return (
-      <div className="min-h-screen pt-32 text-center bg-gray-50">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-pet-blue border-t-transparent mb-4"></div>
+      item?.id !== undefined &&
+      item?.id !== null &&
+      String(item.id).trim() !== "" &&
+      Number.isSafeInteger(Number(item.id)) &&
+      Number(item.id) > 0 &&
+      Number.isInteger(quantity) &&
+      quantity >= 1 &&
+      Number.isFinite(price) &&
+      price >= 0
+    );
+  }
+
+  if (isLoading && safeItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-32 text-center">
+        <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-pet-blue border-t-transparent" />
 
         <h2 className="text-xl font-bold text-gray-600">
           Đang tải giỏ hàng của bạn...
@@ -273,23 +269,37 @@ const Cart = () => {
     );
   }
 
-  /*
-   * Cart rỗng
-   */
-  if (itemDtoList.length === 0) {
+  if (!summaryValidation.isValid) {
     return (
-      <div className="min-h-screen pt-32 text-center bg-gray-50">
-        <h2 className="text-2xl font-black text-gray-800 mb-2">
+      <div className="min-h-screen bg-gray-50 px-4 pt-32 text-center">
+        <h2 className="mb-2 text-2xl font-black text-gray-800">
+          Không thể hiển thị giỏ hàng
+        </h2>
+
+        <p className="mb-6 text-sm text-red-500">
+          Dữ liệu giỏ hàng không hợp lệ. Vui lòng tải lại.
+        </p>
+
+        <Button onClick={() => fetchCart()} className="rounded-xl">
+          Tải lại giỏ hàng
+        </Button>
+      </div>
+    );
+  }
+
+  if (safeItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-32 text-center">
+        <h2 className="mb-2 text-2xl font-black text-gray-800">
           Giỏ hàng trống trơn! 🛒
         </h2>
 
-        <p className="text-gray-500 mb-6 font-medium text-sm">
-          Hãy tìm thêm các sản phẩm chăm sóc thú cưng
-          chất lượng nhé.
+        <p className="mb-6 text-sm font-medium text-gray-500">
+          Hãy tìm thêm các sản phẩm chăm sóc thú cưng chất lượng nhé.
         </p>
 
         <Link to="/shop">
-          <Button className="!px-8 !py-3 rounded-xl uppercase font-black tracking-wide text-xs">
+          <Button className="!rounded-xl !px-8 !py-3 text-xs font-black uppercase tracking-wide">
             Quay lại cửa hàng
           </Button>
         </Link>
@@ -297,53 +307,83 @@ const Cart = () => {
     );
   }
 
-  /*
-   * Cart có sản phẩm
-   */
   return (
-    <div className="min-h-screen bg-gray-50/50 pt-10 pb-20">
-      <div className="container mx-auto px-4 md:px-10 max-w-5xl">
-
-        <h1 className="text-3xl font-black text-pet-blue mb-8 uppercase tracking-tight text-left">
+    <div className="min-h-screen bg-gray-50/50 pb-20 pt-10">
+      <div className="container mx-auto max-w-5xl px-4 md:px-10">
+        <h1 className="mb-8 text-left text-3xl font-black uppercase tracking-tight text-pet-blue">
           Giỏ hàng của bạn
         </h1>
 
-        <div className="grid lg:grid-cols-12 gap-8 items-start">
+        {invalidItems.length > 0 && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Có {invalidItems.length} sản phẩm chứa dữ liệu không hợp lệ. Vui
+            lòng kiểm tra lại hoặc tải lại giỏ hàng trước khi thanh toán.
+          </div>
+        )}
 
+        <div className="grid items-start gap-8 lg:grid-cols-12">
           {/* Danh sách sản phẩm */}
-          <div className="lg:col-span-8 space-y-4">
-            {itemDtoList.map((item) => (
+          <div className="space-y-4 lg:col-span-8">
+            {safeItems.map((item, index) => (
               <CartItemRow
-                key={item.id}
+                key={item?.id ?? `invalid-cart-item-${index}`}
                 item={item}
                 updateQuantity={updateQuantity}
                 removeItem={removeItem}
+                showToast={showToast}
               />
             ))}
           </div>
 
-          {/* Tổng cộng */}
-          <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm sticky top-24 text-left">
+          {/* Tóm tắt đơn hàng */}
+          <div className="sticky top-24 text-left lg:col-span-4">
+            <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 border-b border-gray-50 pb-3 text-lg font-black uppercase tracking-wider text-gray-800">
+                Tóm tắt đơn hàng
+              </h3>
 
-            <h3 className="text-lg font-black text-gray-800 border-b border-gray-50 pb-3 mb-4 uppercase tracking-wider">
-              Tóm tắt đơn hàng
-            </h3>
+              <div className="mb-6 flex items-center justify-between gap-3">
+                <span className="text-sm font-bold text-gray-500">
+                  Tổng tiền tạm tính:
+                </span>
 
-            <div className="flex justify-between items-center mb-6">
-              <span className="text-gray-500 font-bold text-sm">
-                Tổng tiền tạm tính:
-              </span>
+                <span className="text-2xl font-black text-pet-orange">
+                  {formatPrice(totalAmount)}
+                </span>
+              </div>
 
-              <span className="font-black text-2xl text-pet-orange">
-                {formatPrice(totalAmount)}
-              </span>
-            </div>
+              <Button
+                disabled={invalidItems.length > 0 || isLoading}
+                onClick={() => {
+                  if (invalidItems.length > 0) {
+                    showToast(
+                      "Vui lòng kiểm tra lại dữ liệu sản phẩm trong giỏ hàng.",
+                      "error",
+                    );
+                    return;
+                  }
 
-            <Link to="/shop/checkout">
-              <Button className="w-full !py-4 rounded-2xl font-black uppercase text-sm tracking-widest shadow-lg shadow-blue-500/10">
+                  window.location.href = "/shop/checkout";
+                }}
+                className="w-full !rounded-2xl !py-4 text-sm font-black uppercase tracking-widest shadow-lg shadow-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 Tiến hành đặt hàng
               </Button>
-            </Link>
+
+              {invalidItems.length > 0 && (
+                <p className="mt-3 text-xs leading-5 text-red-500">
+                  Không thể thanh toán khi có sản phẩm chứa dữ liệu không hợp
+                  lệ.
+                </p>
+              )}
+
+              <Link
+                to="/shop"
+                className="mt-4 block text-center text-sm font-semibold text-pet-blue hover:underline"
+              >
+                Tiếp tục mua sắm
+              </Link>
+            </div>
           </div>
         </div>
       </div>

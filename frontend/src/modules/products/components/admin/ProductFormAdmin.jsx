@@ -1,23 +1,30 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
+
 import { useProductStore } from "../../store/productStore.js";
 import { useCategoryStore } from "../../../categories/store/categoryStore.js";
 import { useProductImageStore } from "../../store/productImageStore.js";
 import ProductImage from "../../pages/admin/ProductImage.jsx";
+import { validateProductForm } from "../../validators/productFormValidator.js";
 
 const MAX_IMAGES = 6;
+
+const EMPTY_FORM = {
+  name: "",
+  description: "",
+  price: "",
+  categoryId: "",
+  quantity: "",
+};
 
 const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
   const isEdit = Boolean(initialData?.id);
   const productId = initialData?.id;
 
-  // Product store
   const loadingProduct = useProductStore((state) => state.loading);
 
-  // Category store
   const categories = useCategoryStore((state) => state.categories) || [];
   const fetchCategories = useCategoryStore((state) => state.fetchCategories);
 
-  // Product image store
   const imagesByProductId = useProductImageStore(
     (state) => state.imagesByProductId,
   );
@@ -32,56 +39,48 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
     ? imagesByProductId?.[String(productId)] || []
     : [];
 
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    categoryId: "",
-    quantity: "",
-  });
-
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [uploadingImages, setUploadingImages] = useState(false);
+
   const fileInputRef = useRef(null);
 
-  // Fetch categories
   useEffect(() => {
     fetchCategories?.({ type: "PRODUCT" });
   }, [fetchCategories]);
 
-  // Populate form when opening or switching product
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        name: initialData.name || "",
-        description: initialData.description || "",
-        price: initialData.price ?? "",
-        categoryId: initialData.categoryId ?? initialData.category?.id ?? "",
-        quantity:
-          initialData.quantity ??
-          initialData.stockQuantity ??
-          initialData.stock_quantity ??
-          "",
-      });
-
-      if (initialData.id != null) {
-        fetchImages(String(initialData.id)).catch((error) => {
-          console.error("Không tải được danh sách ảnh:", error);
-        });
-      }
-    } else {
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        categoryId: "",
-        quantity: "",
-      });
-
+    if (!initialData) {
+      setFormData({ ...EMPTY_FORM });
       clearImages?.();
+      return;
+    }
+
+    setFormData({
+      name: initialData.name || "",
+      description: initialData.description || "",
+      price: initialData.price ?? "",
+      categoryId: initialData.categoryId ?? initialData.category?.id ?? "",
+      quantity:
+        initialData.quantity ??
+        initialData.stockQuantity ??
+        initialData.stock_quantity ??
+        "",
+    });
+
+    if (initialData.id != null) {
+      fetchImages(String(initialData.id)).catch((error) => {
+        console.error("Không tải được danh sách ảnh:", error);
+      });
     }
   }, [initialData, fetchImages, clearImages]);
 
-  // Upload selected images
+  const handleFieldChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
   const handleFileChange = async (event) => {
     const files = Array.from(event.target.files || []);
 
@@ -101,7 +100,9 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
       return;
     }
 
-    const invalidFile = files.find((file) => !file.type.startsWith("image/"));
+    const invalidFile = files.find(
+      (file) => !file.type.startsWith("image/"),
+    );
 
     if (invalidFile) {
       alert(`Tệp "${invalidFile.name}" không phải là hình ảnh.`);
@@ -118,6 +119,7 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
       alert("Tải ảnh lên thành công.");
     } catch (error) {
       console.error("Upload images error:", error);
+
       alert(
         error?.response?.data?.message ||
           error?.message ||
@@ -129,7 +131,6 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
     }
   };
 
-  // Delete image
   const handleRemoveGalleryImage = async (imageId) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa hình ảnh này không?")) {
       return;
@@ -138,16 +139,19 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
     try {
       await deleteImage(imageId);
       await fetchImages(String(productId));
+
       alert("Xóa ảnh thành công.");
     } catch (error) {
       console.error("Delete image error:", error);
+
       alert(
-        error?.response?.data?.message || error?.message || "Xóa ảnh thất bại.",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Xóa ảnh thất bại.",
       );
     }
   };
 
-  // Set main image
   const handleSetMainImage = async (imageId) => {
     if (!productId) return;
 
@@ -156,6 +160,7 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
       await fetchImages(String(productId));
     } catch (error) {
       console.error("Set main image error:", error);
+
       alert(
         error?.response?.data?.message ||
           error?.message ||
@@ -164,65 +169,38 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
     }
   };
 
-  // Validate and submit
-  const handleSubmitForm = () => {
-    if (!formData.name.trim()) {
-      alert("Tên sản phẩm không được để trống.");
-      return;
-    }
+  const handleSubmitForm = async () => {
+    const result = validateProductForm(formData, isEdit);
 
-    if (!formData.description.trim()) {
-      alert("Mô tả sản phẩm không được để trống.");
+    if (!result.success) {
+      alert(result.error.issues[0]?.message || "Dữ liệu sản phẩm không hợp lệ.");
       return;
-    }
-
-    if (
-      formData.price === "" ||
-      !Number.isFinite(Number(formData.price)) ||
-      Number(formData.price) < 0
-    ) {
-      alert("Giá sản phẩm không hợp lệ.");
-      return;
-    }
-
-    if (
-      formData.categoryId === "" ||
-      !Number.isFinite(Number(formData.categoryId))
-    ) {
-      alert("Vui lòng chọn danh mục hợp lệ.");
-      return;
-    }
-
-    // Only validate quantity when creating a new product.
-    // Editing product details must not change stock quantity.
-    if (!isEdit) {
-      if (
-        formData.quantity === "" ||
-        !Number.isFinite(Number(formData.quantity)) ||
-        Number(formData.quantity) < 0
-      ) {
-        alert("Số lượng nhập kho không hợp lệ.");
-        return;
-      }
     }
 
     const payload = {
-      name: formData.name.trim(),
-      description: formData.description.trim(),
-      price: Number(formData.price),
-      categoryId: Number(formData.categoryId),
+      name: result.data.name,
+      description: result.data.description,
+      price: result.data.price,
+      categoryId: result.data.categoryId,
     };
 
     if (isEdit) {
-      // Update product information only.
-      // Intentionally do not include quantity.
       payload.id = Number(productId);
     } else {
-      // Initial stock quantity is only supplied during creation.
-      payload.quantity = Number(formData.quantity);
+      payload.quantity = result.data.quantity;
     }
 
-    onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (error) {
+      console.error("Submit product error:", error);
+
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể lưu thông tin sản phẩm.",
+      );
+    }
   };
 
   return (
@@ -236,21 +214,16 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
         </div>
       )}
 
-      {/* Product name and category */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Tên sản phẩm *
           </label>
+
           <input
             type="text"
             value={formData.name}
-            onChange={(event) =>
-              setFormData((prev) => ({
-                ...prev,
-                name: event.target.value,
-              }))
-            }
+            onChange={(event) => handleFieldChange("name", event.target.value)}
             placeholder="Nhập tên sản phẩm..."
             className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
@@ -260,17 +233,16 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Danh mục sản phẩm *
           </label>
+
           <select
             value={formData.categoryId}
             onChange={(event) =>
-              setFormData((prev) => ({
-                ...prev,
-                categoryId: event.target.value,
-              }))
+              handleFieldChange("categoryId", event.target.value)
             }
             className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500"
           >
             <option value="">-- Chọn danh mục --</option>
+
             {categories
               .filter(
                 (category) =>
@@ -291,40 +263,34 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
         </div>
       </div>
 
-      {/* Description */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
           Mô tả sản phẩm *
         </label>
+
         <textarea
           rows={3}
           value={formData.description}
           onChange={(event) =>
-            setFormData((prev) => ({
-              ...prev,
-              description: event.target.value,
-            }))
+            handleFieldChange("description", event.target.value)
           }
           placeholder="Mô tả chi tiết các đặc tính, công dụng sản phẩm..."
           className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
-      {/* Price and quantity */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Giá sản phẩm (đ) *
           </label>
+
           <input
             type="number"
             min="0"
             value={formData.price}
             onChange={(event) =>
-              setFormData((prev) => ({
-                ...prev,
-                price: event.target.value,
-              }))
+              handleFieldChange("price", event.target.value)
             }
             placeholder="Nhập giá bán..."
             className="w-full rounded-lg border border-gray-300 p-2.5 text-sm font-medium text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -337,16 +303,14 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
               ? "Số lượng tồn kho hiện tại (chỉ xem)"
               : "Số lượng nhập kho ban đầu *"}
           </label>
+
           <input
             type="number"
             min="0"
             value={formData.quantity}
             disabled={isEdit}
             onChange={(event) =>
-              setFormData((prev) => ({
-                ...prev,
-                quantity: event.target.value,
-              }))
+              handleFieldChange("quantity", event.target.value)
             }
             placeholder={
               isEdit ? "Quản lý tại chức năng kho" : "Nhập số lượng tồn..."
@@ -355,6 +319,7 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
               isEdit ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""
             }`}
           />
+
           {isEdit && (
             <p className="mt-1 text-xs text-gray-500">
               Số lượng tồn kho không thay đổi khi cập nhật thông tin sản phẩm.
@@ -364,7 +329,6 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
         </div>
       </div>
 
-      {/* Image gallery */}
       {isEdit && (
         <div className="relative space-y-4 border-t border-gray-100 pt-4">
           {(loadingImages || uploadingImages) && (
@@ -381,6 +345,7 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
             <label className="block text-sm font-semibold text-gray-800">
               Quản lý album ảnh sản phẩm
             </label>
+
             <p className="mb-3 mt-1 text-xs text-gray-500">
               {productImages.length}/{MAX_IMAGES} ảnh. Nhấn vào ảnh để đặt làm
               ảnh đại diện.
@@ -461,6 +426,7 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
                 >
                   Chọn tệp từ thiết bị
                 </button>
+
                 <span className="text-xs text-gray-400">
                   PNG, JPG, JPEG, WEBP
                 </span>
@@ -470,7 +436,6 @@ const ProductFormAdmin = ({ initialData, onSubmit, onClose }) => {
         </div>
       )}
 
-      {/* Footer */}
       <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
         <button
           type="button"

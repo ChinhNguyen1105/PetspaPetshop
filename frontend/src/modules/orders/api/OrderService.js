@@ -1,4 +1,4 @@
-import api from "../../../infrastructure/api/api.js";
+﻿import api from "../../../infrastructure/api/api.js";
 import { APP_CONFIG } from "../../../infrastructure/api/config.js";
 import { URL_CONSTANT } from "../../../app/config/urlConstant.js";
 
@@ -116,17 +116,6 @@ const getOrderById = async (
 };
 
 /* ───────────────────────── GET MY ORDERS ───────────────────────── */
-
-/*
-Backend:
-
-GET /orders/my-orders?page=1&pageSize=20
-GET /orders/my-orders?status=PENDING&page=1&pageSize=20
-
-Store gọi:
-
-getMyOrders(status, page, pageSize, options)
-*/
 
 const getMyOrders = async (
   status,
@@ -308,8 +297,9 @@ const cancelOrder = async (
     body: {
       status: "SUCCESS",
       data: {
-        id: orderId,
+        id: String(orderId),
         status: "CANCELLED",
+        paymentStatus: "FAILED",
       },
     },
   };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  Image as ImageIcon, // Đổi tên để tránh trùng với Component Image HTML nếu có
+  Image as ImageIcon,
   Trash2,
   Check,
   Plus,
@@ -13,11 +13,14 @@ import { useServiceStore } from "../../store/serviceStore.js";
 import { useCategoryStore } from "../../../categories/store/categoryStore.js";
 import { usePetServiceImageStore } from "../../../pets/store/petServiceImageStore.js";
 import { useCartStore } from "../../../cart/store/cartStore.js";
+import {
+  validateServiceForm,
+  validateServiceImageUrl,
+} from "../../validators/serviceValidator.js";
 
 const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
-  const isEdit = !!initialData;
+  const isEdit = Boolean(initialData);
 
-  // ─── STORES ──────────────────────────────────────────────────────────────────
   const { submitting } = useServiceStore();
   const { categories, fetchCategories } = useCategoryStore();
 
@@ -30,10 +33,9 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
     setMainImage,
     clearImages,
   } = usePetServiceImageStore();
-  console.log("service images:", serviceImages);
+
   const { showToast } = useCartStore();
 
-  // ─── LOCAL STATE ─────────────────────────────────────────────────────────────
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -42,17 +44,15 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
     categoryId: "",
   });
 
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errors, setErrors] = useState({});
   const [newImageUrl, setNewImageUrl] = useState("");
 
-  // ─── EFFECT: FETCH METADATA CATEGORIES ───────────────────────────────────────
   useEffect(() => {
     if (fetchCategories) {
       fetchCategories({ type: "SERVICE" });
     }
   }, [fetchCategories]);
 
-  // ─── EFFECT: ĐIỀN DỮ LIỆU BAN ĐẦU HOẶC RESET ─────────────────────────────────
   useEffect(() => {
     if (initialData) {
       const serviceId = initialData.id;
@@ -65,7 +65,7 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
         basePrice: initialData.basePrice ?? initialData.original_price ?? "",
         durationMin:
           initialData.durationMin ?? initialData.duration_minutes ?? "30",
-        categoryId: rawCategoryId ? rawCategoryId.toString() : "",
+        categoryId: rawCategoryId ? String(rawCategoryId) : "",
       });
 
       if (serviceId) {
@@ -79,50 +79,80 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
         durationMin: "30",
         categoryId: "",
       });
+
       clearImages();
     }
-    setErrorMsg("");
+
+    setErrors({});
     setNewImageUrl("");
   }, [initialData, fetchImages, clearImages]);
 
-  // ─── HANDLERS FORM DỮ LIỆU ──────────────────────────────────────────────────
   const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [field]: "",
+      form: "",
+    }));
   };
 
-  const handleValidationAndSubmit = () => {
-    setErrorMsg("");
+  const handleValidationAndSubmit = async () => {
+    setErrors({});
 
-    if (!formData.name.trim())
-      return setErrorMsg("Tên dịch vụ không được để trống");
-    if (!formData.description.trim())
-      return setErrorMsg("Mô tả dịch vụ không được để trống");
-    if (!formData.categoryId)
-      return setErrorMsg("Vui lòng lựa chọn danh mục dịch vụ");
-    if (formData.basePrice === "" || Number(formData.basePrice) <= 0)
-      return setErrorMsg("Giá dịch vụ niêm yết phải lớn hơn 0đ");
-    if (formData.durationMin === "" || Number(formData.durationMin) <= 0)
-      return setErrorMsg("Thời lượng thực hiện phải lớn hơn 0 phút");
+    const validation = validateServiceForm(formData);
+
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      return;
+    }
 
     const submitPayload = {
-      name: formData.name.trim(),
-      description: formData.description.trim(),
-      basePrice: Number(formData.basePrice),
-      durationMin: Number(formData.durationMin),
-      categoryId: Number(formData.categoryId),
+      ...validation.data,
     };
 
     if (isEdit && initialData?.id) {
       submitPayload.id = Number(initialData.id);
     }
 
-    onSubmit(submitPayload);
+    try {
+      await onSubmit(submitPayload);
+    } catch (error) {
+      console.error("Không thể lưu thông tin dịch vụ:", error);
+
+      setErrors({
+        form:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Không thể lưu thông tin dịch vụ. Vui lòng thử lại.",
+      });
+    }
   };
 
-  // ─── HANDLERS QUẢN LÝ ẢNH ──────────────────────────────────
-  const handleAddImageUrl = async (e) => {
-    e.preventDefault();
-    if (!newImageUrl.trim()) return;
+  const renderFieldError = (field) => {
+    if (!errors[field]) {
+      return null;
+    }
+
+    return (
+      <p className="mt-1 text-xs text-red-600" role="alert">
+        {errors[field]}
+      </p>
+    );
+  };
+
+  const handleAddImageUrl = async (event) => {
+    event.preventDefault();
+
+    const imageValidation = validateServiceImageUrl(newImageUrl);
+
+    if (!imageValidation.isValid) {
+      showToast(imageValidation.message, "error");
+      return;
+    }
 
     if (serviceImages.length >= 6) {
       showToast(
@@ -132,19 +162,24 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
       return;
     }
 
+    if (!isEdit || !initialData?.id) {
+      showToast(
+        "Vui lòng tạo dịch vụ trước khi thêm ảnh vào album chi tiết.",
+        "error",
+      );
+      return;
+    }
+
     try {
-      if (isEdit && initialData?.id) {
-        const isFirstImg = serviceImages.length === 0;
-        await addImage(initialData.id, newImageUrl.trim(), isFirstImg);
-        setNewImageUrl("");
-        showToast("Thêm hình ảnh vào album thành công!", "success");
-      } else {
-        showToast(
-          "Vui lòng tạo dịch vụ trước khi thêm ảnh vào album chi tiết.",
-          "error",
-        );
-      }
-    } catch (err) {
+      const isFirstImg = serviceImages.length === 0;
+
+      await addImage(initialData.id, imageValidation.data, isFirstImg);
+
+      setNewImageUrl("");
+      showToast("Thêm hình ảnh vào album thành công!", "success");
+    } catch (error) {
+      console.error("Không thể thêm ảnh dịch vụ:", error);
+
       showToast(
         "Không thể lưu liên kết hình ảnh này. Vui lòng kiểm tra lại.",
         "error",
@@ -153,16 +188,19 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
   };
 
   const handleRemoveImage = async (imageId) => {
-    if (
-      !window.confirm(
-        "Bạn có chắc chắn muốn xóa hình ảnh này khỏi album không?",
-      )
-    )
+    const confirmed = window.confirm(
+      "Bạn có chắc chắn muốn xóa hình ảnh này khỏi album không?",
+    );
+
+    if (!confirmed) {
       return;
+    }
+
     try {
       await deleteImage(imageId);
       showToast("Đã xóa hình ảnh thành công!", "success");
-    } catch (err) {
+    } catch (error) {
+      console.error("Không thể xóa ảnh dịch vụ:", error);
       showToast("Xóa ảnh dịch vụ thất bại!", "error");
     }
   };
@@ -171,156 +209,208 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
     try {
       await setMainImage(imageId);
       showToast("Thay đổi ảnh hiển thị đại diện thành công!", "success");
-    } catch (err) {
+    } catch (error) {
+      console.error("Không thể đặt ảnh đại diện:", error);
       showToast("Thiết lập ảnh đại diện thất bại!", "error");
     }
   };
 
-  // Lấy Thumbnail hiện tại (ưu tiên Store realtime, nếu store rỗng lúc load thì lấy từ initialData)
   const currentThumbnailObj = serviceImages?.find(
-    (img) => img.isThumbnail || img.isMain,
+    (image) => image.isThumbnail || image.isMain,
   );
+
   const formThumbnailUrl =
     currentThumbnailObj?.imageUrl ||
     currentThumbnailObj?.url ||
-    initialData?.serviceImages?.find((img) => img.isThumbnail)?.imageUrl ||
+    initialData?.serviceImages?.find((image) => image.isThumbnail)?.imageUrl ||
     "https://placehold.co/150x150?text=No+Image";
 
   return (
-    <div className="space-y-6 relative">
+    <div className="relative space-y-6">
       {submitting && (
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] flex flex-col items-center justify-center z-50 rounded-xl">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-2" />
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-xl bg-white/70 backdrop-blur-[2px]">
+          <Loader2 className="mb-2 h-8 w-8 animate-spin text-blue-600" />
           <span className="text-sm font-medium text-gray-600">
             Hệ thống đang lưu dữ liệu dịch vụ...
           </span>
         </div>
       )}
 
-      {errorMsg && (
-        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 font-medium flex items-center gap-2 animate-fadeIn">
-          <AlertCircle size={16} className="flex-shrink-0" />
-          <span>{errorMsg}</span>
+      {errors.form && (
+        <div
+          className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600"
+          role="alert"
+        >
+          <AlertCircle size={16} className="shrink-0" />
+          <span>{errors.form}</span>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-6">
-        {/* ── Khối 1: Thông tin dịch vụ cơ bản ── */}
         <div className="space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Hiển thị Thumbnail trong Form Sửa */}
+          <div className="flex flex-col gap-4 md:flex-row">
             {isEdit && (
-              <div className="flex-shrink-0 hidden md:block">
-                <label className="block text-sm font-medium text-gray-700 mb-1 text-center">
+              <div className="hidden shrink-0 md:block">
+                <label className="mb-1 block text-center text-sm font-medium text-gray-700">
                   Thumbnail
                 </label>
-                <div className="w-[102px] h-[102px] rounded-lg border border-gray-300 overflow-hidden bg-gray-50">
+
+                <div className="h-[102px] w-[102px] overflow-hidden rounded-lg border border-gray-300 bg-gray-50">
                   <img
                     src={formThumbnailUrl}
                     alt="Thumbnail Preview"
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 </div>
               </div>
             )}
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   Tên dịch vụ spa *
                 </label>
+
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  onChange={(event) =>
+                    handleInputChange("name", event.target.value)
+                  }
                   placeholder="Ví dụ: Combo Tắm Sấy & Vệ Sinh Tai"
-                  className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                  aria-invalid={Boolean(errors.name)}
+                  className={`w-full rounded-lg border p-2.5 text-sm outline-none transition-all focus:ring-1 focus:ring-blue-500 ${
+                    errors.name
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-gray-300 focus:border-blue-500"
+                  }`}
                 />
+
+                {renderFieldError("name")}
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   Danh mục dịch vụ *
                 </label>
+
                 <select
                   value={formData.categoryId}
-                  onChange={(e) =>
-                    handleInputChange("categoryId", e.target.value)
+                  onChange={(event) =>
+                    handleInputChange("categoryId", event.target.value)
                   }
-                  className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 bg-white"
+                  aria-invalid={Boolean(errors.categoryId)}
+                  className={`w-full rounded-lg border bg-white p-2.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 ${
+                    errors.categoryId
+                      ? "border-red-500 focus:border-red-500"
+                      : "border-gray-300 focus:border-blue-500"
+                  }`}
                 >
                   <option value="">-- Chọn danh mục dịch vụ --</option>
+
                   {categories &&
                     categories
                       .filter(
-                        (cat) =>
-                          cat.categoryType === "SERVICE" ||
-                          cat.type === "SERVICE" ||
-                          !cat.categoryType ||
-                          cat.id?.toString() === formData.categoryId,
+                        (category) =>
+                          category.categoryType === "SERVICE" ||
+                          category.type === "SERVICE" ||
+                          !category.categoryType ||
+                          String(category.id) === formData.categoryId,
                       )
-                      .map((cat) => (
-                        <option key={cat.id} value={cat.id?.toString()}>
-                          {cat.name}
+                      .map((category) => (
+                        <option key={category.id} value={String(category.id)}>
+                          {category.name}
                         </option>
                       ))}
                 </select>
+
+                {renderFieldError("categoryId")}
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Mô tả dịch vụ chi tiết *
             </label>
+
             <textarea
-              rows="3"
+              rows={3}
               value={formData.description}
-              onChange={(e) => handleInputChange("description", e.target.value)}
+              onChange={(event) =>
+                handleInputChange("description", event.target.value)
+              }
               placeholder="Mô tả chi tiết các bước trong quy trình phục vụ thú cưng..."
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              aria-invalid={Boolean(errors.description)}
+              className={`w-full rounded-lg border p-2.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 ${
+                errors.description
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-gray-300 focus:border-blue-500"
+              }`}
             />
+
+            {renderFieldError("description")}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Giá gốc niêm yết (đ) *
               </label>
+
               <input
                 type="number"
                 min="0"
                 step="1000"
                 value={formData.basePrice}
-                onChange={(e) => handleInputChange("basePrice", e.target.value)}
+                onChange={(event) =>
+                  handleInputChange("basePrice", event.target.value)
+                }
                 placeholder="Nhập giá cơ bản..."
-                className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-semibold text-gray-800"
+                aria-invalid={Boolean(errors.basePrice)}
+                className={`w-full rounded-lg border p-2.5 text-sm font-semibold text-gray-800 outline-none focus:ring-1 focus:ring-blue-500 ${
+                  errors.basePrice
+                    ? "border-red-500 focus:border-red-500"
+                    : "border-gray-300 focus:border-blue-500"
+                }`}
               />
+
+              {renderFieldError("basePrice")}
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Thời lượng hoàn thành (Phút) *
               </label>
+
               <input
                 type="number"
                 min="1"
+                step="1"
                 value={formData.durationMin}
-                onChange={(e) =>
-                  handleInputChange("durationMin", e.target.value)
+                onChange={(event) =>
+                  handleInputChange("durationMin", event.target.value)
                 }
                 placeholder="Ví dụ: 30, 45, 60..."
-                className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+                aria-invalid={Boolean(errors.durationMin)}
+                className={`w-full rounded-lg border p-2.5 text-sm font-medium outline-none focus:ring-1 focus:ring-blue-500 ${
+                  errors.durationMin
+                    ? "border-red-500 focus:border-red-500"
+                    : "border-gray-300 focus:border-blue-500"
+                }`}
               />
+
+              {renderFieldError("durationMin")}
             </div>
           </div>
         </div>
 
-        {/* ── Khối 2: Album Ảnh bằng URL (Chỉ hiển thị khi EDIT) ── */}
         {isEdit && (
-          <div className="space-y-4 border-t border-gray-100 pt-4 relative">
+          <div className="relative space-y-4 border-t border-gray-100 pt-4">
             {loadingImages && (
-              <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10">
-                <span className="text-xs font-semibold text-gray-500 flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin text-blue-500" />{" "}
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+                <span className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                  <Loader2 size={14} className="animate-spin text-blue-500" />
                   Đang đồng bộ ảnh dịch vụ...
                 </span>
               </div>
@@ -331,80 +421,84 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
               <span>Quản lý Album ảnh gói dịch vụ</span>
             </div>
 
-            {/* Ô nhập liên kết ảnh URL */}
             <form onSubmit={handleAddImageUrl} className="flex gap-2">
               <div className="relative flex-grow">
                 <Link
                   size={14}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 />
+
                 <input
                   type="url"
                   value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  placeholder="Dán đường dẫn ảnh mạng URL vào đây... (Ví dụ: https://example.com/pet.png)"
-                  className="w-full text-xs rounded-lg border border-gray-300 pl-9 pr-3 py-2.5 outline-none focus:border-blue-500 bg-white"
+                  onChange={(event) => setNewImageUrl(event.target.value)}
+                  placeholder="Dán đường dẫn ảnh mạng URL vào đây..."
+                  className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-500"
                 />
               </div>
+
               <button
                 type="submit"
                 disabled={!newImageUrl.trim() || serviceImages.length >= 6}
-                className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-slate-900 disabled:opacity-40"
               >
-                <Plus size={14} /> Thêm ảnh
+                <Plus size={14} />
+                Thêm ảnh
               </button>
             </form>
 
             <div>
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="mb-2 text-xs text-gray-500">
                 Ảnh hiện có ({serviceImages.length}/6){" "}
-                <span className="text-gray-400 font-normal ml-1">
+                <span className="ml-1 font-normal text-gray-400">
                   • Click chọn ảnh để đặt làm ảnh đại diện chính (Thumbnail)
                 </span>
               </p>
 
-              {/* Grid danh sách ảnh URL */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                {serviceImages.map((img) => {
-                  const isMain = img.isThumbnail || img.isMain;
-                  const currentImgUrl = img.imageUrl || img.url;
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                {serviceImages.map((image) => {
+                  const isMain = image.isThumbnail || image.isMain;
+                  const currentImgUrl = image.imageUrl || image.url;
+
                   return (
                     <div
-                      key={img.id}
-                      className={`relative group aspect-square rounded-xl border overflow-hidden cursor-pointer transition-all ${
+                      key={image.id}
+                      className={`group relative aspect-square cursor-pointer overflow-hidden rounded-xl border transition-all ${
                         isMain
-                          ? "border-blue-500 ring-2 ring-blue-400/30 shadow-sm"
+                          ? "border-blue-500 shadow-sm ring-2 ring-blue-400/30"
                           : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
                       <img
                         src={currentImgUrl}
-                        alt={`gallery-${img.id}`}
-                        className="w-full h-full object-cover bg-gray-50"
-                        onClick={() => handleSetMainImage(img.id)}
+                        alt={`gallery-${image.id}`}
+                        className="h-full w-full bg-gray-50 object-cover"
+                        onClick={() => handleSetMainImage(image.id)}
                         title="Click để thiết lập làm ảnh đại diện chính"
-                        onError={(e) => {
-                          e.target.src =
+                        onError={(event) => {
+                          event.currentTarget.src =
                             "https://placehold.co/300x300?text=L%E1%BB%97i+Link+%E1%BA%A2nh";
                         }}
                       />
 
                       {isMain && (
-                        <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold shadow flex items-center gap-0.5">
-                          <Check size={8} strokeWidth={4} /> Chính
+                        <span className="absolute bottom-1 left-1 flex items-center gap-0.5 rounded bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
+                          <Check size={8} strokeWidth={4} />
+                          Chính
                         </span>
                       )}
 
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveImage(img.id);
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleRemoveImage(image.id);
                         }}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow hover:bg-red-600"
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white opacity-0 shadow transition-opacity hover:bg-red-600 group-hover:opacity-100"
                         title="Gỡ ảnh này"
+                        aria-label={`Xóa ảnh ${image.id}`}
                       >
-                        ×
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   );
@@ -415,20 +509,23 @@ const ServiceFormAdmin = ({ initialData, onSubmit, onClose }) => {
         )}
       </div>
 
-      {/* ── Khối 3: Các nút bấm điều hướng Footer ── */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
+      <div className="mt-6 flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          disabled={submitting}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
         >
           Hủy bỏ
         </button>
+
         <button
           type="button"
           onClick={handleValidationAndSubmit}
-          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+          disabled={submitting}
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
+          {submitting && <Loader2 size={16} className="animate-spin" />}
           {isEdit ? "Cập nhật dịch vụ" : "Tạo dịch vụ mới"}
         </button>
       </div>

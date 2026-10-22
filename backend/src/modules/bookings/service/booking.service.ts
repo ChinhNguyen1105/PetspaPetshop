@@ -6,18 +6,11 @@ import { BookingDto } from 'src/modules/bookings/dto/response/booking.dto';
 import { BookingTimeSlotDto } from 'src/modules/bookings/dto/response/booking-time-slot.dto';
 
 export interface BookingService {
-  createBooking(
-    req: ReqCreateBookingDto,
-  ): Promise<BookingDto>;
+  createBooking(req: ReqCreateBookingDto): Promise<BookingDto>;
 
-  getBookingById(
-    id: number,
-  ): Promise<BookingDto>;
+  getBookingById(id: number): Promise<BookingDto>;
 
-  getMyBookings(
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto>;
+  getMyBookings(): Promise<ResultPaginationDto>;
 
   getBookingsByStatus(
     status: string,
@@ -25,20 +18,11 @@ export interface BookingService {
     pageSize: number,
   ): Promise<ResultPaginationDto>;
 
-  getAllBookings(
-    query: BookingQueryDto,
-  ): Promise<ResultPaginationDto>;
+  getAllBookings(query: BookingQueryDto): Promise<ResultPaginationDto>;
 
-  getBookedTimeSlots(
-    bookingDate: Date,
-  ): Promise<BookingTimeSlotDto[]>;
+  getBookedTimeSlots(bookingDate: Date): Promise<BookingTimeSlotDto[]>;
 
-  cancelBooking(
-    id: number,
-  ): Promise<BookingDto>;
+  cancelBooking(id: number): Promise<BookingDto>;
 
-  updateBookingStatus(
-    id: number,
-    status: string,
-  ): Promise<BookingDto>;
+  updateBookingStatus(id: number, status: string): Promise<BookingDto>;
 }

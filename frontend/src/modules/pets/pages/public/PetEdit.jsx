@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   PawPrint,
   HeartPulse,
@@ -8,23 +8,33 @@ import {
   FileText,
   ArrowLeft,
   Heart,
+  AlertCircle,
 } from "lucide-react";
+
 import { Input } from "../../../../shared/components/Input.jsx";
 import { Button } from "../../../../shared/components/Button.jsx";
 import Loading from "../../../../shared/components/Loading.jsx";
 import { useCartStore } from "../../../cart/store/cartStore.js";
 import { usePetStore } from "../../store/petStore.js";
+import { validatePetForm } from "../../validators/petFormValidator.js";
+
+const getToday = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
 
 const PetEdit = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useCartStore();
 
-  // 1. BÓC TÁCH STATE VÀ ACTIONS TỪ ZUSTAND STORE
   const { currentPet, loading, submitting, fetchPetById, updatePet } =
     usePetStore();
 
-  // Form State map chính xác theo ReqUpdatePet của Backend
   const [formData, setFormData] = useState({
     id: "",
     name: "",
@@ -35,81 +45,105 @@ const PetEdit = () => {
     healthStatus: "",
   });
 
-  const [localError, setLocalError] = useState(null);
+  const [validationError, setValidationError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
-  // 2. FETCH DỮ LIỆU BAN ĐẦU
   useEffect(() => {
-    if (id) {
-      fetchPetById(id);
+    if (!id) {
+      setLoadError("Không tìm thấy ID thú cưng.");
+      return;
     }
+
+    setLoadError("");
+
+    Promise.resolve(fetchPetById(id)).catch((error) => {
+      setLoadError(error?.message || "Không thể tải thông tin thú cưng.");
+    });
   }, [id, fetchPetById]);
 
-  // 3. ĐỒNG BỘ DỮ LIỆU TỪ STORE VÀO FORM STATE
   useEffect(() => {
     if (!currentPet) return;
 
     setFormData({
-      id: currentPet.id ?? "",
+      id: String(currentPet.id ?? ""),
       name: currentPet.name ?? "",
-      specie:
-        currentPet.specie ?? currentPet.species?.name?.toUpperCase() ?? "DOG",
-      gender: currentPet.gender?.toUpperCase() ?? "MALE",
+      specie: currentPet.specie ?? currentPet.species?.name ?? "DOG",
+      gender: String(currentPet.gender ?? "UNKNOWN").toUpperCase(),
       birthday: currentPet.birthday
         ? String(currentPet.birthday).slice(0, 10)
         : "",
-      weight: currentPet.weight ?? currentPet.weight_kg ?? "",
+      weight: String(currentPet.weight ?? currentPet.weight_kg ?? ""),
       healthStatus: currentPet.healthStatus ?? currentPet.medical_note ?? "",
     });
 
-    setLocalError(null);
+    setValidationError("");
   }, [currentPet]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+
+    setValidationError("");
   };
 
-  // 4. SUBMIT FORM QUA ZUSTAND ACTION
-  // 4. SUBMIT FORM QUA ZUSTAND ACTION
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setValidationError("");
 
-    // Sửa lỗi: Bỏ khai báo kiểu dữ liệu Long của Java trong JS
-    const submitData = {
-      id: parseInt(formData.id, 10),
-      name: formData.name,
-      specie: formData.specie,
-      gender: formData.gender,
-      birthday: formData.birthday,
-      weight: parseFloat(formData.weight) || 0,
-      healthStatus: formData.healthStatus || null,
+    const validation = validatePetForm(formData, true);
+
+    if (!validation.success) {
+      setValidationError(
+        validation.error.issues[0]?.message || "Dữ liệu không hợp lệ.",
+      );
+      return;
+    }
+
+    const payload = {
+      ...validation.data,
+      healthStatus: validation.data.healthStatus || null,
     };
 
-    const result = await updatePet(id, submitData);
-    console.log("update success with response: ", result);
+    try {
+      const response = await updatePet(id, payload);
 
-    if (result && result.status === "SUCCESS") {
-      showToast(`Cập nhật thông tin thú cưng ${result.data.name} thành công!`);
-      navigate(`/profile`);
-    } else {
-      alert(result?.message || "Có lỗi xảy ra khi cập nhật thông tin.");
+      if (!response || response.status !== "SUCCESS") {
+        setValidationError(
+          response?.message || "Có lỗi xảy ra khi cập nhật thông tin.",
+        );
+        return;
+      }
+
+      showToast?.(
+        `Cập nhật thông tin thú cưng ${response.data?.name || payload.name} thành công!`,
+      );
+
+      navigate("/profile");
+    } catch (error) {
+      setValidationError(
+        error?.message || "Đã xảy ra lỗi khi cập nhật thú cưng.",
+      );
     }
   };
 
-  // Giao diện khi đang tải dữ liệu ban đầu
   if (loading && !currentPet) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <Loading size="large" />
       </div>
     );
   }
 
-  // Giao diện lỗi khi không tìm thấy pet
-  if (localError) {
+  if (loadError || (!loading && !currentPet)) {
     return (
-      <div className="text-center py-12 bg-white rounded-3xl border border-gray-100 shadow-sm max-w-2xl mx-auto">
-        <p className="text-red-500 font-bold mb-4">{localError}</p>
+      <div className="mx-auto max-w-2xl rounded-3xl border border-gray-100 bg-white py-12 text-center shadow-sm">
+        <p className="mb-4 font-bold text-red-500">
+          {loadError || "Không tìm thấy thông tin thú cưng."}
+        </p>
         <Button variant="outline" onClick={() => navigate("/profile")}>
           Quay lại hồ sơ
         </Button>
@@ -118,28 +152,42 @@ const PetEdit = () => {
   }
 
   return (
-    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-left max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4 pb-4 border-b border-gray-50 mb-6">
+    <div className="mx-auto max-w-2xl rounded-3xl border border-gray-100 bg-white p-8 text-left shadow-sm">
+      <div className="mb-6 flex items-center gap-4 border-b border-gray-50 pb-4">
         <button
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-gray-50 rounded-xl text-gray-500 transition-colors"
           type="button"
+          onClick={() => navigate(-1)}
+          className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-50"
+          aria-label="Quay lại"
         >
           <ArrowLeft size={20} />
         </button>
+
         <div>
-          <h2 className="text-xl font-black text-pet-blue uppercase tracking-tight flex items-center gap-2">
-            <PawPrint size={22} /> Chỉnh sửa thông tin bé
+          <h2 className="flex items-center gap-2 text-xl font-black uppercase tracking-tight text-pet-blue">
+            <PawPrint size={22} />
+            Chỉnh sửa thông tin bé
           </h2>
-          <p className="text-xs text-gray-400 font-medium">
-            Cập nhật chính xác các thông tin cơ bản phục vụ cho việc quản lý
+          <p className="text-xs font-medium text-gray-400">
+            Cập nhật thông tin cơ bản của thú cưng.
           </p>
         </div>
       </div>
 
+      {validationError && (
+        <div
+          role="alert"
+          className="mb-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-700"
+        >
+          <AlertCircle
+            className="mt-0.5 flex-shrink-0 text-red-500"
+            size={18}
+          />
+          <div>{validationError}</div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Tên Thú Cưng */}
         <Input
           label="Tên của bé *"
           icon={PawPrint}
@@ -150,10 +198,9 @@ const PetEdit = () => {
           required
         />
 
-        {/* Loài & Giới Tính */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Input
-            label="Loài sinh vật * (Specie)"
+            label="Loài thú cưng *"
             icon={HeartPulse}
             name="specie"
             value={formData.specie}
@@ -163,15 +210,16 @@ const PetEdit = () => {
           />
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-              <Heart size={15} className="text-gray-400" /> Giới tính *
+            <label className="mb-1.5 flex items-center gap-1 text-sm font-bold text-gray-700">
+              <Heart size={15} className="text-gray-400" />
+              Giới tính *
             </label>
             <select
               name="gender"
               value={formData.gender}
               onChange={handleInputChange}
               required
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-medium transition-all outline-none focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10 h-[46px]"
+              className="h-[46px] w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium outline-none transition-all focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10"
             >
               <option value="" disabled>
                 -- Chọn giới tính --
@@ -183,25 +231,29 @@ const PetEdit = () => {
           </div>
         </div>
 
-        {/* Ngày sinh & Cân nặng */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Ngày sinh * (Birthday)"
-            icon={Calendar}
-            type="date"
-            name="birthday"
-            value={formData.birthday}
-            onChange={handleInputChange}
-            max={new Date().toISOString().split("T")[0]} // Giới hạn @PastOrPresent từ Client
-            required
-          />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 flex items-center gap-1 text-sm font-bold text-gray-700">
+              <Calendar size={15} className="text-gray-400" />
+              Ngày sinh *
+            </label>
+            <input
+              type="date"
+              name="birthday"
+              value={formData.birthday}
+              onChange={handleInputChange}
+              max={getToday()}
+              required
+              className="h-[46px] w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium outline-none transition-all focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10"
+            />
+          </div>
 
           <Input
             label="Cân nặng (kg) *"
             icon={Scale}
             type="number"
             step="0.1"
-            min="0.1" // Khống chế @Positive tránh số âm hoặc bằng 0
+            min="0.1"
             name="weight"
             value={formData.weight}
             onChange={handleInputChange}
@@ -210,37 +262,37 @@ const PetEdit = () => {
           />
         </div>
 
-        {/* Tình trạng sức khỏe */}
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
-            <FileText size={15} className="text-gray-400" /> Tình trạng sức khỏe
-            (Health Status)
+          <label className="mb-1.5 flex items-center gap-1 text-sm font-bold text-gray-700">
+            <FileText size={15} className="text-gray-400" />
+            Tình trạng sức khỏe
           </label>
           <textarea
             name="healthStatus"
             value={formData.healthStatus}
             onChange={handleInputChange}
-            rows="3"
-            placeholder="Mô tả tình trạng sức khỏe hiện tại của bé (nếu có)..."
-            className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm font-medium transition-all outline-none focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10 resize-none"
+            rows={3}
+            maxLength={1000}
+            placeholder="Mô tả tình trạng sức khỏe hiện tại của bé..."
+            className="w-full resize-none rounded-2xl border border-gray-200 px-4 py-3 text-sm font-medium outline-none transition-all focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/10"
           />
         </div>
 
-        {/* Footer Nút bấm */}
-        <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
+        <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button
             type="button"
             variant="outline"
             onClick={() => navigate(-1)}
             disabled={submitting}
-            className="rounded-xl font-bold px-6"
+            className="rounded-xl px-6 font-bold"
           >
             Hủy bỏ
           </Button>
+
           <Button
             type="submit"
             disabled={submitting}
-            className="rounded-xl font-black px-8 shadow-md shadow-pet-blue/10 uppercase text-sm tracking-wider"
+            className="rounded-xl px-8 text-sm font-black uppercase tracking-wider shadow-md shadow-pet-blue/10"
           >
             {submitting ? "Đang lưu..." : "Lưu thay đổi"}
           </Button>
