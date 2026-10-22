@@ -86,11 +86,7 @@ export class OrderController {
 
     return VsResponseUtil.successWithStatus(
       HttpStatus.OK,
-      await this.orderService.getMyOrders(
-        orderStatus,
-        query.page,
-        query.pageSize,
-      ),
+      await this.orderService.getMyOrders(orderStatus),
     );
   }
 

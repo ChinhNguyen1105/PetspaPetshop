@@ -1,6 +1,8 @@
 ﻿import { Inject, Injectable, Logger, Scope } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
+import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
+
 import { GenderEnum } from 'src/common/constants/gender.enum';
 import { RoleConstant } from 'src/common/constants/role.constant';
 import { PROVIDER_TOKEN } from 'src/common/constants/provider-token.constant';
@@ -11,11 +13,13 @@ import { NotFoundException } from 'src/common/exceptions/not-found.exception';
 import { UnauthorizedException } from 'src/common/exceptions/unauthorized.exception';
 import { FilterProcessor } from 'src/common/specification/filter-processor';
 import { SpecificationBuilder } from 'src/common/specification/specification-builder';
+
 import { ReqUserUpdateProfileDto } from 'src/modules/users/dto/request/req-user-update-profile.dto';
 import { UserCreateDto } from 'src/modules/users/dto/request/user-create.dto';
 import { UserQueryDto } from 'src/modules/users/dto/request/user-query.dto';
 import { UserUpdateDto } from 'src/modules/users/dto/request/user-update.dto';
 import { UserDto } from 'src/modules/users/dto/response/user.dto';
+
 import { Role } from 'src/modules/roles/entities/role.entity';
 import { User } from 'src/modules/users/entities/user.entity';
 import { UserMapper } from 'src/modules/users/mapper/user.mapper';
@@ -61,6 +65,10 @@ export class UserServiceImpl implements UserService {
     await this.checkExistedUserByEmail(userCreateDto.email);
 
     const createUser = this.userMapper.toUser(userCreateDto);
+
+    // User entity đang dùng @PrimaryColumn nên phải tự tạo ID trước khi lưu.
+    createUser.id = randomUUID();
+
     let defaultRole: Role | null = null;
 
     if (
@@ -93,6 +101,7 @@ export class UserServiceImpl implements UserService {
     }
 
     createUser.role = defaultRole;
+
     await this.userRepository.getRepository().save(createUser);
 
     return this.userMapper.toUserDto(createUser);
@@ -148,9 +157,13 @@ export class UserServiceImpl implements UserService {
     }
 
     deleteUser.deleteFlag = true;
+
     await this.userRepository.getRepository().save(deleteUser);
 
-    return { status: true, message: 'Delete user success' };
+    return {
+      status: true,
+      message: 'Delete user success',
+    };
   }
 
   async getAllUser(query: UserQueryDto): Promise<ResultPaginationDto> {
@@ -200,9 +213,13 @@ export class UserServiceImpl implements UserService {
     }
 
     updateUser.activeFlag = !updateUser.activeFlag;
+
     await this.userRepository.getRepository().save(updateUser);
 
-    return { status: true, message: 'Change user status success' };
+    return {
+      status: true,
+      message: 'Change user status success',
+    };
   }
 
   async getUserLogin(): Promise<User> {
@@ -235,6 +252,7 @@ export class UserServiceImpl implements UserService {
 
   async updateUserToken(token: string, email: string): Promise<void> {
     const currentUser = await this.getUserByEmail(email);
+
     currentUser.refreshToken = token;
 
     await this.userRepository.getRepository().save(currentUser);
@@ -269,9 +287,13 @@ export class UserServiceImpl implements UserService {
 
     if (uploadFileResultDto) {
       user.avatarUrl = uploadFileResultDto.fileName;
+
       await this.userRepository.getRepository().save(user);
 
-      return { status: true, message: 'Upload avatar success' };
+      return {
+        status: true,
+        message: 'Upload avatar success',
+      };
     }
 
     return {

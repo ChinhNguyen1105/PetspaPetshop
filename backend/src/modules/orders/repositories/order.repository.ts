@@ -14,12 +14,7 @@ export class OrderRepository {
     private readonly repository: Repository<Order>,
   ) {}
 
-  findByUserIdAndStatus(
-    userId: string,
-    status: OrderStatus,
-    page: number,
-    pageSize: number,
-  ) {
+  findByUserIdAndStatus(userId: string, status: OrderStatus) {
     return this.repository
       .createQueryBuilder('order')
       .leftJoin('order.user', 'user')
@@ -32,16 +27,11 @@ export class OrderRepository {
       .andWhere('order.orderType = :orderType', {
         orderType: OrderType.PRODUCT,
       })
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+      .orderBy('order.createdDate', 'DESC')
+      .getMany();
   }
 
-  findByUserId(
-    userId: string,
-    page: number,
-    pageSize: number,
-  ) {
+  findByUserId(userId: string) {
     return this.repository
       .createQueryBuilder('order')
       .leftJoin('order.user', 'user')
@@ -53,9 +43,8 @@ export class OrderRepository {
       .andWhere('order.orderType = :orderType', {
         orderType: OrderType.PRODUCT,
       })
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+      .orderBy('order.createdDate', 'DESC')
+      .getMany();
   }
 
   findByStatusAndPaymentMethodAndCreatedDateBefore(

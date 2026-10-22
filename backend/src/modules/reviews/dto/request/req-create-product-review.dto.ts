@@ -1,12 +1,15 @@
 ﻿import {
   IsDefined,
   IsInt,
+  IsOptional,
+  IsString,
   Max,
   Min,
 } from 'class-validator';
 
 export class ReqCreateProductReviewDto {
   @IsDefined({ message: 'Product Id must not be null' })
+  @IsInt()
   productId: number;
 
   @IsDefined({ message: 'Rating must not be null' })
@@ -15,5 +18,7 @@ export class ReqCreateProductReviewDto {
   @Max(5, { message: 'Rating must be at most 5' })
   rating: number;
 
+  @IsOptional()
+  @IsString()
   comment: string | null;
 }

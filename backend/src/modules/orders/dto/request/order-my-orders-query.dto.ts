@@ -2,7 +2,7 @@
 
 import { PaginationDto } from 'src/common/dto/pagination/pagination.dto';
 
-export class OrderMyOrdersQueryDto extends PaginationDto {
+export class OrderMyOrdersQueryDto {
   @IsOptional()
   @IsString()
   status?: string;

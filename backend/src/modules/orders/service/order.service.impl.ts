@@ -63,9 +63,7 @@ export class OrderServiceImpl implements OrderService {
     private readonly productRepository: ProductRepository,
   ) {}
 
-  async createOrderFromCart(
-    req: ReqCreateOrderFromCartDto,
-  ): Promise<OrderDto> {
+  async createOrderFromCart(req: ReqCreateOrderFromCartDto): Promise<OrderDto> {
     const currentUser = await this.userService.getUserLogin();
 
     const cart = await this.cartRepository.findByUserId(currentUser.id);
@@ -161,9 +159,7 @@ export class OrderServiceImpl implements OrderService {
     return this.orderMapper.toDto(savedOrder);
   }
 
-  async createOrderFromBuyNow(
-    req: ReqCreateOrderBuyNowDto,
-  ): Promise<OrderDto> {
+  async createOrderFromBuyNow(req: ReqCreateOrderBuyNowDto): Promise<OrderDto> {
     const currentUser = await this.userService.getUserLogin();
 
     const product = await this.productRepository.getRepository().findOne({
@@ -261,7 +257,6 @@ export class OrderServiceImpl implements OrderService {
       }
 
       const oldQuantity = inventory.quantity ?? 0;
-
       const newQuantity = oldQuantity - (orderDetail.quantity ?? 0);
 
       inventory.quantity = newQuantity;
@@ -281,11 +276,7 @@ export class OrderServiceImpl implements OrderService {
     }
   }
 
-  async getMyOrders(
-    orderStatus: ReqOrderStatusDto,
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto> {
+  async getMyOrders(orderStatus: ReqOrderStatusDto): Promise<OrderDto[]> {
     const currentUser = await this.userService.getUserLogin();
 
     let status: OrderStatus | null = null;
@@ -300,26 +291,15 @@ export class OrderServiceImpl implements OrderService {
       status = normalized as OrderStatus;
     }
 
-    const [orders, total] =
+    const orders =
       status !== null
         ? await this.orderRepository.findByUserIdAndStatus(
             currentUser.id,
             status,
-            page,
-            pageSize,
           )
-        : await this.orderRepository.findByUserId(
-            currentUser.id,
-            page,
-            pageSize,
-          );
+        : await this.orderRepository.findByUserId(currentUser.id);
 
-    return this.buildPaginationResponse(
-      this.orderMapper.toDtoList(orders),
-      page,
-      pageSize,
-      total,
-    );
+    return this.orderMapper.toDtoList(orders);
   }
 
   async getOrderDetail(orderId: number): Promise<OrderDto> {
@@ -390,7 +370,6 @@ export class OrderServiceImpl implements OrderService {
         }
 
         const oldQuantity = inventory.quantity ?? 0;
-
         const newQuantity = oldQuantity + (orderDetail.quantity ?? 0);
 
         inventory.quantity = newQuantity;
@@ -425,10 +404,12 @@ export class OrderServiceImpl implements OrderService {
     return this.orderMapper.toDto(updatedOrder);
   }
 
-  validateStatusTransaction(
-    current: OrderStatus,
-    next: OrderStatus,
-  ): void {
+  validateStatusTransaction(current: OrderStatus, next: OrderStatus): void {
+    // Cho phép giữ nguyên trạng thái hiện tại.
+    if (current === next) {
+      return;
+    }
+
     const validTransactions: Record<OrderStatus, OrderStatus[]> = {
       [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
       [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
@@ -446,9 +427,7 @@ export class OrderServiceImpl implements OrderService {
     }
   }
 
-  async updateOrderStatus(
-    req: ReqUpdateOrderStatusDto,
-  ): Promise<OrderDto> {
+  async updateOrderStatus(req: ReqUpdateOrderStatusDto): Promise<OrderDto> {
     const normalized = req.status.toUpperCase().trim();
 
     if (!Object.values(OrderStatus).includes(normalized as OrderStatus)) {
@@ -476,7 +455,12 @@ export class OrderServiceImpl implements OrderService {
 
     this.validateStatusTransaction(order.status, newStatus);
 
-    if (newStatus === OrderStatus.CANCELLED) {
+    // Chỉ hoàn kho khi đơn thực sự chuyển sang CANCELLED,
+    // tránh cộng tồn kho nhiều lần nếu gửi lại trạng thái CANCELLED.
+    if (
+      newStatus === OrderStatus.CANCELLED &&
+      order.status !== OrderStatus.CANCELLED
+    ) {
       for (const orderDetail of order.orderDetails ?? []) {
         const inventory = await this.inventoryRepository.findByProductId(
           orderDetail.product.id,
@@ -487,7 +471,6 @@ export class OrderServiceImpl implements OrderService {
         }
 
         const oldQuantity = inventory.quantity ?? 0;
-
         const newQuantity = oldQuantity + (orderDetail.quantity ?? 0);
 
         inventory.quantity = newQuantity;
@@ -507,7 +490,7 @@ export class OrderServiceImpl implements OrderService {
       }
     }
 
-    if (order.payment) {
+    if (order.payment && order.status !== newStatus) {
       switch (newStatus) {
         case OrderStatus.DELIVERED:
           order.payment.status = PaymentStatus.SUCCESS;
@@ -569,9 +552,7 @@ export class OrderServiceImpl implements OrderService {
         }
 
         const index = expression.indexOf(separator);
-
         const key = expression.substring(0, index).trim();
-
         const value = expression.substring(index + separator.length).trim();
 
         if (!key || !value) {
@@ -600,9 +581,7 @@ export class OrderServiceImpl implements OrderService {
           continue;
         }
 
-        const parameter = `filter_${Math.random()
-          .toString(36)
-          .slice(2, 10)}`;
+        const parameter = `filter_${Math.random().toString(36).slice(2, 10)}`;
 
         switch (separator) {
           case ':':
@@ -701,7 +680,6 @@ export class OrderServiceImpl implements OrderService {
     total: number,
   ): ResultPaginationDto {
     const result = new ResultPaginationDto();
-
     const meta = new Meta();
 
     meta.page = page;

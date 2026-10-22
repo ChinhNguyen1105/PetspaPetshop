@@ -14,11 +14,7 @@ export interface OrderService {
 
   createOrderFromBuyNow(req: ReqCreateOrderBuyNowDto): Promise<OrderDto>;
 
-  getMyOrders(
-    status: ReqOrderStatusDto,
-    page: number,
-    pageSize: number,
-  ): Promise<ResultPaginationDto>;
+  getMyOrders(status: ReqOrderStatusDto): Promise<OrderDto[]>;
 
   getOrderDetail(orderId: number): Promise<OrderDto>;
 
