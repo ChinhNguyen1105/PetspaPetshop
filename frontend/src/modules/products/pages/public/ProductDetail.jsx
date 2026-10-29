@@ -20,6 +20,7 @@ import { useProductImageStore } from "../../store/productImageStore.js";
 import { useReviewStore } from "../../../reviews/store/reviewStore.js";
 
 import ReviewProduct from "../../../reviews/pages/ReviewProduct.jsx";
+import RecommendedProducts from "./RecommendProducts.jsx";
 
 const FALLBACK_IMAGE = "https://placehold.co/500x500";
 
@@ -53,9 +54,7 @@ const ProductDetail = () => {
   } = useReviewStore();
 
   // Lấy danh sách ảnh từ Zustand store theo ID sản phẩm.
-  const currentStoreImages = id
-    ? imagesByProductId?.[id] || []
-    : [];
+  const currentStoreImages = id ? imagesByProductId?.[id] || [] : [];
 
   // Tải thông tin sản phẩm, ảnh và đánh giá.
   useEffect(() => {
@@ -84,8 +83,7 @@ const ProductDetail = () => {
   // Chỉ xử lý ảnh mới lưu tên file, không xử lý đường dẫn /images cũ.
   const galleryImages = useMemo(() => {
     const apiBaseUrl = (
-      import.meta.env.VITE_API_BASE_URL ||
-      "http://localhost:3000/api/v1"
+      import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1"
     ).replace(/\/+$/, "");
 
     return currentStoreImages
@@ -113,8 +111,7 @@ const ProductDetail = () => {
     );
 
     const apiBaseUrl = (
-      import.meta.env.VITE_API_BASE_URL ||
-      "http://localhost:3000/api/v1"
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1"
     ).replace(/\/+$/, "");
 
     let thumbnailUrl = null;
@@ -136,10 +133,7 @@ const ProductDetail = () => {
   const handleAddToCart = async () => {
     if (!product) return;
 
-    if (
-      product.stockQuantity <= 0 ||
-      product.status === "OUT_OF_STOCK"
-    ) {
+    if (product.stockQuantity <= 0 || product.status === "OUT_OF_STOCK") {
       showToast?.("Sản phẩm này hiện đang tạm hết hàng!", "error");
       return;
     }
@@ -150,22 +144,22 @@ const ProductDetail = () => {
       console.error("Lỗi khi thêm sản phẩm vào giỏ hàng:", error);
     }
   };
-
+  const recommendationIds = useMemo(
+    () => (product?.id ? [product.id] : []),
+    [product?.id],
+  );
   if (productLoading) {
     return <Loading fullScreen />;
   }
 
   if (!product) {
     return (
-      <div className="pt-32 text-center font-bold">
-        Sản phẩm không tồn tại.
-      </div>
+      <div className="pt-32 text-center font-bold">Sản phẩm không tồn tại.</div>
     );
   }
 
   const isOutOfStock =
-    product.stockQuantity <= 0 ||
-    product.status === "OUT_OF_STOCK";
+    product.stockQuantity <= 0 || product.status === "OUT_OF_STOCK";
 
   return (
     <div className="min-h-screen bg-white pt-10 pb-20 text-left">
@@ -262,9 +256,7 @@ const ProductDetail = () => {
               <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white">
                 <button
                   type="button"
-                  onClick={() =>
-                    setQuantity((prev) => Math.max(1, prev - 1))
-                  }
+                  onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
                   disabled={isOutOfStock}
                   className="px-4 py-3 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer bg-transparent border-none"
                 >
@@ -279,8 +271,7 @@ const ProductDetail = () => {
                   type="button"
                   onClick={() =>
                     setQuantity((prev) =>
-                      product.stockQuantity &&
-                      prev >= product.stockQuantity
+                      product.stockQuantity && prev >= product.stockQuantity
                         ? prev
                         : prev + 1,
                     )
@@ -302,9 +293,7 @@ const ProductDetail = () => {
                 }`}
               >
                 <ShoppingCart size={20} />
-                {isOutOfStock
-                  ? "Hết hàng tạm thời"
-                  : "Thêm vào giỏ"}
+                {isOutOfStock ? "Hết hàng tạm thời" : "Thêm vào giỏ"}
               </Button>
             </div>
 
@@ -324,12 +313,11 @@ const ProductDetail = () => {
           </div>
         </div>
 
+        <RecommendedProducts currentCartIds={recommendationIds} />
+
         {/* KHU VỰC ĐÁNH GIÁ SẢN PHẨM */}
-        <div className="mt-12 pt-8 border-t border-gray-100">
-          <ReviewProduct
-            reviews={reviews || []}
-            loading={reviewLoading}
-          />
+        <div className="pt-2 border-t border-gray-100">
+          <ReviewProduct reviews={reviews || []} loading={reviewLoading} />
         </div>
       </div>
     </div>

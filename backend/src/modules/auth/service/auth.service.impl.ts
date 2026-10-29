@@ -1,10 +1,6 @@
-﻿
-import { randomUUID } from 'crypto';
+﻿import { randomUUID } from 'crypto';
 
-import {
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 
@@ -52,9 +48,7 @@ export class AuthServiceImpl implements AuthService {
     private readonly configService: ConfigService,
   ) {
     this.refreshExpiration = Number(
-      this.configService.getOrThrow<string>(
-        'JWT_REFRESH_EXPIRATION',
-      ),
+      this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRATION'),
     );
   }
 
@@ -62,16 +56,41 @@ export class AuthServiceImpl implements AuthService {
     req: ReqLoginDto,
     request: import('express').Request,
   ): Promise<LoginResultDto> {
-    const user =
-      await this.userService.getUserByEmail(
-        req.email,
-      );
+    let user: User;
 
-    const passwordMatches =
-      await bcrypt.compare(
-        req.password,
-        user.password,
-      );
+    // Không để lỗi không tìm thấy email trở thành lỗi 500.
+    try {
+      user = await this.userService.getUserByEmail(req.email);
+    } catch (error: unknown) {
+      const err = error as {
+        name?: string;
+        status?: number;
+        statusCode?: number;
+        getStatus?: () => number;
+      };
+
+      const status =
+        typeof err?.getStatus === 'function'
+          ? err.getStatus()
+          : err?.status ?? err?.statusCode;
+
+      if (
+        status === 404 ||
+        err?.name === 'NotFoundException'
+      ) {
+        throw new BadRequestException(
+          'Tài khoản hoặc mật khẩu không chính xác',
+        );
+      }
+
+      // Không che giấu các lỗi khác như lỗi database.
+      throw error;
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      req.password,
+      user.password,
+    );
 
     if (!passwordMatches) {
       throw new BadRequestException(
@@ -85,16 +104,11 @@ export class AuthServiceImpl implements AuthService {
       );
     }
 
-    const userPrincipal =
-      UserPrincipal.create(user);
-
+    const userPrincipal = UserPrincipal.create(user);
     request.user = userPrincipal;
 
-    const resLoginDto =
-      new ResLoginDto();
-
-    const userLoginDto =
-      new UserLoginDto();
+    const resLoginDto = new ResLoginDto();
+    const userLoginDto = new UserLoginDto();
 
     userLoginDto.id = user.id;
     userLoginDto.email = user.email;
@@ -109,8 +123,7 @@ export class AuthServiceImpl implements AuthService {
         false,
       );
 
-    resLoginDto.accessToken =
-      accessToken;
+    resLoginDto.accessToken = accessToken;
 
     const refreshToken =
       this.jwtTokenProvider.generateToken(
@@ -118,23 +131,13 @@ export class AuthServiceImpl implements AuthService {
         true,
       );
 
-    await this.userService.updateUserToken(
-      refreshToken,
-      req.email,
-    );
+    await this.userService.updateUserToken(refreshToken, req.email);
 
-    const responseCookie =
-      new ResponseCookieDto();
+    const responseCookie = new ResponseCookieDto();
 
-    responseCookie.name =
-      'refresh_token';
-
-    responseCookie.value =
-      refreshToken;
-
-    responseCookie.maxAge =
-      this.refreshExpiration;
-
+    responseCookie.name = 'refresh_token';
+    responseCookie.value = refreshToken;
+    responseCookie.maxAge = this.refreshExpiration;
     responseCookie.domain = null;
     responseCookie.path = '/';
     responseCookie.secure = true;
@@ -142,109 +145,61 @@ export class AuthServiceImpl implements AuthService {
     responseCookie.partitioned = false;
     responseCookie.sameSite = null;
 
-    const loginResult =
-      new LoginResultDto();
+    const loginResult = new LoginResultDto();
 
-    loginResult.resLoginDTO =
-      resLoginDto;
-
-    loginResult.responseCookie =
-      responseCookie;
+    loginResult.resLoginDTO = resLoginDto;
+    loginResult.responseCookie = responseCookie;
 
     return loginResult;
   }
 
-  async getNewRefreshToken(
-    refreshToken: string,
-  ): Promise<ResLoginDto> {
+  async getNewRefreshToken(refreshToken: string): Promise<ResLoginDto> {
     return null as unknown as ResLoginDto;
   }
 
-  async register(
-    reqRegister: ReqRegisterDto,
-  ): Promise<UserDto> {
-    const exists =
-      await this.userRepository
-        .existsByEmailAndDeleteFlagFalse(
-          reqRegister.email,
-        );
+  async register(reqRegister: ReqRegisterDto): Promise<UserDto> {
+    const exists = await this.userRepository.existsByEmailAndDeleteFlagFalse(
+      reqRegister.email,
+    );
 
     if (exists) {
-      throw new ConflictException(
-        'Email already exists',
-      );
+      throw new ConflictException('Email already exists');
     }
 
-    if (
-      reqRegister.password !==
-      reqRegister.confirmPassword
-    ) {
+    if (reqRegister.password !== reqRegister.confirmPassword) {
       throw new BadRequestException(
         'Password and confirm password do not match',
       );
     }
 
-    const registerUser =
-      new User();
+    const registerUser = new User();
 
-    registerUser.id =
-      randomUUID();
+    registerUser.id = randomUUID();
+    registerUser.name = reqRegister.name;
+    registerUser.email = reqRegister.email;
 
-    registerUser.name =
-      reqRegister.name;
+    registerUser.password = await bcrypt.hash(reqRegister.password, 10);
 
-    registerUser.email =
-      reqRegister.email;
+    registerUser.role = (await this.roleRepository.findByNameAndDeleteFlagFalse(
+      RoleConstant.USER,
+    )) as User['role'];
 
-    registerUser.password =
-      await bcrypt.hash(
-        reqRegister.password,
-        10,
-      );
+    const savedUser = await this.userRepository
+      .getRepository()
+      .save(registerUser);
 
-    registerUser.role =
-      (await this.roleRepository
-        .findByNameAndDeleteFlagFalse(
-          RoleConstant.USER,
-        )) as User['role'];
+    const registerResponseDto = new UserDto();
 
-    const savedUser =
-      await this.userRepository
-        .getRepository()
-        .save(registerUser);
-
-    const registerResponseDto =
-      new UserDto();
-
-    registerResponseDto.id =
-      savedUser.id;
-
-    registerResponseDto.dateOfBirth =
-      savedUser.dateOfBirth;
-
-    registerResponseDto.email =
-      savedUser.email;
-
-    registerResponseDto.gender =
-      savedUser.gender;
-
-    registerResponseDto.name =
-      savedUser.name;
-
-    registerResponseDto.avatarUrl =
-      savedUser.avatarUrl;
-
-    registerResponseDto.createdDate =
-      savedUser.createdDate;
-
-    registerResponseDto.lastModifiedDate =
-      savedUser.lastModifiedDate;
-
-    registerResponseDto.createdBy =
-      savedUser.createdBy;
-
-    registerResponseDto.lastModifiedBy =
-      savedUser.lastModifiedBy;
+    registerResponseDto.id = savedUser.id;
+    registerResponseDto.dateOfBirth = savedUser.dateOfBirth;
+    registerResponseDto.email = savedUser.email;
+    registerResponseDto.gender = savedUser.gender;
+    registerResponseDto.name = savedUser.name;
+    registerResponseDto.avatarUrl = savedUser.avatarUrl;
+    registerResponseDto.createdDate = savedUser.createdDate;
+    registerResponseDto.lastModifiedDate = savedUser.lastModifiedDate;
+    registerResponseDto.createdBy = savedUser.createdBy;
+    registerResponseDto.lastModifiedBy = savedUser.lastModifiedBy;
 
     return registerResponseDto;
   }

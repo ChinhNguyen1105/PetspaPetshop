@@ -34,7 +34,6 @@ import { BookingDetailRepository } from 'src/modules/bookings/repositories/booki
 import { BookingMapper } from 'src/modules/bookings/mapper/booking.mapper';
 
 import { PetService } from 'src/modules/catalogue/services/entities/pet-service.entity';
-import { PetServiceRepository } from 'src/modules/catalogue/services/repositories/pet-service.repository';
 import { PetRepository } from 'src/modules/pets/repositories/pet.repository';
 import { UserRepository } from 'src/modules/users/repositories/user.repository';
 import { OrderRepository } from 'src/modules/orders/repositories/order.repository';
@@ -52,7 +51,6 @@ export class BookingServiceImpl implements BookingService {
   constructor(
     private readonly bookingRepository: BookingRepository,
     private readonly bookingDetailRepository: BookingDetailRepository,
-    private readonly petServiceRepository: PetServiceRepository,
     private readonly petRepository: PetRepository,
     private readonly userRepository: UserRepository,
     private readonly bookingMapper: BookingMapper,
@@ -156,7 +154,8 @@ export class BookingServiceImpl implements BookingService {
         }
 
         const hasConflict =
-          req.startTime < existing.endTime && req.endTime > existing.startTime;
+          req.startTime < existing.endTime &&
+          req.endTime > existing.startTime;
 
         if (hasConflict) {
           throw new AppBadRequestException(
@@ -222,6 +221,7 @@ export class BookingServiceImpl implements BookingService {
       const savedOrder = await manager.getRepository(Order).save(order);
 
       savedBooking.order = savedOrder;
+      savedOrder.payment = payment;
 
       await manager.getRepository(Booking).save(savedBooking);
 
@@ -240,31 +240,39 @@ export class BookingServiceImpl implements BookingService {
         'user',
         'pet',
         'order',
+        'order.payment',
         'bookingDetails',
         'bookingDetails.service',
       ],
     });
 
     if (!booking) {
-      throw new NotFoundException(`[BOOKING] Booking not found with ID: ${id}`);
+      throw new NotFoundException(
+        `[BOOKING] Booking not found with ID: ${id}`,
+      );
     }
 
     return this.bookingMapper.toDto(booking);
   }
 
-  async getBookedTimeSlots(bookingDate: Date): Promise<BookingTimeSlotDto[]> {
-    const bookings = await this.bookingRepository.findByBookingDateAndStatusNot(
-      bookingDate,
-      BookingStatus.CANCELLED,
-    );
+  async getBookedTimeSlots(
+    bookingDate: Date,
+  ): Promise<BookingTimeSlotDto[]> {
+    const bookings =
+      await this.bookingRepository.findByBookingDateAndStatusNot(
+        bookingDate,
+        BookingStatus.CANCELLED,
+      );
 
     return bookings
-      .filter((booking) => booking.startTime != null && booking.endTime != null)
+      .filter(
+        (booking) =>
+          booking.startTime != null && booking.endTime != null,
+      )
       .map((booking) => {
         const timeSlot = new BookingTimeSlotDto();
 
         timeSlot.startTime = booking.startTime as string;
-
         timeSlot.endTime = booking.endTime as string;
 
         return timeSlot;
@@ -304,7 +312,9 @@ export class BookingServiceImpl implements BookingService {
         throw new Error();
       }
     } catch {
-      throw new AppBadRequestException(`[BOOKING] Invalid status: ${status}`);
+      throw new AppBadRequestException(
+        `[BOOKING] Invalid status: ${status}`,
+      );
     }
 
     const [bookings, total] = await this.bookingRepository.findByStatus(
@@ -321,7 +331,9 @@ export class BookingServiceImpl implements BookingService {
     );
   }
 
-  async getAllBookings(query: BookingQueryDto): Promise<ResultPaginationDto> {
+  async getAllBookings(
+    query: BookingQueryDto,
+  ): Promise<ResultPaginationDto> {
     const page = query.page;
     const pageSize = query.pageSize;
     const filters = query.filter ?? [];
@@ -332,6 +344,7 @@ export class BookingServiceImpl implements BookingService {
       .leftJoinAndSelect('booking.user', 'user')
       .leftJoinAndSelect('booking.pet', 'pet')
       .leftJoinAndSelect('booking.order', 'order')
+      .leftJoinAndSelect('order.payment', 'payment')
       .leftJoinAndSelect('booking.bookingDetails', 'bookingDetail')
       .leftJoinAndSelect('bookingDetail.service', 'service');
 
@@ -357,7 +370,9 @@ export class BookingServiceImpl implements BookingService {
       const matchedOperator = filter.match(/^(.*?)(>=|<=|!=|~|:|!)(.*)$/);
 
       if (!matchedOperator) {
-        throw new AppBadRequestException(`[BOOKING] Invalid filter: ${filter}`);
+        throw new AppBadRequestException(
+          `[BOOKING] Invalid filter: ${filter}`,
+        );
       }
 
       const [, field, operator, rawValue] = matchedOperator;
@@ -371,7 +386,6 @@ export class BookingServiceImpl implements BookingService {
       }
 
       const parameterName = `bookingFilter${index}`;
-
       const value = rawValue.trim();
 
       if (operator === ':') {
@@ -436,6 +450,7 @@ export class BookingServiceImpl implements BookingService {
           'user',
           'pet',
           'order',
+          'order.payment',
           'bookingDetails',
           'bookingDetails.service',
         ],
@@ -461,13 +476,18 @@ export class BookingServiceImpl implements BookingService {
 
       booking.status = BookingStatus.CANCELLED;
 
-      const updatedBooking = await manager.getRepository(Booking).save(booking);
+      const updatedBooking = await manager
+        .getRepository(Booking)
+        .save(booking);
 
       return this.bookingMapper.toDto(updatedBooking);
     });
   }
 
-  async updateBookingStatus(id: number, status: string): Promise<BookingDto> {
+  async updateBookingStatus(
+    id: number,
+    status: string,
+  ): Promise<BookingDto> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const booking = await manager.getRepository(Booking).findOne({
         where: {
@@ -477,6 +497,7 @@ export class BookingServiceImpl implements BookingService {
           'user',
           'pet',
           'order',
+          'order.payment',
           'bookingDetails',
           'bookingDetails.service',
         ],
@@ -498,7 +519,9 @@ export class BookingServiceImpl implements BookingService {
           throw new Error();
         }
       } catch {
-        throw new AppBadRequestException(`[BOOKING] Invalid status: ${status}`);
+        throw new AppBadRequestException(
+          `[BOOKING] Invalid status: ${status}`,
+        );
       }
 
       if (newStatus === BookingStatus.CONFIRMED) {
@@ -507,7 +530,9 @@ export class BookingServiceImpl implements BookingService {
 
       booking.status = newStatus;
 
-      const updatedBooking = await manager.getRepository(Booking).save(booking);
+      const updatedBooking = await manager
+        .getRepository(Booking)
+        .save(booking);
 
       return this.bookingMapper.toDto(updatedBooking);
     });
@@ -530,7 +555,9 @@ export class BookingServiceImpl implements BookingService {
     }
 
     if (!booking.bookingDate) {
-      throw new AppBadRequestException('[BOOKING] Booking date is required');
+      throw new AppBadRequestException(
+        '[BOOKING] Booking date is required',
+      );
     }
 
     const startDateTime = this.combineDateAndTime(
@@ -618,7 +645,10 @@ export class BookingServiceImpl implements BookingService {
     }
   }
 
-  private calculateDurationMinutes(startTime: string, endTime: string): number {
+  private calculateDurationMinutes(
+    startTime: string,
+    endTime: string,
+  ): number {
     return this.timeToMinutes(endTime) - this.timeToMinutes(startTime);
   }
 
@@ -660,4 +690,3 @@ export class BookingServiceImpl implements BookingService {
     return response;
   }
 }
-

@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
+  "dev": "vite --host 0.0.0.0",
+  "build": "vite build",
+  "lint": "eslint .",
+  "preview": "vite preview --host 0.0.0.0"
+},
   "dependencies": {
     "@hookform/resolvers": "^5.9.2",
     "@react-three/drei": "^10.7.9",

@@ -44,8 +44,6 @@ const PRODUCT_NAME_KEYWORDS = {
   ],
 };
 
-const SERVICE_VISIBLE_COUNT = 4;
-
 const SERVICE_GROUPS = [
   {
     key: "spa",
@@ -141,7 +139,7 @@ const findServiceCategory = (categories, group) => {
 const HomePage = () => {
   const navigate = useNavigate();
 
-  // CART STORE: thay thế useCart hook
+  // CART STORE
   const addItem = useCartStore((state) => state.addItem);
 
   const [activeTab, setActiveTab] = useState("ALL");
@@ -286,9 +284,14 @@ const HomePage = () => {
       .slice(0, 4);
   }, [products, activeTab]);
 
-  // Cuộn danh sách dịch vụ.
+  // Cuộn danh sách dịch vụ (Trên mobile hiển thị 1 card, trên PC hiển thị 4 card)
+  const getVisibleCount = () => {
+    return window.innerWidth >= 1024 ? 4 : 1;
+  };
+
   const scrollServices = (groupKey, direction, totalServices) => {
-    const maxOffset = Math.max(0, totalServices - SERVICE_VISIBLE_COUNT);
+    const visibleCount = getVisibleCount();
+    const maxOffset = Math.max(0, totalServices - visibleCount);
 
     setServiceOffsets((previous) => ({
       ...previous,
@@ -302,14 +305,17 @@ const HomePage = () => {
   // Render từng nhóm dịch vụ.
   const renderServiceSection = (group) => {
     const groupServices = servicesByGroup[group.key] ?? [];
+    const visibleCount = 4; // Lấy tối đa để slice, mobile dùng grid-cols-1 ẩn bớt card thừa hoặc cho phép trượt
 
-    const maxOffset = Math.max(0, groupServices.length - SERVICE_VISIBLE_COUNT);
-
+    // Trên mobile hiện 1 card, trên PC hiện 4 card
+    const currentVisibleCount =
+      typeof window !== "undefined" && window.innerWidth < 1024 ? 1 : 4;
+    const maxOffset = Math.max(0, groupServices.length - currentVisibleCount);
     const currentOffset = Math.min(serviceOffsets[group.key] ?? 0, maxOffset);
 
     const visibleServices = groupServices.slice(
       currentOffset,
-      currentOffset + SERVICE_VISIBLE_COUNT,
+      currentOffset + currentVisibleCount,
     );
 
     const canScrollLeft = currentOffset > 0;
@@ -360,8 +366,9 @@ const HomePage = () => {
           </div>
         ) : groupServices.length > 0 ? (
           <>
-            <div className="relative px-2 sm:px-0">
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="relative px-4 sm:px-0">
+              {/* Trên mobile grid-cols-1 (1 card), trên PC lg:grid-cols-4 (4 card) */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                 {visibleServices.map((service, index) => (
                   <ScrollReveal
                     key={service.id}
@@ -387,7 +394,7 @@ const HomePage = () => {
                   onClick={() =>
                     scrollServices(group.key, -1, groupServices.length)
                   }
-                  className="absolute left-0 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-lg transition hover:bg-slate-100"
+                  className="absolute left-1 lg:left-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 lg:-translate-x-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-lg transition hover:bg-slate-100 cursor-pointer"
                 >
                   <ChevronLeft size={22} />
                 </button>
@@ -400,17 +407,17 @@ const HomePage = () => {
                   onClick={() =>
                     scrollServices(group.key, 1, groupServices.length)
                   }
-                  className="absolute right-0 top-1/2 z-10 flex h-10 w-10 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-lg transition hover:bg-slate-100"
+                  className="absolute right-1 lg:right-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 lg:translate-x-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-lg transition hover:bg-slate-100 cursor-pointer"
                 >
                   <ChevronRight size={22} />
                 </button>
               )}
             </div>
 
-            {groupServices.length > SERVICE_VISIBLE_COUNT && (
+            {groupServices.length > currentVisibleCount && (
               <div className="mt-5 flex items-center justify-center gap-2">
                 {Array.from({
-                  length: groupServices.length - SERVICE_VISIBLE_COUNT + 1,
+                  length: groupServices.length - currentVisibleCount + 1,
                 }).map((_, index) => (
                   <button
                     key={index}
@@ -422,7 +429,7 @@ const HomePage = () => {
                         [group.key]: index,
                       }))
                     }
-                    className={`h-2 rounded-full transition-all ${
+                    className={`h-2 rounded-full transition-all cursor-pointer ${
                       currentOffset === index
                         ? "w-6 bg-pet-blue"
                         : "w-2 bg-slate-300 hover:bg-slate-400"
@@ -496,7 +503,7 @@ const HomePage = () => {
                     key={tab.value}
                     type="button"
                     onClick={() => setActiveTab(tab.value)}
-                    className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                    className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
                       activeTab === tab.value
                         ? "bg-pet-blue text-white shadow-sm"
                         : "text-slate-500 hover:text-slate-800"

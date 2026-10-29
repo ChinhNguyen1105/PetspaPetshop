@@ -16,6 +16,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     { path: '/api/v1/categories', method: 'GET', prefix: true },
     { path: '/api/v1/services', method: 'GET', prefix: true },
     { path: '/api/v1/menus', method: 'GET', prefix: true },
+    { path: '/api/v1/products/recommendations', method: 'POST' },
     { path: '/api/v1/products', method: 'GET', prefix: true },
     { path: '/api/v1/product-images', method: 'GET', prefix: true },
     { path: '/upload', method: 'GET', prefix: true },
@@ -25,6 +26,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     { path: '/api/v1/payment/vnpay/return', method: 'ALL' },
     { path: '/api/v1/files/download', method: 'GET' },
+
+    { path: '/api/v1/product-reviews', method: 'GET', prefix: true },
+    { path: '/api/v1/service-reviews/service', method: 'GET', prefix: true },
+    { path: '/api/v1/products/:id', method: 'GET' },
+    { path: '/api/v1/services/:id', method: 'GET' },
   ];
 
   canActivate(context: ExecutionContext) {

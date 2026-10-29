@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   MapPin,
   CreditCard,
@@ -185,6 +185,14 @@ const CheckoutItemRow = ({ item }) => {
 
 const Checkout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Mua ngay truyền mode + productId từ trang chi tiết sản phẩm.
+  const isBuyNow = location.state?.mode === "buyNow";
+  const buyNowProductId =
+    location.state?.productId ??
+    location.state?.product?.id ??
+    location.state?.product?.productId;
 
   // 1. Giỏ hàng Store
   const { itemDtoList, totalAmount, fetchCart, clearCart } = useCartStore();
@@ -198,6 +206,34 @@ const Checkout = () => {
     isLoading: isLoadingAddress,
     fetchAddresses,
   } = useAddressStore();
+
+  // Mua ngay chỉ lấy dòng giỏ hàng của sản phẩm vừa chọn.
+  // Thanh toán từ giỏ hàng vẫn lấy toàn bộ itemDtoList.
+  const checkoutItems = isBuyNow
+    ? buyNowProductId
+      ? itemDtoList
+          .filter((item) => String(item.productId) === String(buyNowProductId))
+          .slice(0, 1)
+      : []
+    : itemDtoList;
+
+  const checkoutTotalAmount = isBuyNow
+    ? checkoutItems.reduce(
+        (total, item) =>
+          total + Number(item.productPrice || 0) * Number(item.quantity || 0),
+        0,
+      )
+    : totalAmount;
+
+  const cleanupCartAfterOrder = async () => {
+    if (isBuyNow) {
+      // Không xóa toàn bộ giỏ hàng khi chỉ mua một sản phẩm.
+      // Backend cần xóa cartItemIds đã đặt; sau đó đồng bộ lại giỏ hàng.
+      await fetchCart();
+    } else {
+      await clearCart();
+    }
+  };
 
   // LOCAL STATE
   const [selectedAddress, setSelectedAddress] = useState(null);
@@ -306,7 +342,7 @@ const Checkout = () => {
     setShowConfirmOverlay(false);
 
     const orderPayload = {
-      cartItemIds: itemDtoList.map((item) => item.id),
+      cartItemIds: checkoutItems.map((item) => item.id),
       addressId: selectedAddress.id,
       paymentMethod,
     };
@@ -335,7 +371,7 @@ const Checkout = () => {
       // =======================================================
 
       if (paymentMethod === "COD") {
-        clearCart();
+        await cleanupCartAfterOrder();
 
         navigate("/order-success", {
           state: {
@@ -356,8 +392,8 @@ const Checkout = () => {
   |--------------------------------------------------------------------------
   */
 
-  const currentCartProductIds = itemDtoList
-    ? itemDtoList.map((item) => item.productId).filter(Boolean)
+  const currentCartProductIds = checkoutItems
+    ? checkoutItems.map((item) => item.productId).filter(Boolean)
     : [];
 
   return (
@@ -371,7 +407,7 @@ const Checkout = () => {
       </button>
 
       <h1 className="text-3xl font-black mb-8 text-gray-800 uppercase tracking-tight text-left">
-        Tiến hành thanh toán
+        {isBuyNow ? "Mua ngay" : "Tiến hành thanh toán"}
       </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -534,16 +570,26 @@ const Checkout = () => {
           </h2>
 
           <div className="divide-y divide-gray-100 max-h-60 overflow-y-auto mb-4 pr-1 scrollbar-thin">
-            {itemDtoList.map((item) => (
-              <CheckoutItemRow key={item.id} item={item} />
-            ))}
+            {checkoutItems.length > 0 ? (
+              checkoutItems.map((item) => (
+                <CheckoutItemRow key={item.id} item={item} />
+              ))
+            ) : (
+              <div className="py-6 text-sm text-gray-500">
+                {isBuyNow
+                  ? "Không tìm thấy sản phẩm vừa chọn. Vui lòng quay lại sản phẩm và nhấn Mua ngay."
+                  : "Giỏ hàng của bạn đang trống."}
+              </div>
+            )}
           </div>
 
           <div className="border-t border-gray-100 pt-4 space-y-2 mb-6">
             <div className="flex justify-between text-sm text-gray-500 font-bold">
               <span>Tạm tính</span>
 
-              <span className="text-gray-700">{formatPrice(totalAmount)}</span>
+              <span className="text-gray-700">
+                {formatPrice(checkoutTotalAmount)}
+              </span>
             </div>
 
             <div className="flex justify-between text-sm text-gray-500 font-bold">
@@ -556,7 +602,7 @@ const Checkout = () => {
               <span className="text-sm text-gray-600 font-bold">Tổng cộng</span>
 
               <span className="text-2xl text-orange-500 font-black">
-                {formatPrice(totalAmount)}
+                {formatPrice(checkoutTotalAmount)}
               </span>
             </div>
           </div>
@@ -564,7 +610,7 @@ const Checkout = () => {
           <Button
             className="w-full py-4 text-sm font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-500/10"
             onClick={handleVerifyOrderClick}
-            disabled={isSubmitting || itemDtoList.length === 0}
+            disabled={isSubmitting || checkoutItems.length === 0}
           >
             {isSubmitting ? "Đang xử lý đơn hàng..." : "Xác nhận đặt đơn"}
           </Button>
@@ -632,7 +678,7 @@ const Checkout = () => {
                   </div>
 
                   <div className="text-base font-black text-orange-600 mt-0.5">
-                    {formatPrice(totalAmount)}
+                    {formatPrice(checkoutTotalAmount)}
                   </div>
                 </div>
               </div>
@@ -788,9 +834,9 @@ const Checkout = () => {
       {showPaymentModal && createdOrderData && (
         <PaymentModal
           isOpen={showPaymentModal}
-          onClose={() => {
+          onClose={async () => {
             setShowPaymentModal(false);
-            clearCart();
+            await cleanupCartAfterOrder();
 
             navigate("/order-success", {
               state: {
@@ -799,9 +845,9 @@ const Checkout = () => {
             });
           }}
           orderData={createdOrderData}
-          onPaymentSuccess={() => {
+          onPaymentSuccess={async () => {
             setShowPaymentModal(false);
-            clearCart();
+            await cleanupCartAfterOrder();
 
             navigate("/order-success", {
               state: {

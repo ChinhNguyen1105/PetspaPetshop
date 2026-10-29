@@ -23,7 +23,7 @@ const useRecommendationStore = create((set, get) => ({
       );
 
       set({
-        serviceRecommendations: res?.data?.recommendedItemIds || [],
+        serviceRecommendations: res?.body?.data?.recommendedItemIds || [],
         loading: false,
       });
 
@@ -50,7 +50,7 @@ const useRecommendationStore = create((set, get) => ({
       );
 
       set({
-        productRecommendations: res?.data?.recommendedItemIds || [],
+        productRecommendations: res?.body?.data?.recommendedItemIds || [],
         loading: false,
       });
 

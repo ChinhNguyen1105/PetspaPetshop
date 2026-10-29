@@ -169,8 +169,11 @@ const downloadAvatar = async (fileName) => {
 
   const token = localStorage.getItem("petspa_token");
 
-  if (!token) {
-    throw new Error("Không tìm thấy JWT. Vui lòng đăng nhập lại.");
+  const headers = {};
+
+  // Chỉ gửi JWT khi đã đăng nhập.
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const response = await api.get("/files/download", {
@@ -180,9 +183,7 @@ const downloadAvatar = async (fileName) => {
       inline: true,
     },
     responseType: "blob",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
   });
 
   return response.data;

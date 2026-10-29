@@ -44,17 +44,14 @@ const ServiceList = () => {
 
       const filters = [];
 
-      // Filter theo danh mục
       if (filterCategoryId !== null && Number(filterCategoryId) !== 0) {
         filters.push(`category.id:${Number(filterCategoryId)}`);
       }
 
-      // Filter theo từ khóa
       if (searchTerm.trim()) {
         filters.push(`name~*${searchTerm.trim()}*`);
       }
 
-      // Gộp điều kiện vào query filter
       if (filters.length > 0) {
         params.filter = filters.join(",");
       }
@@ -67,7 +64,6 @@ const ServiceList = () => {
     loadServices();
   }, [currentPage, filterCategoryId, searchTerm, fetchServices]);
 
-  // FILTER SERVICE CATEGORIES
   const filteredCategories = useMemo(() => {
     return Array.isArray(categories)
       ? categories.filter(
@@ -76,28 +72,23 @@ const ServiceList = () => {
       : [];
   }, [categories]);
 
-  // CURRENT SERVICES
   const currentServices = useMemo(() => {
     return Array.isArray(services) ? services.filter(Boolean) : [];
   }, [services]);
 
-  // PAGINATION
   const totalPages = Number(meta?.pages) || 0;
   const displayedPage = Number(meta?.page) || currentPage;
 
-  // CATEGORY CHANGE
   const handleCategoryChange = (id) => {
     setFilterCategoryId(id === null ? null : Number(id));
     setCurrentPage(1);
   };
 
-  // SEARCH CHANGE
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
   };
 
-  // PAGE CHANGE
   const handlePageChange = (page) => {
     if (page < 1 || (totalPages > 0 && page > totalPages)) {
       return;
@@ -111,7 +102,6 @@ const ServiceList = () => {
     });
   };
 
-  // LOADING
   const isFirstLoad =
     loadingCategories || (loadingServices && currentServices.length === 0);
 
@@ -221,7 +211,7 @@ const ServiceList = () => {
           )}
         </div>
 
-        {/* SERVICE GRID */}
+        {/* SERVICE GRID: 1 cột trên mobile (grid-cols-1), 4 cột trên máy tính (lg:grid-cols-4) */}
         <div className="relative">
           {loadingServices ? (
             <div className="py-20 flex justify-center">
@@ -229,7 +219,7 @@ const ServiceList = () => {
             </div>
           ) : currentServices.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
                 {currentServices.map((service) => (
                   <ServiceCard key={service.id} service={service} />
                 ))}
@@ -259,7 +249,7 @@ const ServiceList = () => {
 
               <p className="text-gray-400 font-medium text-sm">
                 Không tìm thấy dịch vụ nào phù hợp với danh mục hoặc từ khóa "
-                {searchTerm}".
+                {searchTerm}" hiện tại của bạn.
               </p>
             </div>
           )}

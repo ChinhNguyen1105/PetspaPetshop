@@ -8,26 +8,25 @@ import {
   ArrowRight,
   CheckCircle2,
   UserRound,
+  ShieldCheck,
+  PawPrint,
 } from "lucide-react";
 
-// Components & Global Store
 import { Button } from "../../../shared/components/Button.jsx";
 import { Input } from "../../../shared/components/Input.jsx";
 import { useAuthStore } from "../store/authStore.js";
-
-// Validators
 import { validateRegisterForm } from "../validators/authValidator.js";
+import HeroPets3D from "../../home/components/HeroPets3D.jsx";
 
 const Register = () => {
   const navigate = useNavigate();
 
-  // 💡 Lấy các trạng thái và hàm từ Zustand Store thông qua Selector chuẩn
   const loading = useAuthStore((state) => state.loading);
   const serverError = useAuthStore((state) => state.error);
   const registerAction = useAuthStore((state) => state.registerAction);
   const loginAction = useAuthStore((state) => state.loginAction);
+  const clearError = useAuthStore((state) => state.clearError);
 
-  // Khởi tạo State lưu trữ Form dữ liệu nhập liệu (Đồng bộ 4 trường)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -35,29 +34,58 @@ const Register = () => {
     confirmPassword: "",
   });
 
-  // Quản lý trạng thái giao diện UI
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [validationError, setValidationError] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Hàm xử lý thay đổi dữ liệu đầu vào
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
 
-    if (validationError) setValidationError("");
+    setValidationError("");
+    clearError?.();
   };
 
-  // Xử lý gửi Form Đăng ký và Điều Hướng
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const validation = validateRegisterForm(formData);
-    if (!validation.isValid) return;
+    setValidationError("");
+    clearError?.();
+
+    let validation;
+
+    try {
+      validation = validateRegisterForm(formData);
+    } catch (error) {
+      setValidationError(
+        error instanceof Error
+          ? error.message
+          : "Không thể kiểm tra thông tin đăng ký.",
+      );
+      return;
+    }
+
+    if (!validation?.isValid) {
+      setValidationError(
+        validation?.message || "Vui lòng kiểm tra lại thông tin đăng ký.",
+      );
+      return;
+    }
+
+    if (
+      typeof registerAction !== "function" ||
+      typeof loginAction !== "function"
+    ) {
+      setValidationError(
+        "Hệ thống xác thực chưa sẵn sàng. Vui lòng thử lại sau.",
+      );
+      return;
+    }
 
     const submitData = {
       name: formData.name.trim(),
@@ -66,56 +94,58 @@ const Register = () => {
       confirmPassword: formData.confirmPassword,
     };
 
-    // ======================
-    // REGISTER
-    // ======================
-    const registerResult = await registerAction(submitData);
-    if (!registerResult?.success) return;
+    try {
+      const registerResult = await registerAction(submitData);
 
-    // ======================
-    // LOGIN
-    // ======================
-    const loginResult = await loginAction({
-      email: submitData.email,
-      password: submitData.password,
-    });
+      if (!registerResult?.success) {
+        return;
+      }
 
-    if (!loginResult?.success) {
-      navigate("/login");
-      return;
+      const loginResult = await loginAction({
+        email: submitData.email,
+        password: submitData.password,
+      });
+
+      if (!loginResult?.success) {
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      setIsSuccess(true);
+
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+
+      navigate("/", { replace: true });
+    } catch (error) {
+      setValidationError(
+        error instanceof Error
+          ? error.message
+          : "Đăng ký không thành công. Vui lòng thử lại.",
+      );
     }
-
-    // ======================
-    // CHỈ SET SUCCESS SAU KHI LOGIN OK
-    // ======================
-    setIsSuccess(true);
-
-    // CHỜ UI RENDER THẬT SỰ
-    await new Promise((r) => setTimeout(r, 3000));
-
-    navigate("/", { replace: true });
   };
 
-  // MÀN HÌNH CHÚC MỪNG KHI ĐĂNG KÝ THÀNH CÔNG (UX INTERMEDIATE STATE)
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl text-center border border-slate-100 space-y-6">
-          <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
-            <CheckCircle2 size={36} />
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-pet-blue/10 text-pet-blue">
+            <CheckCircle2 size={34} />
           </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-              Đăng Ký Thành Công!
-            </h2>
-            <p className="text-slate-500 text-sm font-medium">
-              Chào mừng thành viên mới gia nhập mái nhà chung{" "}
-              <span className="text-pet-blue font-bold">PetSpa</span>.
-            </p>
-          </div>
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-xs font-semibold text-slate-500 animate-pulse">
-            Hệ thống đang tự động tối ưu hóa tài khoản và đưa bạn vào hệ
-            thống...
+
+          <h2 className="mt-6 text-2xl font-bold text-slate-900">
+            Đăng ký thành công!
+          </h2>
+
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            Chào mừng bạn đến với{" "}
+            <span className="font-semibold text-pet-blue">PetSpa</span>. Tài
+            khoản của bạn đã sẵn sàng.
+          </p>
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-500">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-pet-blue" />
+            Đang chuyển đến trang chủ...
           </div>
         </div>
       </div>
@@ -123,122 +153,186 @@ const Register = () => {
   }
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-slate-50">
-      {/* KHỐI TRÁI: Form Nhập Liệu */}
-      <div className="lg:col-span-5 flex flex-col justify-center px-8 sm:px-16 lg:px-12 xl:px-16 bg-white z-10 relative shadow-xl py-12 max-h-screen overflow-y-auto no-scrollbar">
-        <div className="max-w-md w-full mx-auto">
-          {/* Tiêu đề */}
-          <div className="mb-6">
-            <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">
-              Tạo Tài Khoản
-            </h2>
-            <p className="text-slate-500 text-sm font-medium mt-1">
-              Trở thành thành viên để nhận ngập tràn ưu đãi dịch vụ chăm sóc
-              Boss.
+    <div className="min-h-screen bg-white lg:grid lg:grid-cols-2">
+      {/* REGISTER FORM */}
+      <section className="flex min-h-screen items-center justify-center px-6 py-10 sm:px-10 lg:px-14 xl:px-20">
+        <div className="w-full max-w-md">
+          {/* BRAND
+          <Link to="/" className="mb-8 inline-flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-pet-blue text-white">
+              <PawPrint size={25} />
+            </div>
+
+            <div>
+              <p className="text-xl font-bold tracking-tight text-slate-800">
+                Pet<span className="text-pet-orange">Spa</span>
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Chăm sóc thú cưng tận tâm
+              </p>
+            </div>
+          </Link> */}
+
+          {/* HEADING */}
+          <div className="mb-7">
+            <p className="mb-2 text-sm font-semibold text-pet-blue">
+              Trở thành thành viên PetSpa
+            </p>
+
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              Tạo tài khoản
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              Tạo tài khoản để đặt lịch chăm sóc, theo dõi dịch vụ và quản lý
+              thông tin thú cưng của bạn.
             </p>
           </div>
 
-          {/* Thông báo lỗi tập trung hiển thị */}
+          {/* ERROR */}
           {(validationError || serverError) && (
-            <div className="bg-rose-50 border-l-4 border-rose-500 text-rose-700 p-4 rounded-xl text-xs font-semibold mb-5">
+            <div
+              role="alert"
+              className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
+            >
               {validationError || serverError}
             </div>
           )}
 
-          {/* Form Đăng ký */}
+          {/* FORM */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Ô nhập Họ và Tên */}
+            {/* NAME */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Họ và Tên
+              <label
+                htmlFor="register-name"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
+                Họ và tên
               </label>
+
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <UserRound size={18} />
-                </div>
+                <UserRound
+                  size={18}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+
                 <Input
+                  id="register-name"
                   type="text"
                   name="name"
                   placeholder="Nguyễn Văn A"
                   value={formData.name}
                   onChange={handleChange}
-                  className="pl-10 w-full bg-slate-50 border-slate-200 focus:bg-white rounded-xl py-2.5 text-sm"
+                  autoComplete="name"
                   disabled={loading}
+                  className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition-colors focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/15"
                 />
               </div>
             </div>
 
-            {/* Ô nhập Email */}
+            {/* EMAIL */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Địa chỉ Email
+              <label
+                htmlFor="register-email"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
+                Địa chỉ email
               </label>
+
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Mail size={18} />
-                </div>
+                <Mail
+                  size={18}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+
                 <Input
+                  id="register-email"
                   type="email"
                   name="email"
                   placeholder="bossyeu@example.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className="pl-10 w-full bg-slate-50 border-slate-200 focus:bg-white rounded-xl py-2.5 text-sm"
+                  autoComplete="email"
                   disabled={loading}
+                  className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm text-slate-800 outline-none transition-colors focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/15"
                 />
               </div>
             </div>
 
-            {/* Ô nhập Mật khẩu */}
+            {/* PASSWORD */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label
+                htmlFor="register-password"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
                 Mật khẩu
               </label>
+
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock size={18} />
-                </div>
+                <Lock
+                  size={18}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+
                 <Input
+                  id="register-password"
                   type={showPassword ? "text" : "password"}
                   name="password"
-                  placeholder="Tối thiểu 6 ký tự"
+                  placeholder="Nhập mật khẩu"
                   value={formData.password}
                   onChange={handleChange}
-                  className="pl-10 pr-10 w-full bg-slate-50 border-slate-200 focus:bg-white rounded-xl py-2.5 text-sm"
+                  autoComplete="new-password"
                   disabled={loading}
+                  className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-12 text-sm text-slate-800 outline-none transition-colors focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/15"
                 />
+
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-pet-blue"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            {/* Ô nhập lại Mật khẩu */}
+            {/* CONFIRM PASSWORD */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label
+                htmlFor="register-confirm-password"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
                 Nhập lại mật khẩu
               </label>
+
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock size={18} />
-                </div>
+                <Lock
+                  size={18}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+
                 <Input
+                  id="register-confirm-password"
                   type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
-                  placeholder="••••••••"
+                  placeholder="Nhập lại mật khẩu"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="pl-10 pr-10 w-full bg-slate-50 border-slate-200 focus:bg-white rounded-xl py-2.5 text-sm"
+                  autoComplete="new-password"
                   disabled={loading}
+                  className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-12 text-sm text-slate-800 outline-none transition-colors focus:border-pet-blue focus:ring-2 focus:ring-pet-blue/15"
                 />
+
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={
+                    showConfirmPassword
+                      ? "Ẩn mật khẩu xác nhận"
+                      : "Hiện mật khẩu xác nhận"
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-pet-blue"
                 >
                   {showConfirmPassword ? (
                     <EyeOff size={18} />
@@ -249,58 +343,120 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Nút gửi thông tin Đăng ký */}
+            {/* SUBMIT */}
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-pet-orange hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition-all shadow-md mt-4 flex items-center justify-center gap-2 tracking-wide uppercase text-xs"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-pet-orange px-4 py-3.5 font-semibold text-white transition-colors hover:bg-pet-orange/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Đang khởi tạo tài khoản..." : "Đăng Ký Thành Viên"}
-              {!loading && <ArrowRight size={16} />}
+              {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+              {!loading && <ArrowRight size={18} />}
             </Button>
           </form>
 
-          {/* Điều hướng về trang Đăng Nhập nếu đã có tài khoản */}
-          <div className="text-center mt-6 pt-4 border-t border-slate-100">
-            <p className="text-xs text-slate-500 font-medium">
-              Bạn đã có tài khoản từ trước?{" "}
-              <Link
-                to="/login"
-                className="text-pet-blue hover:text-blue-600 font-bold transition-colors"
-              >
-                Đăng nhập ngay
-              </Link>
-            </p>
+          {/* LOGIN LINK */}
+          <p className="mt-6 border-t border-slate-100 pt-5 text-center text-sm text-slate-600">
+            Bạn đã có tài khoản?{" "}
+            <Link
+              to="/login"
+              onClick={() => clearError?.()}
+              className="font-semibold text-pet-blue hover:underline"
+            >
+              Đăng nhập ngay
+            </Link>
+          </p>
+
+          {/* SECURITY */}
+          <div className="mt-5 flex items-center justify-center gap-2 text-xs text-slate-500">
+            <ShieldCheck size={16} className="text-pet-blue" />
+            Thông tin của bạn được bảo vệ an toàn
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* KHỐI PHẢI: Hình Ảnh Minh Họa Trang Trí */}
-      <div className="hidden lg:col-span-7 lg:flex relative bg-slate-900 items-center justify-center p-12 overflow-hidden">
-        <img
-          src="https://images.unsplash.com/photo-1535268647977-a403b69fc756?q=80&w=1200"
-          alt="Dog taking a bath"
-          className="absolute inset-0 w-full h-full object-cover opacity-40 transform scale-100"
-        />
-        <div className="absolute inset-0 bg-gradient-to-tr from-pet-orange/80 via-slate-900/80 to-transparent"></div>
+      {/* 3D PET PANEL */}
+      <section className="relative hidden min-h-screen flex-col overflow-hidden bg-slate-50 lg:flex">
+        {/* BRAND HEADER */}
+        <div className="relative z-10 flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5 xl:px-12">
+          <div>
+            <p className="text-sm font-bold text-slate-800">
+              Pet<span className="text-pet-orange">Spa</span>
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Dịch vụ chăm sóc thú cưng
+            </p>
+          </div>
 
-        <div className="relative z-10 max-w-md text-left text-white space-y-4">
-          <span className="bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest inline-block">
-            Đăng ký nhanh chóng - Nhận ngàn đặc quyền 🎁
-          </span>
-          <h3 className="text-4xl font-black uppercase tracking-tight leading-tight">
-            Chăm Sóc Boss Cưng <br />
-            Chưa Bao Giờ <span className="text-pet-blue">Dễ Dàng</span> Đến Thế.
-          </h3>
-          <p className="text-sm opacity-90 leading-relaxed font-medium text-slate-200">
-            Tạo tài khoản chỉ trong 1 phút để mở khóa tính năng tự động nhắc
-            lịch tiêm ngừa vắc-xin, lưu trữ lịch trình Spa riêng biệt và tích
-            điểm đổi quà bách hóa cực khủng.
-          </p>
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <span className="h-2 w-2 rounded-full bg-pet-orange" />
+            Chào mừng thành viên mới
+          </div>
         </div>
 
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-pet-blue/20 rounded-full blur-3xl pointer-events-none"></div>
-      </div>
+        {/* 3D SCENE */}
+        <div className="relative flex flex-1 flex-col justify-center px-5 py-8 xl:px-10">
+          <div className="mx-auto w-full max-w-2xl">
+            <div className="mb-1 text-center">
+              <p className="text-sm font-semibold text-pet-blue">
+                Cùng bắt đầu hành trình
+              </p>
+
+              <h2 className="mt-2 text-3xl font-bold leading-tight text-slate-900 xl:text-4xl">
+                Chăm sóc tốt hơn,
+                <br />
+                yêu thương nhiều hơn.
+              </h2>
+
+              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
+                Tạo tài khoản để đặt lịch, theo dõi dịch vụ và chăm sóc người
+                bạn bốn chân thuận tiện hơn.
+              </p>
+            </div>
+
+            <div className="mt-2 h-[340px] w-full sm:h-[390px] xl:h-[430px]">
+              <HeroPets3D />
+            </div>
+
+            {/* SERVICE BENEFITS */}
+            <div className="mx-auto grid max-w-lg grid-cols-2 gap-3">
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pet-blue/10 text-pet-blue">
+                  <PawPrint size={20} />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    Chăm sóc tận tâm
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Dịch vụ dành riêng cho thú cưng.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pet-orange/10 text-pet-orange">
+                  <ShieldCheck size={20} />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    An tâm sử dụng
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Quản lý lịch hẹn thuận tiện.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="border-t border-slate-200 bg-white px-8 py-4 text-center text-xs text-slate-500">
+          PetSpa — Người bạn đồng hành của thú cưng và gia đình bạn.
+        </div>
+      </section>
     </div>
   );
 };

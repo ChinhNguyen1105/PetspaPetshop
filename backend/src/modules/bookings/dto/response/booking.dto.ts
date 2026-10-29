@@ -1,4 +1,5 @@
 ﻿import { BookingStatus } from 'src/common/constants/booking-status.enum';
+import { PaymentStatus } from 'src/common/constants/payment-status.enum';
 import { BookingDetailDto } from 'src/modules/bookings/dto/response/booking-detail.dto';
 
 export class BookingDto {
@@ -22,4 +23,5 @@ export class BookingDto {
   lastModifiedDate: Date;
 
   orderId: number | null;
+  paymentStatus: PaymentStatus | null;
 }

@@ -119,16 +119,10 @@ const getOrderById = async (
 
 const getMyOrders = async (
   status,
-  page = 1,
-  pageSize = 20,
   options = {},
 ) => {
   if (shouldUseApi(options)) {
-    const params = {
-      page,
-      pageSize,
-    };
-
+    const params = {};
     if (
       status !== undefined &&
       status !== null &&
@@ -163,12 +157,6 @@ const getMyOrders = async (
       status: "SUCCESS",
       data: {
         result: [],
-        meta: {
-          page,
-          pageSize,
-          pages: 0,
-          total: 0,
-        },
       },
     },
   };

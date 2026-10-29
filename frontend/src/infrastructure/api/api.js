@@ -1,9 +1,12 @@
+
 import axios from "axios";
 
 // AXIOS INSTANCE
 const api = axios.create({
-  baseURL: "http://localhost:3000/api/v1",
-  timeout: 10000,
+  baseURL:
+    import.meta.env.VITE_API_URL ||
+    "http://192.168.1.195:3000/api/v1",
+  timeout: 15000,
 });
 
 // REQUEST INTERCEPTOR
@@ -20,9 +23,15 @@ api.interceptors.request.use(
     if (config.data instanceof FormData) {
       delete config.headers["Content-Type"];
     } else if (config.data !== undefined) {
-      config.headers.set
-        ? config.headers.set("Content-Type", "application/json")
-        : (config.headers["Content-Type"] = "application/json");
+      if (config.headers.set) {
+        config.headers.set(
+          "Content-Type",
+          "application/json"
+        );
+      } else {
+        config.headers["Content-Type"] =
+          "application/json";
+      }
     }
 
     return config;
@@ -35,7 +44,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.error("Token hết hạn hoặc không hợp lệ");
+      console.error(
+        "Token hết hạn hoặc không hợp lệ"
+      );
 
       localStorage.removeItem("petspa_token");
       localStorage.removeItem("petspa_user");

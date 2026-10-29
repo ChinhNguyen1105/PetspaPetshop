@@ -16,14 +16,18 @@ export class BookingMapper {
     dto.id = booking.id;
     dto.userId = booking.user?.id ?? null;
     dto.userName = booking.user?.name ?? null;
+
     dto.status = booking.status;
     dto.actualPrice = booking.actualPrice;
     dto.bookingDate = booking.bookingDate;
     dto.startTime = booking.startTime;
     dto.endTime = booking.endTime;
+
     dto.petId = booking.pet?.id ?? null;
     dto.petName = booking.pet?.name ?? null;
+
     dto.orderId = booking.order?.id ?? null;
+    dto.paymentStatus = booking.order?.payment?.status ?? null;
 
     dto.bookingDetails = booking.bookingDetails
       ? this.bookingDetailMapper.toDtos(booking.bookingDetails)

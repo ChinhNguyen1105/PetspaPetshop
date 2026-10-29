@@ -17,7 +17,11 @@ export const useProductImageStore = create((set, get) => ({
 
       const res =
         await ProductImageService.getProductImages(productId);
-
+console.log("[PRODUCT IMAGES API]", {
+  productId,
+  response: res,
+  imageList: res?.body?.data ?? res?.data?.data ?? [],
+});
       const imageList =
         res?.body?.data ??
         res?.data?.data ??
@@ -29,7 +33,10 @@ export const useProductImageStore = create((set, get) => ({
           [String(productId)]: imageList,
         },
       }));
-
+console.log("[ZUSTAND IMAGES]", {
+  productId,
+  savedImages: get().imagesByProductId[String(productId)],
+});
       return imageList;
     } catch (err) {
       console.error("Fetch images error:", err);

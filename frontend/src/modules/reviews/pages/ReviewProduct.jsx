@@ -5,7 +5,7 @@ import UserAvatar from "../../users/components/admin/UserAvatar";
 
 const ReviewProduct = ({ reviews = [] }) => {
   return (
-    <div className="mt-12 max-w-2xl ml-0 pl-0 w-full">
+    <div className="mt-5 max-w-2xl ml-0 pl-0 w-full">
       <h3 className="text-2xl font-black text-pet-blue mb-8">
         Đánh giá từ khách hàng
       </h3>

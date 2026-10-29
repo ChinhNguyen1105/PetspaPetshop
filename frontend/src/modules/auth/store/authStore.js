@@ -36,129 +36,117 @@ export const useAuthStore = create((set, get) => ({
 
   /*
   |--------------------------------------------------------------------------
+  | CLEAR ERROR
+  |--------------------------------------------------------------------------
+  */
+  clearError: () => {
+    set({ error: null });
+  },
+
+  /*
+  |--------------------------------------------------------------------------
   | LOGIN
   |--------------------------------------------------------------------------
   */
-loginAction: async (credentials) => {
-  set({ loading: true, error: null });
+  loginAction: async (credentials) => {
+    set({ loading: true, error: null });
 
-  try {
-    const res = await AuthService.login(credentials);
+    try {
+      const res = await AuthService.login(credentials);
 
-    const user = res?.body?.data?.user;
-    const accessToken = res?.body?.data?.accessToken;
+      const user = res?.body?.data?.user;
+      const accessToken = res?.body?.data?.accessToken;
 
-    if (!user || !accessToken) {
-      throw new Error(
-        "Không nhận được thông tin xác thực từ hệ thống."
-      );
+      if (!user || !accessToken) {
+        throw new Error(
+          "Không nhận được thông tin xác thực từ hệ thống."
+        );
+      }
+
+      localStorage.setItem("petspa_user", JSON.stringify(user));
+      localStorage.setItem("petspa_token", accessToken);
+
+      set({
+        user,
+        token: accessToken,
+        isAuthenticated: true,
+        loading: false,
+        error: null,
+      });
+
+      const userRole = user?.role?.name?.toUpperCase() || "";
+
+      return {
+        success: true,
+        role: userRole,
+      };
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Đăng nhập thất bại";
+
+      set({
+        loading: false,
+        error: msg,
+      });
+
+      return {
+        success: false,
+        error: msg,
+      };
     }
+  },
 
-    localStorage.setItem(
-      "petspa_user",
-      JSON.stringify(user)
-    );
-
-    localStorage.setItem(
-      "petspa_token",
-      accessToken
-    );
-
-    set({
-      user,
-      token: accessToken,
-      isAuthenticated: true,
-      loading: false,
-      error: null,
-    });
-
-    const userRole =
-      user?.role?.name?.toUpperCase() || "";
-
-    return {
-      success: true,
-      role: userRole,
-    };
-
-  } catch (err) {
-    const msg =
-      err?.response?.data?.message ||
-      err?.message ||
-      "Đăng nhập thất bại";
-
-    set({
-      loading: false,
-      error: msg,
-    });
-
-    return {
-      success: false,
-      error: msg,
-    };
-  }
-},
   /*
   |--------------------------------------------------------------------------
   | REGISTER
   |--------------------------------------------------------------------------
   */
   registerAction: async (registerData) => {
-  set({ loading: true, error: null });
+    set({ loading: true, error: null });
 
-  try {
-    const res = await AuthService.register(registerData);
+    try {
+      const res = await AuthService.register(registerData);
 
-    // ========================
-    // NORMALIZE RESPONSE
-    // ========================
-    const user = res?.data; // <- user nằm trong data.data
-    const status = res?.status;
-    console.log("user :", user);
-    console.log("status: ", status);
-    // ========================
-    // VALIDATE
-    // ========================
-    if (!user || !status) {
-      throw new Error("Invalid register response structure");
+      const user = res?.body?.data;
+      const status = res?.body?.status;
+
+      if (!user || !status) {
+        throw new Error("Invalid register response structure");
+      }
+
+      localStorage.setItem("petspa_user", JSON.stringify(user));
+
+      set({
+        user,
+        loading: false,
+        error: null,
+        isAuthenticated: false,
+      });
+
+      return {
+        success: true,
+        data: user,
+      };
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Đăng ký thất bại";
+
+      set({
+        loading: false,
+        error: msg,
+        isAuthenticated: false,
+      });
+
+      return {
+        success: false,
+        error: msg,
+      };
     }
-
-    // ========================
-    // SAVE STORAGE
-    // ========================
-    localStorage.setItem("petspa_user", JSON.stringify(user));
-    // ========================
-    // UPDATE STORE
-    // ========================
-    set({
-      user,
-      isAuthenticated: false, // chưa login sau register
-      loading: false,
-      error: null,
-    });
-
-    return {
-      success: true,
-      data: user,
-    };
-
-  } catch (err) {
-    const msg =
-      err?.response?.data?.message ||
-      err?.message ||
-      "Đăng ký thất bại";
-
-    set({
-      loading: false,
-      error: msg,
-      isAuthenticated: false,
-    });
-
-    return {
-      success: false,
-      error: msg,
-    };
-  }
-},
+  },
 
   /*
   |--------------------------------------------------------------------------
@@ -176,6 +164,7 @@ loginAction: async (credentials) => {
       token,
       isAuthenticated: true,
       error: null,
+      loading: false,
     });
   },
 
@@ -195,6 +184,7 @@ loginAction: async (credentials) => {
       token,
       isAuthenticated: true,
       error: null,
+      loading: false,
     });
   },
 
@@ -212,6 +202,7 @@ loginAction: async (credentials) => {
       token: null,
       isAuthenticated: false,
       error: null,
+      loading: false,
     });
   },
 
@@ -237,13 +228,15 @@ loginAction: async (credentials) => {
   |--------------------------------------------------------------------------
   */
   reset: () => {
-    localStorage.clear();
+    localStorage.removeItem("petspa_user");
+    localStorage.removeItem("petspa_token");
 
     set({
       user: null,
       token: null,
       isAuthenticated: false,
       error: null,
+      loading: false,
     });
   },
 

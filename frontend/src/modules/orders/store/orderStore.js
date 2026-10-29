@@ -139,8 +139,6 @@ export const useOrderStore = create((set, get) => ({
   /* ================= MY ORDERS ================= */
   fetchMyOrders: async (
     status,
-    page = 1,
-    pageSize = 20,
     options = {},
   ) => {
     try {
@@ -151,23 +149,20 @@ export const useOrderStore = create((set, get) => ({
 
       const res = await OrderService.getMyOrders(
         status,
-        page,
-        pageSize,
         options,
       );
 
       const data =
         res?.body?.data ||
-        res?.data ||
         null;
 
       set({
-        myOrders: data?.result || [],
+        myOrders: data || [],
         meta: data?.meta || null,
         loading: false,
       });
 
-      console.log("fetch my orders:", res);
+      console.log("fetch my orders:", data);
 
       return res;
     } catch (err) {

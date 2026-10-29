@@ -1,9 +1,6 @@
 ﻿
 import { z } from "zod";
-import {
-  requiredTextSchema,
-  phoneSchema,
-} from "../../../shared/validators/commonSchema.js";
+import { requiredTextSchema, phoneSchema } from "../../../shared/validators/commonSchemas";
 
 export const addressSchema = z.object({
   receiverName: requiredTextSchema("tên người nhận", 1, 255),
