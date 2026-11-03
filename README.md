@@ -75,15 +75,15 @@ The system consists of:
 
 | Home | Shop | Product Detail |
 |:---:|:---:|:---:|
-| ![Home](backend\docs\screenshots\home.png) | ![Shop](backend\docs\screenshots\product-list.png) | ![Product](backend\docs\screenshots\product-detail.png) |
+| ![Home](backend/docs/screenshots/home.png) | ![Shop](backend/docs/screenshots/product-list.png) | ![Product](backend/docs/screenshots/product-detail.png) |
 
 | Spa Booking | Cart and Checkout | Product Recommendations (Apriori) |
 |:---:|:---:|:---:|
-| ![Booking](backend\docs\screenshots\booking.png) | ![Checkout](backend\docs\screenshots\checkout.png) | ![Service](backend\docs\screenshots\service-list.png) |
+| ![Booking](backend/docs/screenshots/booking.png) | ![Checkout](backend/docs/screenshots/checkout.png) | ![Service](backend/docs/screenshots/service-list.png) |
 
 | Admin Dashboard | Inventory Management | Permission Management |
 |:---:|:---:|:---:|
-| ![Dashboard](backend\docs\screenshots\dashboard.png) | ![Inventory](backend\docs\screenshots\inventory.png) | ![Permission](backend\docs\screenshots\permission.png)
+| ![Dashboard](backend/docs/screenshots/dashboard.png) | ![Inventory](backend/docs/screenshots/inventory.png) | ![Permission](backend/docs/screenshots/permission.png) |
 
 
 ---
