@@ -77,7 +77,7 @@ The system consists of:
 |:---:|:---:|:---:|
 | ![Home](backend/docs/screenshots/home.png) | ![Shop](backend/docs/screenshots/product-list.png) | ![Product](backend/docs/screenshots/product-detail.png) |
 
-| Spa Booking | Cart and Checkout | Product Recommendations (Apriori) |
+| Spa Booking | Cart and Checkout | Services |
 |:---:|:---:|:---:|
 | ![Booking](backend/docs/screenshots/booking.png) | ![Checkout](backend/docs/screenshots/checkout.png) | ![Service](backend/docs/screenshots/service-list.png) |
 
