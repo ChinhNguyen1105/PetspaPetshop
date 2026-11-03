@@ -1,6 +1,6 @@
 # API compatibility rule
 
-Current FE base URL is `http://localhost:8080/api/v1` and it sends a Bearer JWT.
+Current FE base URL is `http://localhost:3000/api/v1` and it sends a Bearer JWT.
 Treat frontend service code as the observed caller contract. Preserve method,
 route, body fields, query parameters, response shape and enum spelling unless
 the FE is changed in the same work.

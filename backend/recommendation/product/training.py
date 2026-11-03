@@ -16,8 +16,8 @@ from mlxtend.frequent_patterns import association_rules
 
 BASE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = BASE_DIR.parent.parent
-CONFIG_PATH = REPO_ROOT / "src" / "main" / "resources" / "application.yaml"
-OUTPUT_DIR = REPO_ROOT / "src" / "main" / "resources" / "recommendation" / "product"
+CONFIG_PATH = REPO_ROOT / ".env"
+OUTPUT_DIR = REPO_ROOT  / "recommendation" / "product"
 OUTPUT_JSON = OUTPUT_DIR / "association_rules.json"
 OUTPUT_MODEL = OUTPUT_DIR / "model.pkl"
 MIN_SUPPORT = 0.01

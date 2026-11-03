@@ -15,6 +15,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     { path: '/api/v1/categories', method: 'GET', prefix: true },
     { path: '/api/v1/services', method: 'GET', prefix: true },
+    { path: '/api/v1/services/recommendations', method: 'POST' },
+
     { path: '/api/v1/menus', method: 'GET', prefix: true },
     { path: '/api/v1/products/recommendations', method: 'POST' },
     { path: '/api/v1/products', method: 'GET', prefix: true },

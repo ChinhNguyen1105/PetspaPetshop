@@ -81,6 +81,16 @@ export class PermissionsGuard implements CanActivate {
       method: 'GET',
       prefix: true,
     },
+    {
+      path: '/api/v1/products/recommendations',
+      method: 'POST',
+      prefix: true,
+    },
+    {
+      path: '/api/v1/services/recommendations',
+      method: 'POST',
+      prefix: true,
+    },
   ];
 
   constructor(

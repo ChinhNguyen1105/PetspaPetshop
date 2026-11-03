@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 
-// Import Các Zustand Stores
+// Import Zustand Stores
 import { useBookingStore } from "../../../bookings/store/bookingStore.js";
 import { useOrderStore } from "../../../orders/store/orderStore.js";
 import { useUserStore } from "../../../users/store/userStore.js";
@@ -20,6 +20,7 @@ import StatCard from "../../components/StatCard.jsx";
 import { formatPrice } from "../../../../shared/utils/formatPrice.js";
 
 import { STATUS_CONFIG } from "../../../../shared/constants/index.js";
+import RevenueChart from "../../components/RevenueChart.jsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER
@@ -40,10 +41,10 @@ const getStatusBadge = (status) => {
   const config = STATUS_CONFIG[status] || {
     className: "bg-gray-50 text-gray-600 border-gray-200",
     iconName: null,
-    text: status,
+    text: status || "Không xác định",
   };
 
-  const IconComponent = LucideIcons[config.iconName];
+  const IconComponent = config.iconName ? LucideIcons[config.iconName] : null;
 
   return (
     <span
@@ -54,6 +55,10 @@ const getStatusBadge = (status) => {
     </span>
   );
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DASHBOARD
+// ─────────────────────────────────────────────────────────────────────────────
 
 const Dashboard = () => {
   // ─── LẤY DỮ LIỆU VÀ ACTIONS TỪ ZUSTAND STORES ──────────────────────────────
@@ -73,27 +78,31 @@ const Dashboard = () => {
     fetchRevenue,
   } = useOrderStore();
 
-  const {
-    users,
-    loading: userLoading,
-    fetchUsers,
-  } = useUserStore();
+  const { users, loading: userLoading, fetchUsers } = useUserStore();
 
-  // ─── FETCH DASHBOARD DATA ───────────────────────────────────────────────────
+  // ─── FETCH DASHBOARD DATA ──────────────────────────────────────────────────
 
   const fetchDashboardData = async () => {
     try {
       await Promise.all([
+        // Lấy doanh thu tổng hợp từ backend
         fetchRevenue(),
-        fetchOrders(),
+
+        // Chỉ lấy 10 đơn hàng sản phẩm gần nhất
+        fetchOrders({
+          page: 1,
+          pageSize: 10,
+          filter: "orderType:PRODUCT",
+        }),
+
+        // Lấy danh sách lịch hẹn
         fetchBookings(),
+
+        // Lấy danh sách người dùng
         fetchUsers(),
       ]);
     } catch (error) {
-      console.error(
-        "Fetch dashboard data failed:",
-        error,
-      );
+      console.error("Fetch dashboard data failed:", error);
     }
   };
 
@@ -101,54 +110,42 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // ─── XỬ LÝ TRẠNG THÁI ───────────────────────────────────────────────────────
+  // ─── XỬ LÝ TRẠNG THÁI ──────────────────────────────────────────────────────
 
-  const isGlobalLoading =
-    bookingLoading ||
-    orderLoading ||
-    userLoading;
+  const isGlobalLoading = bookingLoading || orderLoading || userLoading;
 
-  const systemError =
-    bookingError;
+  const systemError = bookingError;
 
-  // ─── DOANH THU ──────────────────────────────────────────────────────────────
+  // ─── DOANH THU ─────────────────────────────────────────────────────────────
   //
   // Doanh thu được lấy trực tiếp từ:
-  //
   // GET /orders/revenue
   //
-  // Backend đã phân loại:
+  // Backend chịu trách nhiệm phân loại:
   // PRODUCT  → shopRevenue
   // BOOKING  → spaRevenue
   // SUCCESS  → doanh thu thực tế
   //
   // Không cộng orders + bookings ở frontend nữa.
 
-  const totalRevenue = toNumber(
-    revenue?.totalRevenue,
-  );
+  const totalRevenue = toNumber(revenue?.totalRevenue);
 
-  // ─── THỐNG KÊ ───────────────────────────────────────────────────────────────
+  // ─── THỐNG KÊ ──────────────────────────────────────────────────────────────
 
   const stats = {
     revenue: totalRevenue,
-    bookings:
-      bookings?.length || 0,
-    orders:
-      orders?.length || 0,
-    users:
-      users?.length || 0,
+    bookings: bookings?.length || 0,
+    orders: orders?.length || 0,
+    users: users?.length || 0,
   };
 
-  // ─── DỮ LIỆU GẦN ĐÂY ────────────────────────────────────────────────────────
+  // ─── DỮ LIỆU GẦN ĐÂY ───────────────────────────────────────────────────────
 
-  const recentBookings =
-    bookings?.slice(0, 5) || [];
+  const recentBookings = bookings?.slice(0, 5) || [];
 
-  const recentOrders =
-    orders?.slice(0, 5) || [];
+  const recentOrders = orders?.slice(0, 5) || [];
 
-  // ─── LOADING ─────────────────────────────────────────────────────────────────
+  // ─── LOADING ───────────────────────────────────────────────────────────────
 
   if (isGlobalLoading) {
     return (
@@ -158,7 +155,7 @@ const Dashboard = () => {
     );
   }
 
-  // ─── ERROR ───────────────────────────────────────────────────────────────────
+  // ─── ERROR ─────────────────────────────────────────────────────────────────
 
   if (systemError) {
     return (
@@ -182,9 +179,11 @@ const Dashboard = () => {
     );
   }
 
+  // ─── RENDER ────────────────────────────────────────────────────────────────
+
   return (
     <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
-      {/* Tiêu đề */}
+      {/* TIÊU ĐỀ */}
 
       <div>
         <h1 className="text-3xl font-black text-pet-blue tracking-tight">
@@ -197,14 +196,12 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {/* Grid 4 Thẻ chỉ số chính */}
+      {/* GRID 4 THẺ CHỈ SỐ CHÍNH */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard
           title="Tổng doanh thu"
-          value={formatPrice(
-            stats.revenue,
-          )}
+          value={formatPrice(stats.revenue)}
           icon={DollarSign}
           iconBg="bg-emerald-50"
           iconColor="text-emerald-500"
@@ -235,7 +232,9 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Grid 2 bảng dữ liệu chi tiết */}
+      {/* BIỂU ĐỒ DOANH THU THỰC TẾ */}
+      <RevenueChart orders={orders} revenueData={revenue} />
+      {/* GRID 2 BẢNG DỮ LIỆU CHI TIẾT */}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* BẢNG LỊCH SPA GẦN ĐÂY */}
@@ -259,21 +258,10 @@ const Dashboard = () => {
             <table className="w-full text-left text-sm text-gray-600">
               <thead>
                 <tr className="bg-gray-50 text-gray-400 text-xs uppercase font-bold">
-                  <th className="p-3 rounded-l-lg">
-                    Khách hàng
-                  </th>
-
-                  <th className="p-3">
-                    Thú cưng
-                  </th>
-
-                  <th className="p-3">
-                    Tổng chi phí
-                  </th>
-
-                  <th className="p-3 rounded-r-lg text-center">
-                    Trạng thái
-                  </th>
+                  <th className="p-3 rounded-l-lg">Khách hàng</th>
+                  <th className="p-3">Thú cưng</th>
+                  <th className="p-3">Tổng chi phí</th>
+                  <th className="p-3 rounded-r-lg text-center">Trạng thái</th>
                 </tr>
               </thead>
 
@@ -288,54 +276,36 @@ const Dashboard = () => {
                     </td>
                   </tr>
                 ) : (
-                  recentBookings.map(
-                    (booking) => (
-                      <tr
-                        key={booking.id}
-                        className="hover:bg-gray-50/50 transition-colors"
-                      >
-                        <td className="p-3">
-                          <div className="font-semibold text-gray-800">
-                            {
-                              booking.userName
-                            }
-                          </div>
+                  recentBookings.map((booking) => (
+                    <tr
+                      key={booking.id}
+                      className="hover:bg-gray-50/50 transition-colors"
+                    >
+                      <td className="p-3">
+                        <div className="font-semibold text-gray-800">
+                          {booking.userName}
+                        </div>
 
-                          <div className="text-xs text-gray-400">
-                            {
-                              booking.bookingDate
-                            }{" "}
-                            |{" "}
-                            {
-                              booking.startTime
-                            }
-                          </div>
-                        </td>
+                        <div className="text-xs text-gray-400">
+                          {booking.bookingDate} | {booking.startTime}
+                        </div>
+                      </td>
 
-                        <td className="p-3">
-                          <div className="text-sm font-medium text-gray-700">
-                            {
-                              booking.petName
-                            }
-                          </div>
-                        </td>
+                      <td className="p-3">
+                        <div className="text-sm font-medium text-gray-700">
+                          {booking.petName}
+                        </div>
+                      </td>
 
-                        <td className="p-3 font-bold text-gray-900">
-                          {formatPrice(
-                            toNumber(
-                              booking.actualPrice,
-                            ),
-                          )}
-                        </td>
+                      <td className="p-3 font-bold text-gray-900">
+                        {formatPrice(toNumber(booking.actualPrice))}
+                      </td>
 
-                        <td className="p-3 text-center">
-                          {getStatusBadge(
-                            booking.status,
-                          )}
-                        </td>
-                      </tr>
-                    ),
-                  )
+                      <td className="p-3 text-center">
+                        {getStatusBadge(booking.status)}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -363,21 +333,10 @@ const Dashboard = () => {
             <table className="w-full text-left text-sm text-gray-600">
               <thead>
                 <tr className="bg-gray-50 text-gray-400 text-xs uppercase font-bold">
-                  <th className="p-3 rounded-l-lg">
-                    ID đơn
-                  </th>
-
-                  <th className="p-3">
-                    Khách hàng
-                  </th>
-
-                  <th className="p-3">
-                    Giá trị đơn
-                  </th>
-
-                  <th className="p-3 rounded-r-lg text-center">
-                    Thanh toán
-                  </th>
+                  <th className="p-3 rounded-l-lg">ID đơn</th>
+                  <th className="p-3">Khách hàng</th>
+                  <th className="p-3">Giá trị đơn</th>
+                  <th className="p-3 rounded-r-lg text-center">Thanh toán</th>
                 </tr>
               </thead>
 
@@ -392,42 +351,32 @@ const Dashboard = () => {
                     </td>
                   </tr>
                 ) : (
-                  recentOrders.map(
-                    (order) => (
-                      <tr
-                        key={order.id}
-                        className="hover:bg-gray-50/50 transition-colors"
-                      >
-                        <td className="p-3">
-                          <span className="font-mono text-xs font-bold text-pet-blue bg-blue-50/50 px-2 py-1 rounded">
-                            #{order.id}
-                          </span>
-                        </td>
+                  recentOrders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="hover:bg-gray-50/50 transition-colors"
+                    >
+                      <td className="p-3">
+                        <span className="font-mono text-xs font-bold text-pet-blue bg-blue-50/50 px-2 py-1 rounded">
+                          #{order.id}
+                        </span>
+                      </td>
 
-                        <td className="p-3">
-                          <div className="font-medium text-gray-800">
-                            {
-                              order.shippingName
-                            }
-                          </div>
-                        </td>
+                      <td className="p-3">
+                        <div className="font-medium text-gray-800">
+                          {order.shippingName}
+                        </div>
+                      </td>
 
-                        <td className="p-3 font-black text-gray-900">
-                          {formatPrice(
-                            toNumber(
-                              order.totalAmount,
-                            ),
-                          )}
-                        </td>
+                      <td className="p-3 font-black text-gray-900">
+                        {formatPrice(toNumber(order.totalAmount))}
+                      </td>
 
-                        <td className="p-3 text-center">
-                          {getStatusBadge(
-                            order.paymentStatus,
-                          )}
-                        </td>
-                      </tr>
-                    ),
-                  )
+                      <td className="p-3 text-center">
+                        {getStatusBadge(order.paymentStatus)}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
