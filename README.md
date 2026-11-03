@@ -73,8 +73,6 @@ The system consists of:
 
 ## Screenshots / Demo
 
-> Add screenshots to the `docs/screenshots/` folder, then update the image paths below.
-
 | Home | Shop | Product Detail |
 |:---:|:---:|:---:|
 | ![Home](backend\docs\screenshots\home.png) | ![Shop](backend\docs\screenshots\product-list.png) | ![Product](backend\docs\screenshots\product-detail.png) |
